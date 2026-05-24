@@ -16,6 +16,7 @@
     "@earendil-works/pi-ai": "^0.75.5",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",
+    "diff": "^9.0.0",
     "react": "^19.2.6",
     "zustand": "^5.0.13"
   },

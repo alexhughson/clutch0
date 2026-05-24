@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
-import type { Context } from "@earendil-works/pi-ai";
+import type { Context, Tool } from "@earendil-works/pi-ai";
 import type { FilePath } from "../../types";
+import { defaultSystemPrompt } from "./prompts";
 
 export const MAX_FILE_CONTEXT_CHARACTERS = 60_000;
 export const MAX_TOTAL_FILE_CONTEXT_CHARACTERS = 200_000;
@@ -10,6 +11,8 @@ export type BuildLlmContextOptions = {
   question: string;
   selectedFilePaths: readonly FilePath[];
   root?: string;
+  systemPrompt?: string;
+  tools?: Tool[];
 };
 
 export type LlmFileContext = {
@@ -29,13 +32,14 @@ export async function buildLlmContext({
   question,
   selectedFilePaths,
   root = process.cwd(),
+  systemPrompt = defaultSystemPrompt,
+  tools,
 }: BuildLlmContextOptions): Promise<BuiltLlmContext> {
   const files = await readSelectedFiles({ root, selectedFilePaths });
 
   return {
     context: {
-      systemPrompt:
-        "You are Clutch, a concise coding assistant. Answer the user's question using the selected files when they are relevant. If file context is missing or truncated, say so when it affects the answer.",
+      systemPrompt,
       messages: [
         {
           role: "user",
@@ -43,6 +47,7 @@ export async function buildLlmContext({
           timestamp: Date.now(),
         },
       ],
+      tools,
     },
     files,
   };

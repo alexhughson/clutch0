@@ -1,7 +1,7 @@
 import type { KeyEvent } from "@opentui/core";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import { NoFileSelector } from "../../lib/inputLineParser";
-import { streamLlmResponse } from "../../lib/llm/streamResponse";
+import { streamLlmInteraction } from "../../lib/llm/streamResponse";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
@@ -189,17 +189,22 @@ function submitQuestion(event: KeyEvent) {
     return;
   }
 
-  void streamLlmResponse({
+  void streamLlmInteraction({
     question,
     selectedFilePaths,
     onDelta: (delta) => {
       useAppStore.getState().actions.response.appendDelta({ delta, requestId });
     },
   }).then(
-    (responseText) => {
-      useAppStore
-        .getState()
-        .actions.response.finish({ requestId, responseText });
+    ({ patch, responseText }) => {
+      const actions = useAppStore.getState().actions.response;
+      actions.finish({ requestId, responseText });
+      if (patch !== null) {
+        actions.setPatch({
+          patch: { ...patch, applyStatus: "pending" },
+          requestId,
+        });
+      }
     },
     (error: unknown) => {
       useAppStore.getState().actions.response.fail({

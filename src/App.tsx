@@ -26,7 +26,7 @@ export function App({ filePaths }: AppProps) {
         width: "100%",
       }}
     >
-      <text>React + Zustand OpenTUI demo</text>
+      <text>Clutch</text>
       <SelectedFilesList selectedFilePaths={screen.selectedFilePaths} />
       <MessageComposer composeScreen={screen} filePaths={filePaths} />
     </box>

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { PatchReviewState } from "../lib/patch/types";
 import type { FilePath } from "../types";
 
 export type AppScreen =
@@ -14,6 +15,7 @@ export type LlmRequestStatus = "loading" | "streaming" | "done" | "error";
 type LlmRequestBase = {
   filePaths: FilePath[];
   id: number;
+  patch?: PatchReviewState;
   question: string;
   responseText: string;
 };
@@ -65,12 +67,20 @@ type AppActions = {
   };
   navigation: {
     clearResponseAndMessage: () => void;
+    rejectResponse: () => void;
     showComposer: () => void;
   };
   response: {
     appendDelta: (options: { delta: string; requestId: number }) => void;
     fail: (options: { errorMessage: string; requestId: number }) => void;
+    failPatchApply: (options: {
+      errorMessage: string;
+      requestId: number;
+    }) => void;
     finish: (options: { requestId: number; responseText: string }) => void;
+    finishPatchApply: (options: { requestId: number }) => void;
+    setPatch: (options: { patch: PatchReviewState; requestId: number }) => void;
+    startPatchApply: (options: { requestId: number }) => void;
   };
 };
 
@@ -152,6 +162,20 @@ export const useAppStore = create<AppState>((set, get) => ({
               }
             : state,
         ),
+      rejectResponse: () =>
+        set((state) =>
+          state.screen.name === "response"
+            ? {
+                screen: {
+                  ...state.screen.returnToCompose,
+                  composer: {
+                    cursorPosition: 0,
+                    message: "",
+                  },
+                },
+              }
+            : state,
+        ),
       showComposer: () =>
         set((state) =>
           state.screen.name === "response"
@@ -180,6 +204,22 @@ export const useAppStore = create<AppState>((set, get) => ({
               })
             : state,
         ),
+      failPatchApply: ({ errorMessage, requestId }) =>
+        set((state) => {
+          const request = getActiveLlmRequest(state, requestId);
+          if (request?.patch === undefined) {
+            return state;
+          }
+
+          return setActiveLlmRequest(state, {
+            ...request,
+            patch: {
+              ...request.patch,
+              applyErrorMessage: errorMessage,
+              applyStatus: "apply-error",
+            },
+          });
+        }),
       finish: ({ requestId, responseText }) =>
         set((state) =>
           isActiveInProgressLlmRequest(state, requestId)
@@ -190,6 +230,50 @@ export const useAppStore = create<AppState>((set, get) => ({
               })
             : state,
         ),
+      finishPatchApply: ({ requestId }) =>
+        set((state) => {
+          const request = getActiveLlmRequest(state, requestId);
+          if (request?.patch === undefined) {
+            return state;
+          }
+
+          return setActiveLlmRequest(state, {
+            ...request,
+            patch: {
+              ...request.patch,
+              applyErrorMessage: undefined,
+              applyStatus: "applied",
+            },
+          });
+        }),
+      setPatch: ({ patch, requestId }) =>
+        set((state) => {
+          const request = getActiveLlmRequest(state, requestId);
+          if (request === null) {
+            return state;
+          }
+
+          return setActiveLlmRequest(state, {
+            ...request,
+            patch,
+          });
+        }),
+      startPatchApply: ({ requestId }) =>
+        set((state) => {
+          const request = getActiveLlmRequest(state, requestId);
+          if (request?.patch === undefined) {
+            return state;
+          }
+
+          return setActiveLlmRequest(state, {
+            ...request,
+            patch: {
+              ...request.patch,
+              applyErrorMessage: undefined,
+              applyStatus: "applying",
+            },
+          });
+        }),
     },
   },
   nextLlmRequestId: 1,
@@ -210,16 +294,24 @@ function isActiveInProgressLlmRequest(
   );
 }
 
+function getActiveLlmRequest(
+  state: AppState,
+  requestId: number,
+): LlmRequestState | null {
+  return state.screen.name === "response" &&
+    state.screen.request.id === requestId
+    ? state.screen.request
+    : null;
+}
+
 function setActiveLlmRequest(
-  state: AppState & {
-    screen: {
-      name: "response";
-      request: InProgressLlmRequestState;
-      returnToCompose: ComposeScreenState;
-    };
-  },
+  state: AppState,
   request: LlmRequestState,
-): Pick<AppState, "screen"> {
+): AppState | Pick<AppState, "screen"> {
+  if (state.screen.name !== "response") {
+    return state;
+  }
+
   return {
     screen: {
       ...state.screen,
