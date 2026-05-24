@@ -2,14 +2,14 @@ import type { KeyEvent } from "@opentui/core";
 import { getKeyAction, type KeyBinding } from "../../lib/keymap";
 
 export type MessageComposerKeyAction =
-  | "accept-file-selection"
+  | "confirm"
   | "select-next-file"
   | "select-previous-file";
 
 const messageComposerKeyBindings: KeyBinding<MessageComposerKeyAction>[] = [
-  { name: "return", action: "accept-file-selection" },
-  { name: "kpenter", action: "accept-file-selection" },
-  { name: "linefeed", action: "accept-file-selection" },
+  { name: "return", action: "confirm" },
+  { name: "kpenter", action: "confirm" },
+  { name: "linefeed", action: "confirm" },
   { name: "down", action: "select-next-file" },
   { name: "n", ctrl: true, action: "select-next-file" },
   { name: "up", action: "select-previous-file" },

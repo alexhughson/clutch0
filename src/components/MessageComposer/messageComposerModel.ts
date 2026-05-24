@@ -6,7 +6,7 @@ import {
   NoFileSelector,
   type FileSelectorMatchResult,
 } from "../../lib/inputLineParser";
-import type { AppState } from "../../store/appStore";
+import type { ComposeScreenState } from "../../store/appStore";
 import type { FilePath, HighlightedFilePath } from "../../types";
 
 export type FileSuggestionState = {
@@ -106,22 +106,21 @@ export function getFileSuggestionState({
   };
 }
 
-export function getFileSuggestionStateFromAppState({
+export function getFileSuggestionStateFromComposeScreen({
   filePaths,
-  state,
+  highlightedFilePath,
+  screen,
 }: {
   filePaths: readonly FilePath[];
-  state: Pick<
-    AppState,
-    "cursorPosition" | "highlightedFilePath" | "message" | "selectedFilePaths"
-  >;
+  highlightedFilePath: HighlightedFilePath;
+  screen: ComposeScreenState;
 }): FileSuggestionState {
   return getFileSuggestionState({
-    cursorPosition: state.cursorPosition,
+    cursorPosition: screen.composer.cursorPosition,
     filePaths,
-    highlightedFilePath: state.highlightedFilePath,
-    message: state.message,
-    selectedFilePaths: state.selectedFilePaths,
+    highlightedFilePath,
+    message: screen.composer.message,
+    selectedFilePaths: screen.selectedFilePaths,
   });
 }
 

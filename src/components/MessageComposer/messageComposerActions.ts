@@ -1,6 +1,7 @@
 import type { KeyEvent } from "@opentui/core";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import { NoFileSelector } from "../../lib/inputLineParser";
+import { streamLlmResponse } from "../../lib/llm/streamResponse";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
@@ -12,68 +13,54 @@ import type {
 import { getMessageComposerKeyAction } from "./messageComposerKeymap";
 import {
   getCursorPositionAfterInput,
-  getFileSuggestionState,
-  getFileSuggestionStateFromAppState,
+  getFileSuggestionStateFromComposeScreen,
 } from "./messageComposerModel";
 
-export function updateMessage({
-  filePaths,
-  nextMessage,
-}: {
-  filePaths: readonly FilePath[];
-  nextMessage: string;
-}) {
+export function updateMessage({ nextMessage }: { nextMessage: string }) {
   const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
+
   const nextCursorPosition = getCursorPositionAfterInput({
     nextMessage,
-    previousCursorPosition: currentState.cursorPosition,
-    previousMessage: currentState.message,
-  });
-  const nextSuggestionState = getFileSuggestionState({
-    cursorPosition: nextCursorPosition,
-    filePaths,
-    highlightedFilePath: currentState.highlightedFilePath,
-    message: nextMessage,
-    selectedFilePaths: currentState.selectedFilePaths,
+    previousCursorPosition: currentState.screen.composer.cursorPosition,
+    previousMessage: currentState.screen.composer.message,
   });
 
-  currentState.setComposerState({
+  currentState.actions.compose.setComposerState({
     cursorPosition: nextCursorPosition,
-    highlightedFilePath: nextSuggestionState.highlightedFilePath,
     message: nextMessage,
   });
 }
 
 export function updateCursorPosition({
   cursorPosition,
-  filePaths,
 }: {
   cursorPosition: number;
-  filePaths: readonly FilePath[];
 }) {
   const currentState = useAppStore.getState();
-  const nextSuggestionState = getFileSuggestionState({
-    cursorPosition,
-    filePaths,
-    highlightedFilePath: currentState.highlightedFilePath,
-    message: currentState.message,
-    selectedFilePaths: currentState.selectedFilePaths,
-  });
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
 
-  currentState.setComposerState({
+  currentState.actions.compose.setComposerState({
     cursorPosition,
-    highlightedFilePath: nextSuggestionState.highlightedFilePath,
-    message: currentState.message,
+    message: currentState.screen.composer.message,
   });
 }
 
-/** Consumes suggestion keys only while the cursor is inside an @file selector. */
-export function handleFileSelectorKeyDown({
+/** Handles composer keyboard shortcuts for file selection and message submission. */
+export function handleMessageComposerKeyDown({
   event,
   filePaths,
+  highlightedFilePath,
+  setHighlightedFilePath,
 }: {
   event: KeyEvent;
   filePaths: readonly FilePath[];
+  highlightedFilePath: HighlightedFilePath;
+  setHighlightedFilePath: (highlightedFilePath: HighlightedFilePath) => void;
 }) {
   const action = getMessageComposerKeyAction(event);
   if (action === null) {
@@ -81,20 +68,29 @@ export function handleFileSelectorKeyDown({
   }
 
   const currentState = useAppStore.getState();
-  const suggestionState = getFileSuggestionStateFromAppState({
-    filePaths,
-    state: currentState,
-  });
-
-  if (suggestionState.fileSelectorMatch === NoFileSelector) {
+  if (currentState.screen.name !== "compose") {
     return;
   }
 
-  if (action === "accept-file-selection") {
+  const suggestionState = getFileSuggestionStateFromComposeScreen({
+    filePaths,
+    highlightedFilePath,
+    screen: currentState.screen,
+  });
+
+  if (suggestionState.fileSelectorMatch === NoFileSelector) {
+    if (action === "confirm") {
+      submitQuestion(event);
+    }
+    return;
+  }
+
+  if (action === "confirm") {
     acceptFileSelection({
       event,
       fileSelectorMatch: suggestionState.fileSelectorMatch,
       highlightedFilePath: suggestionState.highlightedFilePath,
+      setHighlightedFilePath,
     });
     return;
   }
@@ -107,6 +103,7 @@ export function handleFileSelectorKeyDown({
     direction: action === "select-next-file" ? "next" : "previous",
     event,
     highlightedFilePath: suggestionState.highlightedFilePath,
+    setHighlightedFilePath,
     visibleFilePaths: suggestionState.visibleFilePaths,
   });
 }
@@ -116,23 +113,32 @@ function acceptFileSelection({
   event,
   fileSelectorMatch,
   highlightedFilePath,
+  setHighlightedFilePath,
 }: {
   event: KeyEvent;
   fileSelectorMatch: FileSelectorMatch;
   highlightedFilePath: HighlightedFilePath;
+  setHighlightedFilePath: (highlightedFilePath: HighlightedFilePath) => void;
 }) {
   if (highlightedFilePath === null) {
     return;
   }
 
   const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
 
   event.preventDefault();
   event.stopPropagation();
-  currentState.acceptFileSelection({
+  setHighlightedFilePath(null);
+  currentState.actions.compose.acceptFileSelection({
     cursorPosition: fileSelectorMatch.start,
     filePath: highlightedFilePath,
-    message: removeStringRange(currentState.message, fileSelectorMatch),
+    message: removeStringRange(
+      currentState.screen.composer.message,
+      fileSelectorMatch,
+    ),
   });
 }
 
@@ -140,20 +146,66 @@ function moveHighlightedFile({
   direction,
   event,
   highlightedFilePath,
+  setHighlightedFilePath,
   visibleFilePaths,
 }: {
   direction: FileSelectionDirection;
   event: KeyEvent;
   highlightedFilePath: HighlightedFilePath;
+  setHighlightedFilePath: (highlightedFilePath: HighlightedFilePath) => void;
   visibleFilePaths: FilePath[];
 }) {
   event.preventDefault();
   event.stopPropagation();
-  useAppStore.getState().setHighlightedFilePath(
+  setHighlightedFilePath(
     moveFileHighlight({
       direction,
       highlightedFilePath,
       visibleFilePaths,
     }),
+  );
+}
+
+function submitQuestion(event: KeyEvent) {
+  const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
+
+  const question = currentState.screen.composer.message.trim();
+
+  if (question.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  const selectedFilePaths = [...currentState.screen.selectedFilePaths];
+  const requestId = currentState.actions.compose.startLlmRequest({
+    question,
+  });
+  if (requestId === null) {
+    return;
+  }
+
+  void streamLlmResponse({
+    question,
+    selectedFilePaths,
+    onDelta: (delta) => {
+      useAppStore.getState().actions.response.appendDelta({ delta, requestId });
+    },
+  }).then(
+    (responseText) => {
+      useAppStore
+        .getState()
+        .actions.response.finish({ requestId, responseText });
+    },
+    (error: unknown) => {
+      useAppStore.getState().actions.response.fail({
+        errorMessage: error instanceof Error ? error.message : String(error),
+        requestId,
+      });
+    },
   );
 }

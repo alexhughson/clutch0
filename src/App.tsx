@@ -1,3 +1,4 @@
+import { LlmResponseScreen } from "./components/LlmResponseScreen";
 import { MessageComposer } from "./components/MessageComposer/MessageComposer";
 import { SelectedFilesList } from "./components/SelectedFilesList";
 import { useAppStore } from "./store/appStore";
@@ -8,7 +9,11 @@ type AppProps = {
 };
 
 export function App({ filePaths }: AppProps) {
-  const selectedFilePaths = useAppStore((state) => state.selectedFilePaths);
+  const screen = useAppStore((state) => state.screen);
+
+  if (screen.name === "response") {
+    return <LlmResponseScreen request={screen.request} />;
+  }
 
   return (
     <box
@@ -22,8 +27,8 @@ export function App({ filePaths }: AppProps) {
       }}
     >
       <text>React + Zustand OpenTUI demo</text>
-      <SelectedFilesList selectedFilePaths={selectedFilePaths} />
-      <MessageComposer filePaths={filePaths} />
+      <SelectedFilesList selectedFilePaths={screen.selectedFilePaths} />
+      <MessageComposer composeScreen={screen} filePaths={filePaths} />
     </box>
   );
 }

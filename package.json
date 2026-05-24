@@ -13,6 +13,7 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "^0.75.5",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",
     "react": "^19.2.6",

@@ -1,10 +1,10 @@
 import type { CursorChangeEvent, KeyEvent } from "@opentui/core";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { NoFileSelector } from "../../lib/inputLineParser";
-import { useAppStore } from "../../store/appStore";
-import type { FilePath } from "../../types";
+import type { ComposeScreenState } from "../../store/appStore";
+import type { FilePath, HighlightedFilePath } from "../../types";
 import {
-  handleFileSelectorKeyDown,
+  handleMessageComposerKeyDown,
   updateCursorPosition,
   updateMessage,
 } from "./messageComposerActions";
@@ -13,49 +13,58 @@ import {
   type FileSuggestionState,
 } from "./messageComposerModel";
 
-export function useMessageComposerController(filePaths: readonly FilePath[]) {
-  const cursorPosition = useAppStore((state) => state.cursorPosition);
-  const highlightedFilePath = useAppStore((state) => state.highlightedFilePath);
-  const message = useAppStore((state) => state.message);
-  const selectedFilePaths = useAppStore((state) => state.selectedFilePaths);
+export function useMessageComposerController({
+  composeScreen,
+  filePaths,
+}: {
+  composeScreen: ComposeScreenState;
+  filePaths: readonly FilePath[];
+}) {
+  const [highlightedFilePath, setHighlightedFilePath] =
+    useState<HighlightedFilePath>(null);
 
   const suggestionState = useMemo(
     () =>
       getFileSuggestionState({
-        cursorPosition,
+        cursorPosition: composeScreen.composer.cursorPosition,
         filePaths,
         highlightedFilePath,
-        message,
-        selectedFilePaths,
+        message: composeScreen.composer.message,
+        selectedFilePaths: composeScreen.selectedFilePaths,
       }),
     [
-      cursorPosition,
+      composeScreen.composer.cursorPosition,
+      composeScreen.composer.message,
+      composeScreen.selectedFilePaths,
       filePaths,
       highlightedFilePath,
-      message,
-      selectedFilePaths,
     ],
   );
 
-  const handleInput = useCallback(
-    (nextMessage: string) => {
-      updateMessage({ filePaths, nextMessage });
-    },
-    [filePaths],
-  );
+  useEffect(() => {
+    if (highlightedFilePath !== suggestionState.highlightedFilePath) {
+      setHighlightedFilePath(suggestionState.highlightedFilePath);
+    }
+  }, [highlightedFilePath, suggestionState.highlightedFilePath]);
 
-  const handleCursorChange = useCallback(
-    (event: CursorChangeEvent) => {
-      updateCursorPosition({ cursorPosition: event.visualColumn, filePaths });
-    },
-    [filePaths],
-  );
+  const handleInput = useCallback((nextMessage: string) => {
+    updateMessage({ nextMessage });
+  }, []);
+
+  const handleCursorChange = useCallback((event: CursorChangeEvent) => {
+    updateCursorPosition({ cursorPosition: event.visualColumn });
+  }, []);
 
   const handleKeyDown = useCallback(
     (event: KeyEvent) => {
-      handleFileSelectorKeyDown({ event, filePaths });
+      handleMessageComposerKeyDown({
+        event,
+        filePaths,
+        highlightedFilePath: suggestionState.highlightedFilePath,
+        setHighlightedFilePath,
+      });
     },
-    [filePaths],
+    [filePaths, suggestionState.highlightedFilePath],
   );
 
   return {
@@ -65,7 +74,7 @@ export function useMessageComposerController(filePaths: readonly FilePath[]) {
       onInput: handleInput,
       onKeyDown: handleKeyDown,
     },
-    message,
+    message: composeScreen.composer.message,
   };
 }
 
