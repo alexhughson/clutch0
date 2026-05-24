@@ -1,58 +1,19 @@
+import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { applyPatchProposal } from "../lib/patch/patchEngine";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
-import type { FilePath } from "../types";
 
 type LlmResponseScreenProps = {
   request: LlmRequestState;
 };
 
+type ResponseActions = ReturnType<typeof useAppStore.getState>["actions"];
+
 export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
-  const clearResponseAndMessage = useAppStore(
-    (state) => state.actions.navigation.clearResponseAndMessage,
-  );
-  const rejectResponse = useAppStore(
-    (state) => state.actions.navigation.rejectResponse,
-  );
-  const showComposer = useAppStore(
-    (state) => state.actions.navigation.showComposer,
-  );
-  const responseActions = useAppStore((state) => state.actions.response);
+  const actions = useAppStore((state) => state.actions);
 
   useKeyboard((event) => {
-    if (request.patch !== undefined) {
-      if (event.name === "a") {
-        event.preventDefault();
-        event.stopPropagation();
-        void applyPatch(request, responseActions);
-        return;
-      }
-
-      if (event.name === "e") {
-        event.preventDefault();
-        event.stopPropagation();
-        showComposer();
-        return;
-      }
-
-      if (event.name === "escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        rejectResponse();
-        return;
-      }
-    }
-
-    if (event.name === "escape") {
-      showComposer();
-      return;
-    }
-
-    if (isEnterKey(event.name)) {
-      event.preventDefault();
-      event.stopPropagation();
-      clearResponseAndMessage();
-    }
+    handleResponseKey({ actions, event, request });
   });
 
   return (
@@ -66,7 +27,6 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
         width: "100%",
       }}
     >
-      <text>{getHelpText(request)}</text>
       <box
         title="Question"
         borderStyle="rounded"
@@ -74,24 +34,34 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
       >
         <text>{request.question}</text>
       </box>
-      <SubmittedFiles filePaths={request.filePaths} />
-      <box
-        title={`Response (${formatStatus(request.status)})`}
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        {request.responseText.length > 0 ? (
-          <text>{request.responseText}</text>
-        ) : (
-          <text>
-            {request.status === "loading" ? "Waiting for model..." : ""}
-          </text>
-        )}
-        {request.status === "error" ? (
-          <text style={{ fg: "red" }}>{request.errorMessage}</text>
-        ) : null}
-      </box>
+      {request.patch === undefined ? <TextResponse request={request} /> : null}
       {request.patch === undefined ? null : <PatchReview request={request} />}
+    </box>
+  );
+}
+
+function TextResponse({ request }: { request: LlmRequestState }) {
+  return (
+    <box
+      title={`Response (${formatStatus(request.status)})`}
+      bottomTitle={getTextResponseHotkeys(request)}
+      bottomTitleAlignment="right"
+      borderStyle="rounded"
+      style={{ border: true, flexDirection: "column", padding: 1 }}
+    >
+      {request.responseText.length > 0 ? (
+        <text>{request.responseText}</text>
+      ) : (
+        <text>
+          {request.status === "loading" ? "Waiting for model..." : ""}
+        </text>
+      )}
+      {request.status === "error" ? (
+        <text style={{ fg: "red" }}>{request.errorMessage}</text>
+      ) : null}
+      {request.savedContextItemId === undefined ? null : (
+        <text style={{ fg: "green" }}>Saved to context.</text>
+      )}
     </box>
   );
 }
@@ -105,6 +75,8 @@ function PatchReview({ request }: { request: LlmRequestState }) {
   return (
     <box
       title={`Patch (${formatPatchStatus(patch.applyStatus)})`}
+      bottomTitle={getPatchReviewHotkeys(request)}
+      bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{ border: true, flexDirection: "column", padding: 1 }}
     >
@@ -145,31 +117,151 @@ function PatchReview({ request }: { request: LlmRequestState }) {
       {patch.applyErrorMessage === undefined ? null : (
         <text style={{ fg: "red" }}>{patch.applyErrorMessage}</text>
       )}
-      <text style={{ fg: "gray" }}>
-        {patch.status === "valid"
-          ? "a apply · e edit message · Esc reject"
-          : "e edit message · Esc reject"}
-      </text>
+      {request.savedContextItemId === undefined ? null : (
+        <text style={{ fg: "green" }}>Saved to context.</text>
+      )}
     </box>
   );
 }
 
-function SubmittedFiles({ filePaths }: { filePaths: readonly FilePath[] }) {
-  if (filePaths.length === 0) {
-    return null;
+function handleResponseKey({
+  actions,
+  event,
+  request,
+}: {
+  actions: ResponseActions;
+  event: KeyEvent;
+  request: LlmRequestState;
+}) {
+  if (request.patch !== undefined) {
+    handlePatchReviewKey({ actions, event, request });
+    return;
   }
 
-  return (
-    <box
-      title="Selected files sent as context"
-      borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
-    >
-      {filePaths.map((filePath) => (
-        <text key={filePath}>@{filePath}</text>
-      ))}
-    </box>
-  );
+  handleTextResponseKey({ actions, event, request });
+}
+
+function handleTextResponseKey({
+  actions,
+  event,
+  request,
+}: {
+  actions: ResponseActions;
+  event: KeyEvent;
+  request: LlmRequestState;
+}) {
+  if (request.status === "loading" || request.status === "streaming") {
+    return;
+  }
+
+  if (request.status === "done" && event.name === "s") {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.response.saveTextToContext({ requestId: request.id });
+    return;
+  }
+
+  if (event.name === "escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.navigation.showComposer();
+    return;
+  }
+
+  if (isEnterKey(event.name)) {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.navigation.clearResponseAndMessage();
+  }
+}
+
+function handlePatchReviewKey({
+  actions,
+  event,
+  request,
+}: {
+  actions: ResponseActions;
+  event: KeyEvent;
+  request: LlmRequestState;
+}) {
+  const patch = request.patch;
+  if (patch === undefined || request.status !== "done") {
+    return;
+  }
+
+  if (patch.applyStatus === "applying" || patch.applyStatus === "applied") {
+    return;
+  }
+
+  if (patch.status === "valid" && event.name === "a") {
+    event.preventDefault();
+    event.stopPropagation();
+    void applyPatch(request, actions.response);
+    return;
+  }
+
+  if (
+    patch.status === "valid" &&
+    request.savedContextItemId === undefined &&
+    event.name === "s"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.response.saveDiffToContext({ requestId: request.id });
+    return;
+  }
+
+  if (event.name === "e") {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.navigation.showComposer();
+    return;
+  }
+
+  if (event.name === "escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.navigation.rejectResponse();
+  }
+}
+
+function getTextResponseHotkeys(request: LlmRequestState): string | undefined {
+  if (request.status === "loading" || request.status === "streaming") {
+    return undefined;
+  }
+
+  if (request.status === "error") {
+    return "Enter clear · Esc return";
+  }
+
+  return request.savedContextItemId === undefined
+    ? "s save to context · Enter clear · Esc return"
+    : "Enter clear · Esc return";
+}
+
+function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
+  const patch = request.patch;
+  if (
+    patch === undefined ||
+    request.status !== "done" ||
+    patch.applyStatus === "applying" ||
+    patch.applyStatus === "applied"
+  ) {
+    return undefined;
+  }
+
+  if (patch.status !== "valid") {
+    return "e edit message · Esc reject";
+  }
+
+  return [
+    patch.applyStatus === "apply-error" ? "a retry apply" : "a apply",
+    request.savedContextItemId === undefined ? "s save diff to context" : null,
+    "e edit message",
+    "Esc reject",
+  ]
+    .filter((item): item is string => item !== null)
+    .join(" · ");
 }
 
 function formatStatus(status: string): string {
@@ -188,17 +280,9 @@ function formatPatchStatus(status: string): string {
   return status;
 }
 
-function getHelpText(request: LlmRequestState): string {
-  return request.patch === undefined
-    ? "Clutch response — press Enter to clear, Esc to return"
-    : "Clutch patch — press a to apply, e to edit message, Esc to reject";
-}
-
 async function applyPatch(
   request: LlmRequestState,
-  responseActions: ReturnType<
-    typeof useAppStore.getState
-  >["actions"]["response"],
+  responseActions: ResponseActions["response"],
 ) {
   if (
     request.patch === undefined ||

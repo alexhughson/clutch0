@@ -4,7 +4,7 @@ import {
   type TextContent,
   type ToolCall,
 } from "@earendil-works/pi-ai";
-import type { FilePath } from "../../types";
+import type { ContextItem } from "../../types";
 import { validatePatchProposal } from "../patch/patchEngine";
 import type { PatchValidationResult } from "../patch/types";
 import { buildLlmContext } from "./context";
@@ -14,7 +14,8 @@ import { patchAwareSystemPrompt } from "./prompts";
 
 export type StreamLlmResponseOptions = {
   question: string;
-  selectedFilePaths: readonly FilePath[];
+  contextItems: readonly ContextItem[];
+  focusedContextItemId?: string | null;
   root?: string;
   signal?: AbortSignal;
   onDelta?: (delta: string) => void;
@@ -34,14 +35,16 @@ export async function streamLlmResponse(
 
 export async function streamLlmInteraction({
   question,
-  selectedFilePaths,
+  contextItems,
+  focusedContextItemId,
   root,
   signal,
   onDelta,
 }: StreamLlmResponseOptions): Promise<StreamLlmInteractionResult> {
   const { context } = await buildLlmContext({
     question,
-    selectedFilePaths,
+    contextItems,
+    focusedContextItemId,
     root,
     systemPrompt: patchAwareSystemPrompt,
     tools: [proposePatchTool],

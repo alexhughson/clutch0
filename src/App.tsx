@@ -1,6 +1,6 @@
 import { LlmResponseScreen } from "./components/LlmResponseScreen";
 import { MessageComposer } from "./components/MessageComposer/MessageComposer";
-import { SelectedFilesList } from "./components/SelectedFilesList";
+import { ContextItemsList } from "./components/ContextItemsList";
 import { useAppStore } from "./store/appStore";
 import type { FilePath } from "./types";
 
@@ -27,7 +27,10 @@ export function App({ filePaths }: AppProps) {
       }}
     >
       <text>Clutch</text>
-      <SelectedFilesList selectedFilePaths={screen.selectedFilePaths} />
+      <ContextItemsList
+        contextItems={screen.contextItems}
+        focusedContextItemId={screen.focusedContextItemId}
+      />
       <MessageComposer composeScreen={screen} filePaths={filePaths} />
     </box>
   );

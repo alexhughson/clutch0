@@ -7,7 +7,8 @@ import {
   type FileSelectorMatchResult,
 } from "../../lib/inputLineParser";
 import type { ComposeScreenState } from "../../store/appStore";
-import type { FilePath, HighlightedFilePath } from "../../types";
+import { getSelectedFilePaths } from "../../lib/context/contextItems";
+import type { ContextItem, FilePath, HighlightedFilePath } from "../../types";
 
 export type FileSuggestionState = {
   fileSelectorMatch: FileSelectorMatchResult;
@@ -78,13 +79,13 @@ export function getFileSuggestionState({
   filePaths,
   highlightedFilePath,
   message,
-  selectedFilePaths,
+  contextItems,
 }: {
+  contextItems: readonly ContextItem[];
   cursorPosition: number;
   filePaths: readonly FilePath[];
   highlightedFilePath: HighlightedFilePath;
   message: string;
-  selectedFilePaths: readonly FilePath[];
 }): FileSuggestionState {
   const fileSelectorMatch = getFileSelectorMatchAtCursor(
     message,
@@ -93,7 +94,7 @@ export function getFileSuggestionState({
   const visibleFilePaths = getVisibleFilePaths({
     filePaths,
     fileSelectorMatch,
-    selectedFilePaths,
+    selectedFilePaths: getSelectedFilePaths(contextItems),
   });
 
   return {
@@ -120,7 +121,7 @@ export function getFileSuggestionStateFromComposeScreen({
     filePaths,
     highlightedFilePath,
     message: screen.composer.message,
-    selectedFilePaths: screen.selectedFilePaths,
+    contextItems: screen.contextItems,
   });
 }
 

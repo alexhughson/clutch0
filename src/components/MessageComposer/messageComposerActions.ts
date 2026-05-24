@@ -1,10 +1,12 @@
 import type { KeyEvent } from "@opentui/core";
+import { getContextItemById } from "../../lib/context/contextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import { NoFileSelector } from "../../lib/inputLineParser";
 import { streamLlmInteraction } from "../../lib/llm/streamResponse";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
+  ContextItemAction,
   FilePath,
   FileSelectionDirection,
   FileSelectorMatch,
@@ -79,9 +81,7 @@ export function handleMessageComposerKeyDown({
   });
 
   if (suggestionState.fileSelectorMatch === NoFileSelector) {
-    if (action === "confirm") {
-      submitQuestion(event);
-    }
+    handleContextOrSubmitAction({ action, event });
     return;
   }
 
@@ -92,6 +92,10 @@ export function handleMessageComposerKeyDown({
       highlightedFilePath: suggestionState.highlightedFilePath,
       setHighlightedFilePath,
     });
+    return;
+  }
+
+  if (action !== "select-next-file" && action !== "select-previous-file") {
     return;
   }
 
@@ -166,6 +170,51 @@ function moveHighlightedFile({
   );
 }
 
+function handleContextOrSubmitAction({
+  action,
+  event,
+}: {
+  action: ReturnType<typeof getMessageComposerKeyAction>;
+  event: KeyEvent;
+}) {
+  const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
+
+  if (action === "confirm") {
+    submitQuestion(event);
+    return;
+  }
+
+  if (action === "select-next-file") {
+    event.preventDefault();
+    event.stopPropagation();
+    currentState.actions.compose.focusNextContextItem();
+    return;
+  }
+
+  if (action === "select-previous-file") {
+    event.preventDefault();
+    event.stopPropagation();
+    currentState.actions.compose.focusPreviousContextItem();
+    return;
+  }
+
+  if (action === "remove-focused-context-item") {
+    event.preventDefault();
+    event.stopPropagation();
+    runFocusedContextItemAction("remove");
+    return;
+  }
+
+  if (action === "run-focused-context-action") {
+    event.preventDefault();
+    event.stopPropagation();
+    runFocusedContextItemPrimaryAction();
+  }
+}
+
 function submitQuestion(event: KeyEvent) {
   const currentState = useAppStore.getState();
   if (currentState.screen.name !== "compose") {
@@ -181,7 +230,17 @@ function submitQuestion(event: KeyEvent) {
   event.preventDefault();
   event.stopPropagation();
 
-  const selectedFilePaths = [...currentState.screen.selectedFilePaths];
+  startPromptRequest(question);
+}
+
+function startPromptRequest(question: string) {
+  const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
+
+  const contextItems = [...currentState.screen.contextItems];
+  const focusedContextItemId = currentState.screen.focusedContextItemId;
   const requestId = currentState.actions.compose.startLlmRequest({
     question,
   });
@@ -191,7 +250,8 @@ function submitQuestion(event: KeyEvent) {
 
   void streamLlmInteraction({
     question,
-    selectedFilePaths,
+    contextItems,
+    focusedContextItemId,
     onDelta: (delta) => {
       useAppStore.getState().actions.response.appendDelta({ delta, requestId });
     },
@@ -213,4 +273,54 @@ function submitQuestion(event: KeyEvent) {
       });
     },
   );
+}
+
+function runFocusedContextItemPrimaryAction() {
+  const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
+
+  const focusedItem = getContextItemById(
+    currentState.screen.contextItems,
+    currentState.screen.focusedContextItemId,
+  );
+  const primaryAction = focusedItem
+    ?.getActions()
+    .find((action) => action.id !== "remove");
+  if (primaryAction === undefined) {
+    runFocusedContextItemAction("remove");
+    return;
+  }
+
+  runContextItemAction(primaryAction);
+}
+
+function runFocusedContextItemAction(actionId: string) {
+  const currentState = useAppStore.getState();
+  if (currentState.screen.name !== "compose") {
+    return;
+  }
+
+  const focusedItem = getContextItemById(
+    currentState.screen.contextItems,
+    currentState.screen.focusedContextItemId,
+  );
+  const action = focusedItem
+    ?.getActions()
+    .find((candidate) => candidate.id === actionId);
+  if (action === undefined) {
+    return;
+  }
+
+  runContextItemAction(action);
+}
+
+function runContextItemAction(action: ContextItemAction) {
+  void action.run({
+    removeContextItem: (itemId) => {
+      useAppStore.getState().actions.compose.removeContextItem({ itemId });
+    },
+    rerunPrompt: startPromptRequest,
+  });
 }

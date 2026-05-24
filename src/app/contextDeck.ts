@@ -1,0 +1,100 @@
+import { hasContextItem } from "../lib/context/contextItems";
+import type { ContextItem } from "../types";
+import type { ComposeScreenState } from "./appTypes";
+
+export class ContextDeck {
+  constructor(
+    readonly contextItems: readonly ContextItem[],
+    readonly focusedContextItemId: string | null,
+  ) {}
+
+  add(item: ContextItem): ContextDeck {
+    if (hasContextItem(this.contextItems, item.id)) {
+      return new ContextDeck(this.contextItems, item.id);
+    }
+
+    return new ContextDeck([...this.contextItems, item], item.id);
+  }
+
+  focus(direction: "next" | "previous"): ContextDeck {
+    if (this.contextItems.length === 0) {
+      return new ContextDeck(this.contextItems, null);
+    }
+
+    const currentIndex = this.contextItems.findIndex(
+      (item) => item.id === this.focusedContextItemId,
+    );
+    const offset = direction === "next" ? 1 : -1;
+    const nextIndex =
+      currentIndex === -1
+        ? direction === "next"
+          ? 0
+          : this.contextItems.length - 1
+        : (currentIndex + offset + this.contextItems.length) %
+          this.contextItems.length;
+
+    return new ContextDeck(
+      this.contextItems,
+      this.contextItems[nextIndex]?.id ?? null,
+    );
+  }
+
+  remove(itemId: string): ContextDeck {
+    const removedIndex = this.contextItems.findIndex(
+      (item) => item.id === itemId,
+    );
+    if (removedIndex === -1) {
+      return this;
+    }
+
+    const contextItems = this.contextItems.filter((item) => item.id !== itemId);
+    return new ContextDeck(
+      contextItems,
+      getFocusAfterRemoval({
+        contextItems,
+        previousFocusedContextItemId: this.focusedContextItemId,
+        removedIndex,
+        removedItemId: itemId,
+      }),
+    );
+  }
+
+  applyTo(composeScreen: ComposeScreenState): ComposeScreenState {
+    return {
+      ...composeScreen,
+      contextItems: [...this.contextItems],
+      focusedContextItemId: this.focusedContextItemId,
+    };
+  }
+
+  static fromComposeScreen(composeScreen: ComposeScreenState): ContextDeck {
+    return new ContextDeck(
+      composeScreen.contextItems,
+      composeScreen.focusedContextItemId,
+    );
+  }
+}
+
+function getFocusAfterRemoval({
+  contextItems,
+  previousFocusedContextItemId,
+  removedIndex,
+  removedItemId,
+}: {
+  contextItems: readonly ContextItem[];
+  previousFocusedContextItemId: string | null;
+  removedIndex: number;
+  removedItemId: string;
+}): string | null {
+  if (contextItems.length === 0) {
+    return null;
+  }
+
+  if (previousFocusedContextItemId !== removedItemId) {
+    return previousFocusedContextItemId;
+  }
+
+  return (
+    contextItems[Math.min(removedIndex, contextItems.length - 1)]?.id ?? null
+  );
+}

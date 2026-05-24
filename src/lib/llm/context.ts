@@ -1,27 +1,33 @@
+import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { resolve } from "node:path";
+import { promisify } from "node:util";
 import type { Context, Tool } from "@earendil-works/pi-ai";
-import type { FilePath } from "../../types";
+import {
+  MAX_TOTAL_FILE_CONTEXT_CHARACTERS,
+  getContextItemById,
+} from "../context/contextItems";
+import { loadFileList } from "../fileListLoader";
+import type { ContextItem, LlmFileContext } from "../../types";
 import { defaultSystemPrompt } from "./prompts";
 
-export const MAX_FILE_CONTEXT_CHARACTERS = 60_000;
-export const MAX_TOTAL_FILE_CONTEXT_CHARACTERS = 200_000;
+const execFileAsync = promisify(execFile);
+
+export { MAX_FILE_CONTEXT_CHARACTERS } from "../context/contextItems";
+export const MAX_AGENTS_CONTEXT_CHARACTERS = 40_000;
+export const MAX_DIFF_CONTEXT_CHARACTERS = 120_000;
+export const MAX_DIRECTORY_TREE_ENTRIES = 1_000;
 
 export type BuildLlmContextOptions = {
+  contextItems: readonly ContextItem[];
+  focusedContextItemId?: string | null;
   question: string;
-  selectedFilePaths: readonly FilePath[];
   root?: string;
   systemPrompt?: string;
   tools?: Tool[];
 };
 
-export type LlmFileContext = {
-  filePath: FilePath;
-  content: string;
-  status: "included" | "skipped";
-  truncated: boolean;
-  errorMessage?: string;
-};
+export type { LlmFileContext } from "../../types";
 
 export type BuiltLlmContext = {
   context: Context;
@@ -29,13 +35,19 @@ export type BuiltLlmContext = {
 };
 
 export async function buildLlmContext({
+  contextItems,
+  focusedContextItemId = null,
   question,
-  selectedFilePaths,
   root = process.cwd(),
   systemPrompt = defaultSystemPrompt,
   tools,
 }: BuildLlmContextOptions): Promise<BuiltLlmContext> {
-  const files = await readSelectedFiles({ root, selectedFilePaths });
+  const selectedContext = await formatSelectedContextItems({
+    contextItems,
+    focusedContextItemId,
+    root,
+  });
+  const automaticContext = await buildAutomaticContext({ root });
 
   return {
     context: {
@@ -43,127 +55,199 @@ export async function buildLlmContext({
       messages: [
         {
           role: "user",
-          content: formatUserMessage({ files, question }),
+          content: formatUserMessage({
+            automaticContext,
+            focusedContextItem:
+              focusedContextItemId === null
+                ? null
+                : getContextItemById(contextItems, focusedContextItemId),
+            question,
+            selectedContextText: selectedContext.text,
+          }),
           timestamp: Date.now(),
         },
       ],
       tools,
     },
-    files,
+    files: selectedContext.files,
   };
 }
 
-async function readSelectedFiles({
+async function formatSelectedContextItems({
+  contextItems,
+  focusedContextItemId,
   root,
-  selectedFilePaths,
 }: {
+  contextItems: readonly ContextItem[];
+  focusedContextItemId: string | null;
   root: string;
-  selectedFilePaths: readonly FilePath[];
-}): Promise<LlmFileContext[]> {
-  const absoluteRoot = resolve(root);
+}): Promise<{ files: LlmFileContext[]; text: string }> {
+  if (contextItems.length === 0) {
+    return { files: [], text: "No selected context items." };
+  }
+
   const files: LlmFileContext[] = [];
-  let remainingCharacters = MAX_TOTAL_FILE_CONTEXT_CHARACTERS;
+  const formattedItems: string[] = [];
+  let remainingFileCharacters = MAX_TOTAL_FILE_CONTEXT_CHARACTERS;
 
-  for (const filePath of selectedFilePaths) {
-    if (remainingCharacters <= 0) {
-      files.push({
-        filePath,
-        content: "",
-        status: "skipped",
-        truncated: false,
-        errorMessage:
-          "Skipped because the selected file context limit was reached.",
-      });
-      continue;
-    }
+  for (const item of contextItems) {
+    const formatted = await item.formatForLlm({
+      focused: item.id === focusedContextItemId,
+      remainingFileCharacters,
+      root,
+    });
 
-    const absoluteFilePath = resolve(absoluteRoot, filePath);
-    if (!isInsideRoot(absoluteRoot, absoluteFilePath)) {
-      files.push({
-        filePath,
-        content: "",
-        status: "skipped",
-        truncated: false,
-        errorMessage:
-          "Skipped because the path is outside the working directory.",
-      });
-      continue;
-    }
-
-    try {
-      const rawContent = await readFile(absoluteFilePath, "utf8");
-      if (rawContent.includes("\0")) {
-        files.push({
-          filePath,
-          content: "",
-          status: "skipped",
-          truncated: false,
-          errorMessage: "Skipped because the file appears to be binary.",
-        });
-        continue;
-      }
-
-      const characterLimit = Math.min(
-        MAX_FILE_CONTEXT_CHARACTERS,
-        remainingCharacters,
-      );
-      const content = rawContent.slice(0, characterLimit);
-      const truncated = rawContent.length > content.length;
-      remainingCharacters -= content.length;
-
-      files.push({
-        filePath,
-        content,
-        status: "included",
-        truncated,
-      });
-    } catch (error) {
-      files.push({
-        filePath,
-        content: "",
-        status: "skipped",
-        truncated: false,
-        errorMessage: error instanceof Error ? error.message : String(error),
-      });
+    formattedItems.push(formatted.text);
+    remainingFileCharacters -= formatted.consumedFileCharacters;
+    if (formatted.file !== undefined) {
+      files.push(formatted.file);
     }
   }
 
-  return files;
+  return { files, text: formattedItems.join("\n\n") };
 }
 
 function formatUserMessage({
-  files,
+  automaticContext,
+  focusedContextItem,
   question,
+  selectedContextText,
 }: {
-  files: readonly LlmFileContext[];
+  automaticContext: readonly AutomaticContextBlock[];
+  focusedContextItem: ContextItem | null;
   question: string;
+  selectedContextText: string;
 }): string {
-  const fileContext =
-    files.length === 0 ? "No selected files." : formatFiles(files);
+  const automaticContextText =
+    automaticContext.length === 0
+      ? "No automatic context available."
+      : formatAutomaticContext(automaticContext);
+  const focusedContextText =
+    focusedContextItem === null
+      ? "No focused context item."
+      : focusedContextItem.getListLabel();
 
-  return `Question:\n${question}\n\nSelected file context:\n${fileContext}`;
+  return `Question:\n${question}\n\nFocused context item:\n${focusedContextText}\n\nSelected context:\n${selectedContextText}\n\nAutomatic context:\n${automaticContextText}`;
 }
 
-function formatFiles(files: readonly LlmFileContext[]): string {
-  return files
-    .map((file) => {
-      if (file.status === "skipped") {
-        return `<file path=${JSON.stringify(file.filePath)} status="skipped">\n${file.errorMessage ?? "Skipped."}\n</file>`;
-      }
+type AutomaticContextBlock = {
+  content: string;
+  name: string;
+};
 
-      const truncatedNote = file.truncated
-        ? "\n[File truncated because the selected file context limit was reached.]"
-        : "";
+async function buildAutomaticContext({
+  root,
+}: {
+  root: string;
+}): Promise<AutomaticContextBlock[]> {
+  const [agents, diff, directoryTree] = await Promise.all([
+    readAgentsContext({ root }),
+    readCurrentDiffContext({ root }),
+    readDirectoryTreeContext({ root }),
+  ]);
 
-      return `<file path=${JSON.stringify(file.filePath)}>\n${file.content}${truncatedNote}\n</file>`;
-    })
+  return [agents, diff, directoryTree].filter(
+    (block): block is AutomaticContextBlock => block !== null,
+  );
+}
+
+async function readAgentsContext({
+  root,
+}: {
+  root: string;
+}): Promise<AutomaticContextBlock | null> {
+  try {
+    const content = await readFile(resolve(root, "AGENTS.md"), "utf8");
+    if (content.trim().length === 0) {
+      return null;
+    }
+
+    return {
+      name: "AGENTS.md",
+      content: truncateContent(content, MAX_AGENTS_CONTEXT_CHARACTERS),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function readCurrentDiffContext({
+  root,
+}: {
+  root: string;
+}): Promise<AutomaticContextBlock | null> {
+  try {
+    const stdout = await readGitDiff({ root, includeStaged: true }).catch(() =>
+      readGitDiff({ root, includeStaged: false }),
+    );
+    if (stdout.trim().length === 0) {
+      return null;
+    }
+
+    return {
+      name: "current_diff",
+      content: truncateContent(stdout, MAX_DIFF_CONTEXT_CHARACTERS),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function readGitDiff({
+  includeStaged,
+  root,
+}: {
+  includeStaged: boolean;
+  root: string;
+}): Promise<string> {
+  const { stdout } = await execFileAsync(
+    "git",
+    includeStaged
+      ? ["-C", resolve(root), "diff", "--no-ext-diff", "HEAD", "--", "."]
+      : ["-C", resolve(root), "diff", "--no-ext-diff", "--", "."],
+    { maxBuffer: MAX_DIFF_CONTEXT_CHARACTERS * 2 },
+  );
+
+  return stdout;
+}
+
+async function readDirectoryTreeContext({
+  root,
+}: {
+  root: string;
+}): Promise<AutomaticContextBlock | null> {
+  const filePaths = await loadFileList({ root });
+  if (filePaths.length === 0) {
+    return null;
+  }
+
+  const visibleFilePaths = filePaths.slice(0, MAX_DIRECTORY_TREE_ENTRIES);
+  const truncatedNote =
+    filePaths.length > visibleFilePaths.length
+      ? `\n[Directory tree truncated after ${visibleFilePaths.length} of ${filePaths.length} files.]`
+      : "";
+
+  return {
+    name: "directory_tree",
+    content: `${visibleFilePaths.join("\n")}${truncatedNote}`,
+  };
+}
+
+function formatAutomaticContext(
+  blocks: readonly AutomaticContextBlock[],
+): string {
+  return blocks
+    .map(
+      (block) =>
+        `<automatic_context name=${JSON.stringify(block.name)}>\n${block.content}\n</automatic_context>`,
+    )
     .join("\n\n");
 }
 
-function isInsideRoot(root: string, path: string): boolean {
-  const relativePath = relative(root, path);
-  return (
-    relativePath === "" ||
-    (!relativePath.startsWith("..") && !isAbsolute(relativePath))
-  );
+function truncateContent(content: string, maxCharacters: number): string {
+  if (content.length <= maxCharacters) {
+    return content;
+  }
+
+  return `${content.slice(0, maxCharacters)}\n[Context truncated.]`;
 }

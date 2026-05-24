@@ -3,6 +3,8 @@ import { getKeyAction, type KeyBinding } from "../../lib/keymap";
 
 export type MessageComposerKeyAction =
   | "confirm"
+  | "remove-focused-context-item"
+  | "run-focused-context-action"
   | "select-next-file"
   | "select-previous-file";
 
@@ -14,6 +16,8 @@ const messageComposerKeyBindings: KeyBinding<MessageComposerKeyAction>[] = [
   { name: "n", ctrl: true, action: "select-next-file" },
   { name: "up", action: "select-previous-file" },
   { name: "p", ctrl: true, action: "select-previous-file" },
+  { name: "x", ctrl: true, action: "remove-focused-context-item" },
+  { name: "r", ctrl: true, action: "run-focused-context-action" },
 ];
 
 export function getMessageComposerKeyAction(

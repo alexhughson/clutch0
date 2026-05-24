@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { createFileContextItem } from "../../lib/context/contextItems";
 import { NoFileSelector } from "../../lib/inputLineParser";
 import {
   getCursorPositionAfterInput,
@@ -13,7 +14,7 @@ test("derives visible files for the active file selector", () => {
     filePaths,
     highlightedFilePath: null,
     message: "hey @src",
-    selectedFilePaths: [],
+    contextItems: [],
   });
 
   expect(suggestionState.fileSelectorMatch).toEqual({
@@ -34,7 +35,7 @@ test("excludes already selected files from visible files", () => {
     filePaths,
     highlightedFilePath: "src/index.tsx",
     message: "@src",
-    selectedFilePaths: ["src/index.tsx"],
+    contextItems: [createFileContextItem("src/index.tsx")],
   });
 
   expect(suggestionState.visibleFilePaths).toEqual(["src/lib/fileFilter.ts"]);
@@ -47,7 +48,7 @@ test("does not derive file suggestions without an active selector", () => {
     filePaths,
     highlightedFilePath: "src/index.tsx",
     message: "hello",
-    selectedFilePaths: [],
+    contextItems: [],
   });
 
   expect(suggestionState.fileSelectorMatch).toBe(NoFileSelector);
