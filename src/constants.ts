@@ -1,0 +1,1 @@
+export const MAX_VISIBLE_FILE_SUGGESTIONS = 10;
