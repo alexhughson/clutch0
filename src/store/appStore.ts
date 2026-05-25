@@ -5,12 +5,13 @@ import type { AppState } from "../app/appTypes";
 
 export type {
   AppActions,
-  AppScreen,
+  AppTask,
   AppState,
   ComposerState,
   ComposeScreenState,
   LlmRequestState,
   LlmRequestStatus,
+  WorkspaceState,
 } from "../app/appTypes";
 
 /**

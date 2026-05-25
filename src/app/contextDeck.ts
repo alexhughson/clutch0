@@ -39,6 +39,19 @@ export class ContextDeck {
     );
   }
 
+  replace(item: ContextItem): ContextDeck {
+    if (!hasContextItem(this.contextItems, item.id)) {
+      return this;
+    }
+
+    return new ContextDeck(
+      this.contextItems.map((contextItem) =>
+        contextItem.id === item.id ? item : contextItem,
+      ),
+      this.focusedContextItemId,
+    );
+  }
+
   remove(itemId: string): ContextDeck {
     const removedIndex = this.contextItems.findIndex(
       (item) => item.id === itemId,

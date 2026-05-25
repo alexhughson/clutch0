@@ -1,15 +1,17 @@
 import type { PatchReviewState } from "../lib/patch/types";
 import type { ContextItem, FilePath } from "../types";
 
-export type AppScreen =
-  | ComposeScreenState
-  | {
-      name: "response";
-      request: LlmRequestState;
-      returnToCompose: ComposeScreenState;
-    };
+export type AppTask =
+  | ContextItemViewerTaskState
+  | FindFilesTaskState
+  | ResponseTaskState;
 
 export type LlmRequestStatus = "loading" | "streaming" | "done" | "error";
+
+export type ContextItemReplacementTarget = {
+  contextItemId: string;
+  expectedResult: "diff" | "text";
+};
 
 type LlmRequestBase = {
   contextItems: ContextItem[];
@@ -17,6 +19,7 @@ type LlmRequestBase = {
   id: number;
   patch?: PatchReviewState;
   question: string;
+  replacement?: ContextItemReplacementTarget;
   responseText: string;
   savedContextItemId?: string;
 };
@@ -44,18 +47,53 @@ export type ComposerState = {
   message: string;
 };
 
-export type ComposeScreenState = {
+export type WorkspaceState = {
   composer: ComposerState;
   contextItems: ContextItem[];
   focusedContextItemId: string | null;
-  name: "compose";
 };
+
+export type ComposeScreenState = WorkspaceState;
+
+export type RelevantFileCandidate = {
+  confidence?: "high" | "low" | "medium";
+  path: FilePath;
+  reason: string;
+};
+
+export type ResponseTaskState = {
+  kind: "response";
+  request: LlmRequestState;
+};
+
+export type ContextItemViewerTaskState = {
+  applyErrorMessage?: string;
+  applyStatus: "apply-error" | "applying" | "idle";
+  item: ContextItem;
+  kind: "context-item-viewer";
+};
+
+export type FindFilesTaskState = {
+  candidates: RelevantFileCandidate[];
+  errorMessage?: string;
+  goal: string;
+  hints: string[];
+  kind: "find-files";
+  searchActivity: string[];
+  selectedIndex: number;
+  status: "searching" | "results" | "error";
+};
+
+export type FindFilesScreenState = FindFilesTaskState;
+export type ContextItemViewerScreenState = ContextItemViewerTaskState;
+export type AppScreen = AppTask;
 
 export type AppState = {
   actions: AppActions;
+  activeTask: AppTask | null;
   nextContextItemId: number;
   nextLlmRequestId: number;
-  screen: AppScreen;
+  workspace: WorkspaceState;
 };
 
 export type AppActions = {
@@ -70,7 +108,29 @@ export type AppActions = {
     removeContextItem: (options: { itemId: string }) => void;
     removeFocusedContextItem: () => void;
     setComposerState: (composerState: ComposerState) => void;
-    startLlmRequest: (options: { question: string }) => number | null;
+    startLlmRequest: (options: {
+      question: string;
+      replacement?: ContextItemReplacementTarget;
+    }) => number | null;
+  };
+  contextItems: {
+    failSavedDiffApply: (options: {
+      errorMessage: string;
+      itemId: string;
+    }) => void;
+    finishSavedDiffApply: (options: { itemId: string }) => void;
+    openContextItem: (options: { itemId: string }) => void;
+    startSavedDiffApply: (options: { itemId: string }) => void;
+  };
+  findFiles: {
+    addAllCandidates: () => void;
+    addSearchActivity: (options: { line: string }) => void;
+    addSelectedCandidate: () => void;
+    fail: (options: { errorMessage: string }) => void;
+    finish: (options: { candidates: RelevantFileCandidate[] }) => void;
+    selectNext: () => void;
+    selectPrevious: () => void;
+    showSearch: (options: { goal: string; hints: string[] }) => void;
   };
   navigation: {
     clearResponseAndMessage: () => void;
@@ -84,7 +144,11 @@ export type AppActions = {
       errorMessage: string;
       requestId: number;
     }) => void;
-    finish: (options: { requestId: number; responseText: string }) => void;
+    finish: (options: {
+      requestId: number;
+      responseKind: "patch" | "text";
+      responseText: string;
+    }) => void;
     finishPatchApply: (options: { requestId: number }) => void;
     saveDiffToContext: (options: { requestId: number }) => void;
     saveTextToContext: (options: { requestId: number }) => void;

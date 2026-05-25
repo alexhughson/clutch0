@@ -1,6 +1,6 @@
-import { LlmResponseScreen } from "./components/LlmResponseScreen";
-import { MessageComposer } from "./components/MessageComposer/MessageComposer";
+import { renderTask } from "./app/taskRegistry";
 import { ContextItemsList } from "./components/ContextItemsList";
+import { MessageComposer } from "./components/MessageComposer/MessageComposer";
 import { useAppStore } from "./store/appStore";
 import type { FilePath } from "./types";
 
@@ -9,10 +9,11 @@ type AppProps = {
 };
 
 export function App({ filePaths }: AppProps) {
-  const screen = useAppStore((state) => state.screen);
+  const activeTask = useAppStore((state) => state.activeTask);
+  const workspace = useAppStore((state) => state.workspace);
 
-  if (screen.name === "response") {
-    return <LlmResponseScreen request={screen.request} />;
+  if (activeTask !== null) {
+    return renderTask(activeTask);
   }
 
   return (
@@ -28,10 +29,10 @@ export function App({ filePaths }: AppProps) {
     >
       <text>Clutch</text>
       <ContextItemsList
-        contextItems={screen.contextItems}
-        focusedContextItemId={screen.focusedContextItemId}
+        contextItems={workspace.contextItems}
+        focusedContextItemId={workspace.focusedContextItemId}
       />
-      <MessageComposer composeScreen={screen} filePaths={filePaths} />
+      <MessageComposer composeScreen={workspace} filePaths={filePaths} />
     </box>
   );
 }

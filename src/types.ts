@@ -8,8 +8,34 @@ export interface ContextItem {
     options: FormatContextItemForLlmOptions,
   ): Promise<FormattedContextItem>;
   getActions(): readonly ContextItemAction[];
+  getDetailView(
+    options: GetContextItemDetailViewOptions,
+  ): Promise<ContextItemDetailView | null>;
   getListLabel(): string;
+  getSummaryView(): ContextItemSummaryView;
 }
+
+export type ContextItemSummaryView = {
+  detail?: string;
+  title: string;
+};
+
+export type ContextItemDetailView =
+  | {
+      content: string;
+      kind: "text";
+      title: string;
+    }
+  | {
+      diffText: string;
+      kind: "diff";
+      summary: string;
+      title: string;
+    };
+
+export type GetContextItemDetailViewOptions = {
+  root: string;
+};
 
 export type ContextItemAction = {
   id: string;
@@ -19,8 +45,14 @@ export type ContextItemAction = {
 };
 
 export type ContextItemActionContext = {
+  applySavedDiff: (itemId: string) => void;
+  openContextItem: (itemId: string) => void;
   removeContextItem: (itemId: string) => void;
-  rerunPrompt: (prompt: string) => void;
+  rerunPrompt: (options: {
+    expectedResult: "diff" | "text";
+    prompt: string;
+    replaceContextItemId: string;
+  }) => void;
 };
 
 export type FormatContextItemForLlmOptions = {

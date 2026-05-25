@@ -1,10 +1,16 @@
 import type { KeyEvent } from "@opentui/core";
-import { getKeyAction, type KeyBinding } from "../../lib/keymap";
+import {
+  getKeyAction,
+  getVerticalNavigationDirection,
+  type KeyBinding,
+} from "../../lib/keymap";
 
 export type MessageComposerKeyAction =
+  | "apply-focused-context-item"
   | "confirm"
+  | "open-focused-context-item"
   | "remove-focused-context-item"
-  | "run-focused-context-action"
+  | "rerun-focused-context-item"
   | "select-next-file"
   | "select-previous-file";
 
@@ -12,16 +18,21 @@ const messageComposerKeyBindings: KeyBinding<MessageComposerKeyAction>[] = [
   { name: "return", action: "confirm" },
   { name: "kpenter", action: "confirm" },
   { name: "linefeed", action: "confirm" },
-  { name: "down", action: "select-next-file" },
-  { name: "n", ctrl: true, action: "select-next-file" },
-  { name: "up", action: "select-previous-file" },
-  { name: "p", ctrl: true, action: "select-previous-file" },
+  { name: "o", ctrl: true, action: "open-focused-context-item" },
+  { name: "r", ctrl: true, action: "rerun-focused-context-item" },
   { name: "x", ctrl: true, action: "remove-focused-context-item" },
-  { name: "r", ctrl: true, action: "run-focused-context-action" },
+  { name: "y", ctrl: true, action: "apply-focused-context-item" },
 ];
 
 export function getMessageComposerKeyAction(
   event: KeyEvent,
 ): MessageComposerKeyAction | null {
+  const verticalNavigationDirection = getVerticalNavigationDirection(event);
+  if (verticalNavigationDirection !== null) {
+    return verticalNavigationDirection === "next"
+      ? "select-next-file"
+      : "select-previous-file";
+  }
+
   return getKeyAction(event, messageComposerKeyBindings);
 }

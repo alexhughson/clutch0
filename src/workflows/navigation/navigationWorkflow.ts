@@ -15,27 +15,21 @@ export function createNavigationActions({
   return {
     clearResponseAndMessage: () => set(clearResponseAndMessage),
     rejectResponse: () => set(clearResponseAndMessage),
-    showComposer: () =>
-      set((state) =>
-        state.screen.name === "response"
-          ? { screen: state.screen.returnToCompose }
-          : state,
-      ),
+    showComposer: () => set({ activeTask: null }),
   };
 }
 
 function clearResponseAndMessage(
   state: AppState,
 ): Partial<AppState> | AppState {
-  return state.screen.name === "response"
-    ? {
-        screen: {
-          ...state.screen.returnToCompose,
-          composer: {
-            cursorPosition: 0,
-            message: "",
-          },
-        },
-      }
-    : state;
+  return {
+    activeTask: null,
+    workspace: {
+      ...state.workspace,
+      composer: {
+        cursorPosition: 0,
+        message: "",
+      },
+    },
+  };
 }

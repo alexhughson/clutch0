@@ -13,6 +13,7 @@ import type {
 export const MAX_FILE_CONTEXT_CHARACTERS = 60_000;
 export const MAX_TOTAL_FILE_CONTEXT_CHARACTERS = 200_000;
 export const MAX_SAVED_CONTEXT_CHARACTERS = 60_000;
+export const MAX_CONTEXT_ITEM_DETAIL_CHARACTERS = 20_000;
 
 export class FileContextItem implements ContextItem {
   readonly id: string;
@@ -23,11 +24,35 @@ export class FileContextItem implements ContextItem {
   }
 
   getListLabel(): string {
-    return `@${this.filePath}`;
+    return this.getSummaryView().title;
+  }
+
+  getSummaryView() {
+    return {
+      detail: "file",
+      title: `@${this.filePath}`,
+    };
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [removeContextItemAction(this.id)];
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getDetailView({ root }: { root: string }) {
+    const file = await readFileContext({
+      filePath: this.filePath,
+      remainingFileCharacters: MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
+      root,
+    });
+
+    return {
+      content:
+        file.status === "included"
+          ? `${file.content}${file.truncated ? "\n[File truncated.]" : ""}`
+          : (file.errorMessage ?? "Unable to read file."),
+      kind: "text" as const,
+      title: this.filePath,
+    };
   }
 
   async formatForLlm({
@@ -62,11 +87,34 @@ export class SavedLlmResponseContextItem implements ContextItem {
   ) {}
 
   getListLabel(): string {
-    return `LLM response: ${summarize(this.prompt)}`;
+    return this.getSummaryView().title;
+  }
+
+  getSummaryView() {
+    return {
+      detail: summarize(this.output),
+      title: `Prompt result: ${summarize(this.prompt)}`,
+    };
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [rerunPromptAction(this.prompt), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      rerunPromptAction({
+        expectedResult: "text",
+        prompt: this.prompt,
+        replaceContextItemId: this.id,
+      }),
+      removeContextItemAction(this.id),
+    ];
+  }
+
+  async getDetailView() {
+    return {
+      content: this.output,
+      kind: "text" as const,
+      title: `Output for: ${summarize(this.prompt)}`,
+    };
   }
 
   async formatForLlm({
@@ -93,11 +141,36 @@ export class SavedDiffContextItem implements ContextItem {
   ) {}
 
   getListLabel(): string {
-    return `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`;
+    return this.getSummaryView().title;
+  }
+
+  getSummaryView() {
+    return {
+      detail: summarize(this.prompt),
+      title: `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`,
+    };
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [rerunPromptAction(this.prompt), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      applySavedDiffAction(this.id),
+      rerunPromptAction({
+        expectedResult: "diff",
+        prompt: this.prompt,
+        replaceContextItemId: this.id,
+      }),
+      removeContextItemAction(this.id),
+    ];
+  }
+
+  async getDetailView() {
+    return {
+      diffText: this.diffText,
+      kind: "diff" as const,
+      summary: this.summary,
+      title: `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`,
+    };
   }
 
   async formatForLlm({
@@ -190,6 +263,24 @@ export function getContextItemById(
   return contextItems.find((item) => item.id === itemId) ?? null;
 }
 
+function openContextItemAction(itemId: string): ContextItemAction {
+  return {
+    id: "open",
+    key: "Ctrl+o",
+    label: "open",
+    run: (context) => context.openContextItem(itemId),
+  };
+}
+
+function applySavedDiffAction(itemId: string): ContextItemAction {
+  return {
+    id: "apply",
+    key: "Ctrl+y",
+    label: "apply",
+    run: (context) => context.applySavedDiff(itemId),
+  };
+}
+
 function removeContextItemAction(itemId: string): ContextItemAction {
   return {
     id: "remove",
@@ -199,12 +290,21 @@ function removeContextItemAction(itemId: string): ContextItemAction {
   };
 }
 
-function rerunPromptAction(prompt: string): ContextItemAction {
+function rerunPromptAction({
+  expectedResult,
+  prompt,
+  replaceContextItemId,
+}: {
+  expectedResult: "diff" | "text";
+  prompt: string;
+  replaceContextItemId: string;
+}): ContextItemAction {
   return {
     id: "rerun",
     key: "Ctrl+r",
-    label: "rerun prompt",
-    run: (context) => context.rerunPrompt(prompt),
+    label: "rerun",
+    run: (context) =>
+      context.rerunPrompt({ expectedResult, prompt, replaceContextItemId }),
   };
 }
 

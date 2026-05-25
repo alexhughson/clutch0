@@ -11,6 +11,22 @@ export type KeyBinding<Action extends string> = {
   hyper?: boolean;
 };
 
+export type VerticalNavigationDirection = "next" | "previous";
+
+const verticalNavigationKeyBindings: KeyBinding<VerticalNavigationDirection>[] =
+  [
+    { name: "down", action: "next" },
+    { name: "n", ctrl: true, action: "next" },
+    { name: "up", action: "previous" },
+    { name: "p", ctrl: true, action: "previous" },
+  ];
+
+export function getVerticalNavigationDirection(
+  event: KeyEvent,
+): VerticalNavigationDirection | null {
+  return getKeyAction(event, verticalNavigationKeyBindings);
+}
+
 export function getKeyAction<Action extends string>(
   event: KeyEvent,
   bindings: readonly KeyBinding<Action>[],

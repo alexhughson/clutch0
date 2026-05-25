@@ -1,6 +1,10 @@
 import type { KeyEvent } from "@opentui/core";
 import { expect, test } from "bun:test";
-import { getKeyAction, type KeyBinding } from "./keymap";
+import {
+  getKeyAction,
+  getVerticalNavigationDirection,
+  type KeyBinding,
+} from "./keymap";
 
 type TestAction = "next" | "previous";
 
@@ -23,6 +27,22 @@ test("requires modifiers to match exactly", () => {
     null,
   );
   expect(getKeyAction(keyEvent({ name: "n" }), bindings)).toBe(null);
+});
+
+test("maps shared vertical navigation keys", () => {
+  expect(getVerticalNavigationDirection(keyEvent({ name: "down" }))).toBe(
+    "next",
+  );
+  expect(
+    getVerticalNavigationDirection(keyEvent({ name: "n", ctrl: true })),
+  ).toBe("next");
+  expect(getVerticalNavigationDirection(keyEvent({ name: "up" }))).toBe(
+    "previous",
+  );
+  expect(
+    getVerticalNavigationDirection(keyEvent({ name: "p", ctrl: true })),
+  ).toBe("previous");
+  expect(getVerticalNavigationDirection(keyEvent({ name: "j" }))).toBe(null);
 });
 
 function keyEvent(event: Partial<KeyEvent> & { name: string }): KeyEvent {

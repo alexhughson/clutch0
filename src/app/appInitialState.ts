@@ -1,14 +1,15 @@
-import type { AppState, ComposeScreenState } from "./appTypes";
+import type { AppState, WorkspaceState } from "./appTypes";
 
 export function createInitialAppState(): Omit<AppState, "actions"> {
   return {
+    activeTask: null,
     nextContextItemId: 1,
     nextLlmRequestId: 1,
-    screen: createInitialComposeScreen(),
+    workspace: createInitialWorkspace(),
   };
 }
 
-export function createInitialComposeScreen(): ComposeScreenState {
+export function createInitialWorkspace(): WorkspaceState {
   return {
     composer: {
       cursorPosition: 0,
@@ -16,6 +17,7 @@ export function createInitialComposeScreen(): ComposeScreenState {
     },
     contextItems: [],
     focusedContextItemId: null,
-    name: "compose",
   };
 }
+
+export const createInitialComposeScreen = createInitialWorkspace;

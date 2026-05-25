@@ -1,5 +1,10 @@
 import { ContextDeck } from "../../app/contextDeck";
-import type { AppActions, AppState, ComposerState } from "../../app/appTypes";
+import type {
+  AppActions,
+  AppState,
+  ComposerState,
+  ContextItemReplacementTarget,
+} from "../../app/appTypes";
 import {
   createFileContextItem,
   getFileContextItemId,
@@ -29,58 +34,42 @@ export function createComposeActions({
         acceptFileSelection(state, { cursorPosition, filePath, message }),
       ),
     focusNextContextItem: () =>
-      set((state) =>
-        state.screen.name === "compose"
-          ? {
-              screen: ContextDeck.fromComposeScreen(state.screen)
-                .focus("next")
-                .applyTo(state.screen),
-            }
-          : state,
-      ),
+      set((state) => ({
+        workspace: ContextDeck.fromComposeScreen(state.workspace)
+          .focus("next")
+          .applyTo(state.workspace),
+      })),
     focusPreviousContextItem: () =>
-      set((state) =>
-        state.screen.name === "compose"
-          ? {
-              screen: ContextDeck.fromComposeScreen(state.screen)
-                .focus("previous")
-                .applyTo(state.screen),
-            }
-          : state,
-      ),
+      set((state) => ({
+        workspace: ContextDeck.fromComposeScreen(state.workspace)
+          .focus("previous")
+          .applyTo(state.workspace),
+      })),
     removeContextItem: ({ itemId }) =>
-      set((state) =>
-        state.screen.name === "compose"
-          ? {
-              screen: ContextDeck.fromComposeScreen(state.screen)
-                .remove(itemId)
-                .applyTo(state.screen),
-            }
-          : state,
-      ),
+      set((state) => ({
+        workspace: ContextDeck.fromComposeScreen(state.workspace)
+          .remove(itemId)
+          .applyTo(state.workspace),
+      })),
     removeFocusedContextItem: () =>
       set((state) =>
-        state.screen.name === "compose" &&
-        state.screen.focusedContextItemId !== null
+        state.workspace.focusedContextItemId !== null
           ? {
-              screen: ContextDeck.fromComposeScreen(state.screen)
-                .remove(state.screen.focusedContextItemId)
-                .applyTo(state.screen),
+              workspace: ContextDeck.fromComposeScreen(state.workspace)
+                .remove(state.workspace.focusedContextItemId)
+                .applyTo(state.workspace),
             }
           : state,
       ),
     setComposerState: (composer) =>
-      set((state) =>
-        state.screen.name === "compose"
-          ? {
-              screen: {
-                ...state.screen,
-                composer,
-              },
-            }
-          : state,
-      ),
-    startLlmRequest: ({ question }) => startLlmRequest({ get, question, set }),
+      set((state) => ({
+        workspace: {
+          ...state.workspace,
+          composer,
+        },
+      })),
+    startLlmRequest: ({ question, replacement }) =>
+      startLlmRequest({ get, question, replacement, set }),
   };
 }
 
@@ -96,18 +85,14 @@ function acceptFileSelection(
     message: string;
   },
 ): Partial<AppState> | AppState {
-  if (state.screen.name !== "compose") {
-    return state;
-  }
-
   const itemId = getFileContextItemId(filePath);
-  const contextItems = hasContextItem(state.screen.contextItems, itemId)
-    ? state.screen.contextItems
-    : [...state.screen.contextItems, createFileContextItem(filePath)];
+  const contextItems = hasContextItem(state.workspace.contextItems, itemId)
+    ? state.workspace.contextItems
+    : [...state.workspace.contextItems, createFileContextItem(filePath)];
 
   return {
-    screen: {
-      ...state.screen,
+    workspace: {
+      ...state.workspace,
       composer: {
         cursorPosition,
         message,
@@ -121,36 +106,39 @@ function acceptFileSelection(
 function startLlmRequest({
   get,
   question,
+  replacement,
   set,
 }: {
   get: GetAppState;
   question: string;
+  replacement?: ContextItemReplacementTarget;
   set: SetAppState;
 }): number | null {
   const state = get();
-
-  if (state.screen.name !== "compose") {
-    return null;
-  }
-
   const requestId = state.nextLlmRequestId;
-  const contextItems = [...state.screen.contextItems];
-  const focusedContextItemId = state.screen.focusedContextItemId;
+  const contextItems = state.workspace.contextItems.filter(
+    (item) => item.id !== replacement?.contextItemId,
+  );
+  const focusedContextItemId = contextItems.some(
+    (item) => item.id === state.workspace.focusedContextItemId,
+  )
+    ? state.workspace.focusedContextItemId
+    : null;
 
   set({
-    nextLlmRequestId: requestId + 1,
-    screen: {
-      name: "response",
+    activeTask: {
+      kind: "response",
       request: {
         contextItems,
         focusedContextItemId,
         id: requestId,
         question,
+        replacement,
         responseText: "",
         status: "loading",
       },
-      returnToCompose: state.screen,
     },
+    nextLlmRequestId: requestId + 1,
   });
 
   return requestId;
@@ -160,12 +148,10 @@ export function withComposerState(
   state: AppState,
   composer: ComposerState,
 ): Partial<AppState> | AppState {
-  return state.screen.name === "compose"
-    ? {
-        screen: {
-          ...state.screen,
-          composer,
-        },
-      }
-    : state;
+  return {
+    workspace: {
+      ...state.workspace,
+      composer,
+    },
+  };
 }

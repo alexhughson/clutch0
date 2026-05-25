@@ -2,7 +2,8 @@ import type { KeyEvent } from "@opentui/core";
 import { getContextItemById } from "../../lib/context/contextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import { NoFileSelector } from "../../lib/inputLineParser";
-import { streamLlmInteraction } from "../../lib/llm/streamResponse";
+import { applySavedDiffContextItem } from "../../workflows/contextItems/contextItemEffects";
+import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
@@ -20,14 +21,14 @@ import {
 
 export function updateMessage({ nextMessage }: { nextMessage: string }) {
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
   const nextCursorPosition = getCursorPositionAfterInput({
     nextMessage,
-    previousCursorPosition: currentState.screen.composer.cursorPosition,
-    previousMessage: currentState.screen.composer.message,
+    previousCursorPosition: currentState.workspace.composer.cursorPosition,
+    previousMessage: currentState.workspace.composer.message,
   });
 
   currentState.actions.compose.setComposerState({
@@ -42,13 +43,13 @@ export function updateCursorPosition({
   cursorPosition: number;
 }) {
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
   currentState.actions.compose.setComposerState({
     cursorPosition,
-    message: currentState.screen.composer.message,
+    message: currentState.workspace.composer.message,
   });
 }
 
@@ -70,14 +71,14 @@ export function handleMessageComposerKeyDown({
   }
 
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
   const suggestionState = getFileSuggestionStateFromComposeScreen({
     filePaths,
     highlightedFilePath,
-    screen: currentState.screen,
+    screen: currentState.workspace,
   });
 
   if (suggestionState.fileSelectorMatch === NoFileSelector) {
@@ -129,7 +130,7 @@ function acceptFileSelection({
   }
 
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
@@ -140,7 +141,7 @@ function acceptFileSelection({
     cursorPosition: fileSelectorMatch.start,
     filePath: highlightedFilePath,
     message: removeStringRange(
-      currentState.screen.composer.message,
+      currentState.workspace.composer.message,
       fileSelectorMatch,
     ),
   });
@@ -178,7 +179,7 @@ function handleContextOrSubmitAction({
   event: KeyEvent;
 }) {
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
@@ -201,6 +202,20 @@ function handleContextOrSubmitAction({
     return;
   }
 
+  if (action === "apply-focused-context-item") {
+    event.preventDefault();
+    event.stopPropagation();
+    runFocusedContextItemAction("apply");
+    return;
+  }
+
+  if (action === "open-focused-context-item") {
+    event.preventDefault();
+    event.stopPropagation();
+    runFocusedContextItemAction("open");
+    return;
+  }
+
   if (action === "remove-focused-context-item") {
     event.preventDefault();
     event.stopPropagation();
@@ -208,20 +223,20 @@ function handleContextOrSubmitAction({
     return;
   }
 
-  if (action === "run-focused-context-action") {
+  if (action === "rerun-focused-context-item") {
     event.preventDefault();
     event.stopPropagation();
-    runFocusedContextItemPrimaryAction();
+    runFocusedContextItemAction("rerun");
   }
 }
 
 function submitQuestion(event: KeyEvent) {
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
-  const question = currentState.screen.composer.message.trim();
+  const question = currentState.workspace.composer.message.trim();
 
   if (question.length === 0) {
     return;
@@ -230,81 +245,18 @@ function submitQuestion(event: KeyEvent) {
   event.preventDefault();
   event.stopPropagation();
 
-  startPromptRequest(question);
-}
-
-function startPromptRequest(question: string) {
-  const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
-    return;
-  }
-
-  const contextItems = [...currentState.screen.contextItems];
-  const focusedContextItemId = currentState.screen.focusedContextItemId;
-  const requestId = currentState.actions.compose.startLlmRequest({
-    question,
-  });
-  if (requestId === null) {
-    return;
-  }
-
-  void streamLlmInteraction({
-    question,
-    contextItems,
-    focusedContextItemId,
-    onDelta: (delta) => {
-      useAppStore.getState().actions.response.appendDelta({ delta, requestId });
-    },
-  }).then(
-    ({ patch, responseText }) => {
-      const actions = useAppStore.getState().actions.response;
-      actions.finish({ requestId, responseText });
-      if (patch !== null) {
-        actions.setPatch({
-          patch: { ...patch, applyStatus: "pending" },
-          requestId,
-        });
-      }
-    },
-    (error: unknown) => {
-      useAppStore.getState().actions.response.fail({
-        errorMessage: error instanceof Error ? error.message : String(error),
-        requestId,
-      });
-    },
-  );
-}
-
-function runFocusedContextItemPrimaryAction() {
-  const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
-    return;
-  }
-
-  const focusedItem = getContextItemById(
-    currentState.screen.contextItems,
-    currentState.screen.focusedContextItemId,
-  );
-  const primaryAction = focusedItem
-    ?.getActions()
-    .find((action) => action.id !== "remove");
-  if (primaryAction === undefined) {
-    runFocusedContextItemAction("remove");
-    return;
-  }
-
-  runContextItemAction(primaryAction);
+  startLlmRequest(question);
 }
 
 function runFocusedContextItemAction(actionId: string) {
   const currentState = useAppStore.getState();
-  if (currentState.screen.name !== "compose") {
+  if (currentState.activeTask !== null) {
     return;
   }
 
   const focusedItem = getContextItemById(
-    currentState.screen.contextItems,
-    currentState.screen.focusedContextItemId,
+    currentState.workspace.contextItems,
+    currentState.workspace.focusedContextItemId,
   );
   const action = focusedItem
     ?.getActions()
@@ -321,6 +273,18 @@ function runContextItemAction(action: ContextItemAction) {
     removeContextItem: (itemId) => {
       useAppStore.getState().actions.compose.removeContextItem({ itemId });
     },
-    rerunPrompt: startPromptRequest,
+    applySavedDiff: (itemId) => {
+      void applySavedDiffContextItem(itemId);
+    },
+    openContextItem: (itemId) => {
+      useAppStore.getState().actions.contextItems.openContextItem({ itemId });
+    },
+    rerunPrompt: ({ expectedResult, prompt, replaceContextItemId }) =>
+      startLlmRequest(prompt, {
+        replacement: {
+          contextItemId: replaceContextItemId,
+          expectedResult,
+        },
+      }),
   });
 }

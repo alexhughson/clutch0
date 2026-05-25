@@ -5,12 +5,14 @@ import {
   type ToolCall,
 } from "@earendil-works/pi-ai";
 import type { ContextItem } from "../../types";
-import { validatePatchProposal } from "../patch/patchEngine";
-import type { PatchValidationResult } from "../patch/types";
 import { buildLlmContext } from "./context";
 import { resolveLlmModel } from "./model";
-import { getPatchProposalFromToolCalls, proposePatchTool } from "./patchTool";
 import { patchAwareSystemPrompt } from "./prompts";
+import {
+  getLlmWorkflowTools,
+  routeLlmWorkflowToolCalls,
+} from "../../workflows/llmTools/toolRegistry";
+import type { LlmWorkflowToolResult } from "../../workflows/llmTools/types";
 
 export type StreamLlmResponseOptions = {
   question: string;
@@ -21,16 +23,18 @@ export type StreamLlmResponseOptions = {
   onDelta?: (delta: string) => void;
 };
 
-export type StreamLlmInteractionResult = {
-  patch: PatchValidationResult | null;
-  responseText: string;
-};
+export type StreamLlmInteractionResult =
+  | {
+      kind: "text";
+      responseText: string;
+    }
+  | ({ responseText: string } & LlmWorkflowToolResult);
 
 export async function streamLlmResponse(
   options: StreamLlmResponseOptions,
 ): Promise<string> {
   const result = await streamLlmInteraction(options);
-  return result.responseText;
+  return result.kind === "text" ? result.responseText : "";
 }
 
 export async function streamLlmInteraction({
@@ -47,7 +51,7 @@ export async function streamLlmInteraction({
     focusedContextItemId,
     root,
     systemPrompt: patchAwareSystemPrompt,
-    tools: [proposePatchTool],
+    tools: getLlmWorkflowTools(),
   });
   const model = resolveLlmModel();
   const eventStream = stream(model, context, { signal });
@@ -71,15 +75,20 @@ export async function streamLlmInteraction({
   const finalMessage = await eventStream.result();
   const finalText = getAssistantText(finalMessage);
   const responseText = finalText.length > 0 ? finalText : streamedText;
-  const patchProposal = getPatchProposalFromToolCalls(
-    getAssistantToolCalls(finalMessage),
-  );
+  const workflowResult = await routeLlmWorkflowToolCalls({
+    root,
+    toolCalls: getAssistantToolCalls(finalMessage),
+  });
+
+  if (workflowResult !== null) {
+    return {
+      ...workflowResult,
+      responseText,
+    };
+  }
 
   return {
-    patch:
-      patchProposal === null
-        ? null
-        : await validatePatchProposal({ proposal: patchProposal, root }),
+    kind: "text",
     responseText,
   };
 }

@@ -15,6 +15,24 @@ test("context deck adds and focuses context items", () => {
   expect(nextScreen.focusedContextItemId).toBe(item.id);
 });
 
+test("context deck replaces an existing item and preserves focus", () => {
+  const original = createFileContextItem("src/App.tsx");
+  const replacement = createFileContextItem("src/App.tsx");
+  const other = createFileContextItem("src/index.tsx");
+  const screen = {
+    ...createInitialComposeScreen(),
+    contextItems: [original, other],
+    focusedContextItemId: original.id,
+  };
+
+  const nextScreen = ContextDeck.fromComposeScreen(screen)
+    .replace(replacement)
+    .applyTo(screen);
+
+  expect(nextScreen.contextItems).toEqual([replacement, other]);
+  expect(nextScreen.focusedContextItemId).toBe(original.id);
+});
+
 test("context deck cycles focus and keeps focus valid after removal", () => {
   const first = createFileContextItem("src/App.tsx");
   const second = createFileContextItem("src/index.tsx");

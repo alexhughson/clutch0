@@ -1,5 +1,7 @@
 import type { AppActions, AppState } from "./appTypes";
 import { createComposeActions } from "../workflows/compose/composeWorkflow";
+import { createContextItemsActions } from "../workflows/contextItems/contextItemsWorkflow";
+import { createFindFilesActions } from "../workflows/findFiles/findFilesWorkflow";
 import { createNavigationActions } from "../workflows/navigation/navigationWorkflow";
 import { createResponseActions } from "../workflows/response/responseWorkflow";
 
@@ -21,6 +23,8 @@ export function createAppActions({
 }): AppActions {
   return {
     compose: createComposeActions({ get, set }),
+    contextItems: createContextItemsActions({ set }),
+    findFiles: createFindFilesActions({ set }),
     navigation: createNavigationActions({ set }),
     response: createResponseActions({ set }),
   };
