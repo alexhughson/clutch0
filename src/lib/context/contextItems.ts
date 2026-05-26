@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { PatchProposal } from "../patch/types";
 import type {
   ContextItem,
   ContextItemAction,
+  ContextItemSummaryState,
   FilePath,
   FormattedContextItem,
   FormatContextItemForLlmOptions,
@@ -14,12 +16,18 @@ export const MAX_FILE_CONTEXT_CHARACTERS = 60_000;
 export const MAX_TOTAL_FILE_CONTEXT_CHARACTERS = 200_000;
 export const MAX_SAVED_CONTEXT_CHARACTERS = 60_000;
 export const MAX_CONTEXT_ITEM_DETAIL_CHARACTERS = 20_000;
+export const MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS = 30_000;
+
+const MISSING_SUMMARY_STATE: ContextItemSummaryState = { status: "missing" };
 
 export class FileContextItem implements ContextItem {
   readonly id: string;
   readonly type = "file";
 
-  constructor(readonly filePath: FilePath) {
+  constructor(
+    readonly filePath: FilePath,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {
     this.id = getFileContextItemId(filePath);
   }
 
@@ -27,15 +35,44 @@ export class FileContextItem implements ContextItem {
     return this.getSummaryView().title;
   }
 
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
   getSummaryView() {
-    return {
-      detail: "file",
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: "File context",
       title: `@${this.filePath}`,
-    };
+    });
+  }
+
+  withSummaryState(summaryState: ContextItemSummaryState): FileContextItem {
+    return new FileContextItem(this.filePath, summaryState);
   }
 
   getActions(): readonly ContextItemAction[] {
     return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput({ root }: { root: string }) {
+    const file = await readFileContext({
+      filePath: this.filePath,
+      remainingFileCharacters: MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS,
+      root,
+    });
+    const content =
+      file.status === "included"
+        ? file.content
+        : (file.errorMessage ?? "Unable to read file.");
+    const sourceText = `File: ${this.filePath}\nStatus: ${file.status}\n\n${content}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: this.filePath,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
   }
 
   async getDetailView({ root }: { root: string }) {
@@ -84,17 +121,35 @@ export class SavedLlmResponseContextItem implements ContextItem {
     readonly output: string,
     readonly sourceRequestId: number,
     readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
   ) {}
 
   getListLabel(): string {
     return this.getSummaryView().title;
   }
 
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
   getSummaryView() {
-    return {
+    return getGeneratedSummaryView(this.summaryState, {
       detail: summarize(this.output),
       title: `Prompt result: ${summarize(this.prompt)}`,
-    };
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): SavedLlmResponseContextItem {
+    return new SavedLlmResponseContextItem(
+      this.id,
+      this.prompt,
+      this.output,
+      this.sourceRequestId,
+      this.createdAt,
+      summaryState,
+    );
   }
 
   getActions(): readonly ContextItemAction[] {
@@ -107,6 +162,18 @@ export class SavedLlmResponseContextItem implements ContextItem {
       }),
       removeContextItemAction(this.id),
     ];
+  }
+
+  async getSummarizationInput() {
+    const sourceText = `Prompt:\n${truncateContent(this.prompt, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nOutput:\n${truncateContent(this.output, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `Prompt result: ${summarize(this.prompt)}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
   }
 
   async getDetailView() {
@@ -138,17 +205,37 @@ export class SavedDiffContextItem implements ContextItem {
     readonly proposal: PatchProposal,
     readonly sourceRequestId: number,
     readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
   ) {}
 
   getListLabel(): string {
     return this.getSummaryView().title;
   }
 
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
   getSummaryView() {
-    return {
+    return getGeneratedSummaryView(this.summaryState, {
       detail: summarize(this.prompt),
       title: `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`,
-    };
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): SavedDiffContextItem {
+    return new SavedDiffContextItem(
+      this.id,
+      this.prompt,
+      this.summary,
+      this.diffText,
+      this.proposal,
+      this.sourceRequestId,
+      this.createdAt,
+      summaryState,
+    );
   }
 
   getActions(): readonly ContextItemAction[] {
@@ -162,6 +249,18 @@ export class SavedDiffContextItem implements ContextItem {
       }),
       removeContextItemAction(this.id),
     ];
+  }
+
+  async getSummarizationInput() {
+    const sourceText = `Prompt:\n${truncateContent(this.prompt, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nSummary:\n${truncateContent(this.summary, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nDiff:\n${truncateContent(this.diffText, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
   }
 
   async getDetailView() {
@@ -423,6 +522,48 @@ function isInsideRoot(root: string, path: string): boolean {
     relativePath === "" ||
     (!relativePath.startsWith("..") && !isAbsolute(relativePath))
   );
+}
+
+function getGeneratedSummaryView(
+  summaryState: ContextItemSummaryState,
+  fallback: { detail: string; title: string },
+) {
+  if (summaryState.status === "ready") {
+    return {
+      detail: summaryState.summary.details,
+      label: fallback.title,
+      status: summaryState.status,
+      title: summaryState.summary.oneLine,
+    };
+  }
+
+  if (summaryState.status === "pending") {
+    return {
+      detail: "Summarizing…",
+      label: fallback.title,
+      status: summaryState.status,
+      title: fallback.title,
+    };
+  }
+
+  if (summaryState.status === "error") {
+    return {
+      detail: `Summary unavailable: ${summaryState.errorMessage}`,
+      label: fallback.title,
+      status: summaryState.status,
+      title: fallback.title,
+    };
+  }
+
+  return {
+    ...fallback,
+    label: fallback.title,
+    status: summaryState.status,
+  };
+}
+
+function hashContent(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
 }
 
 function summarize(value: string): string {

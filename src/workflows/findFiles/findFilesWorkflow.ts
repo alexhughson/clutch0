@@ -1,4 +1,5 @@
 import { ContextDeck } from "../../app/contextDeck";
+import { applyAgentOutputUpdate } from "../../lib/agentOutput/agentOutputReducer";
 import type {
   AppActions,
   AppState,
@@ -23,20 +24,6 @@ export function createFindFilesActions({
 }): AppActions["findFiles"] {
   return {
     addAllCandidates: () => set(addAllCandidates),
-    addSearchActivity: ({ line }) =>
-      set((state) =>
-        state.activeTask?.kind === "find-files"
-          ? {
-              activeTask: {
-                ...state.activeTask,
-                searchActivity: [
-                  ...state.activeTask.searchActivity,
-                  line,
-                ].slice(-MAX_SEARCH_ACTIVITY_LINES),
-              },
-            }
-          : state,
-      ),
     addSelectedCandidate: () => set(addSelectedCandidate),
     fail: ({ errorMessage }) =>
       set((state) =>
@@ -63,16 +50,31 @@ export function createFindFilesActions({
             }
           : state,
       ),
+    recordAgentOutput: ({ update }) =>
+      set((state) =>
+        state.activeTask?.kind === "find-files"
+          ? {
+              activeTask: {
+                ...state.activeTask,
+                agentOutput: applyAgentOutputUpdate(
+                  state.activeTask.agentOutput,
+                  update,
+                  { maxBlocks: MAX_SEARCH_ACTIVITY_LINES },
+                ),
+              },
+            }
+          : state,
+      ),
     selectNext: () => set((state) => selectCandidate(state, "next")),
     selectPrevious: () => set((state) => selectCandidate(state, "previous")),
     showSearch: ({ goal, hints }) =>
       set({
         activeTask: {
+          agentOutput: [],
           candidates: [],
           goal,
           hints,
           kind: "find-files",
-          searchActivity: [],
           selectedIndex: 0,
           status: "searching",
         },

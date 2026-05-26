@@ -12,12 +12,53 @@ export interface ContextItem {
     options: GetContextItemDetailViewOptions,
   ): Promise<ContextItemDetailView | null>;
   getListLabel(): string;
+  getSummarizationInput(
+    options: GetContextItemSummaryInputOptions,
+  ): Promise<ContextItemSummarizationInput | null>;
+  getSummaryState(): ContextItemSummaryState;
   getSummaryView(): ContextItemSummaryView;
+  withSummaryState(summaryState: ContextItemSummaryState): ContextItem;
 }
+
+export type GeneratedContextItemSummary = {
+  details: string;
+  generatedAt: number;
+  oneLine: string;
+  sourceHash: string;
+};
+
+export type ContextItemSummaryState =
+  | { status: "missing" }
+  | {
+      sourceHash: string;
+      status: "ready";
+      summary: GeneratedContextItemSummary;
+    }
+  | {
+      errorMessage: string;
+      sourceHash: string;
+      status: "error";
+      workerId: string;
+    }
+  | { sourceHash: string; status: "pending"; workerId: string };
 
 export type ContextItemSummaryView = {
   detail?: string;
+  label: string;
+  status: ContextItemSummaryState["status"];
   title: string;
+};
+
+export type ContextItemSummarizationInput = {
+  content: string;
+  itemId: string;
+  label: string;
+  sourceHash: string;
+  type: string;
+};
+
+export type GetContextItemSummaryInputOptions = {
+  root: string;
 };
 
 export type ContextItemDetailView =

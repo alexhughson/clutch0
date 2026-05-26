@@ -1,3 +1,7 @@
+import type {
+  AgentOutputBlock,
+  AgentOutputUpdate,
+} from "../lib/agentOutput/agentOutputTypes";
 import type { PatchReviewState } from "../lib/patch/types";
 import type { ContextItem, FilePath } from "../types";
 
@@ -74,12 +78,12 @@ export type ContextItemViewerTaskState = {
 };
 
 export type FindFilesTaskState = {
+  agentOutput: AgentOutputBlock[];
   candidates: RelevantFileCandidate[];
   errorMessage?: string;
   goal: string;
   hints: string[];
   kind: "find-files";
-  searchActivity: string[];
   selectedIndex: number;
   status: "searching" | "results" | "error";
 };
@@ -113,6 +117,9 @@ export type AppActions = {
       replacement?: ContextItemReplacementTarget;
     }) => number | null;
   };
+  contextSummaries: {
+    ensureWorkspaceSummaries: () => void;
+  };
   contextItems: {
     failSavedDiffApply: (options: {
       errorMessage: string;
@@ -124,8 +131,8 @@ export type AppActions = {
   };
   findFiles: {
     addAllCandidates: () => void;
-    addSearchActivity: (options: { line: string }) => void;
     addSelectedCandidate: () => void;
+    recordAgentOutput: (options: { update: AgentOutputUpdate }) => void;
     fail: (options: { errorMessage: string }) => void;
     finish: (options: { candidates: RelevantFileCandidate[] }) => void;
     selectNext: () => void;

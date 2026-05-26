@@ -66,7 +66,17 @@ test("find files search activity is capped", () => {
 
   harness.findFiles.showSearch({ goal: "Find app files", hints: [] });
   for (let index = 0; index < 205; index += 1) {
-    harness.findFiles.addSearchActivity({ line: `line ${index}` });
+    harness.findFiles.recordAgentOutput({
+      update: {
+        block: {
+          id: `status:${index}`,
+          kind: "status",
+          message: `line ${index}`,
+          timestamp: index,
+        },
+        kind: "append-block",
+      },
+    });
   }
 
   expect(harness.state.activeTask?.kind).toBe("find-files");
@@ -74,6 +84,8 @@ test("find files search activity is capped", () => {
     return;
   }
 
-  expect(harness.state.activeTask.searchActivity).toHaveLength(200);
-  expect(harness.state.activeTask.searchActivity[0]).toBe("line 5");
+  expect(harness.state.activeTask.agentOutput).toHaveLength(200);
+  expect(harness.state.activeTask.agentOutput[0]).toMatchObject({
+    message: "line 5",
+  });
 });

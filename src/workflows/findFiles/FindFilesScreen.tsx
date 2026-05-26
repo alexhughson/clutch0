@@ -2,6 +2,7 @@ import type { ScrollBoxRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useRef } from "react";
 import type { FindFilesScreenState } from "../../app/appTypes";
+import { AgentOutputLog } from "../../components/AgentOutputLog";
 import {
   getFileContextItemId,
   hasContextItem,
@@ -26,9 +27,9 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
     void runPiFileSearchAgent({
       goal: screen.goal,
       hints: screen.hints,
-      onActivity: (line) => {
+      onAgentOutput: (update) => {
         if (!cancelled) {
-          actions.findFiles.addSearchActivity({ line });
+          actions.findFiles.recordAgentOutput({ update });
         }
       },
     }).then(
@@ -120,9 +121,7 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
           >{`Hints: ${screen.hints.join(", ")}`}</text>
         )}
       </box>
-      {screen.status === "searching" ? (
-        <SearchingView searchActivity={screen.searchActivity} />
-      ) : null}
+      {screen.status === "searching" ? <SearchingView screen={screen} /> : null}
       {screen.status === "error" ? (
         <ErrorView errorMessage={screen.errorMessage ?? "Unknown error"} />
       ) : null}
@@ -131,11 +130,7 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
   );
 }
 
-function SearchingView({
-  searchActivity,
-}: {
-  searchActivity: readonly string[];
-}) {
+function SearchingView({ screen }: { screen: FindFilesScreenState }) {
   return (
     <box
       title="Searching"
@@ -143,19 +138,11 @@ function SearchingView({
       style={{ border: true, flexDirection: "column", padding: 1 }}
     >
       <text>Running a read-only pi agent to find relevant files...</text>
-      <scrollbox
-        stickyScroll
-        stickyStart="bottom"
-        style={{ height: 24, width: "100%" }}
-      >
-        {searchActivity.length === 0 ? (
-          <text style={{ fg: "gray" }}>Waiting for pi activity...</text>
-        ) : (
-          searchActivity.map((line, index) => (
-            <text key={`${index}:${line}`}>{line}</text>
-          ))
-        )}
-      </scrollbox>
+      <AgentOutputLog
+        blocks={screen.agentOutput}
+        emptyMessage="Waiting for pi activity..."
+        height={24}
+      />
     </box>
   );
 }

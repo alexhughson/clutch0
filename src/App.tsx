@@ -18,9 +18,7 @@ export function App({ filePaths }: AppProps) {
 
   return (
     <box
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         gap: 1,
         padding: 1,

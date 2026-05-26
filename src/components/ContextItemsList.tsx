@@ -1,105 +1,136 @@
-import { useEffect, useState } from "react";
+import { useTerminalDimensions } from "@opentui/react";
 import { getContextItemById } from "../lib/context/contextItems";
-import type { ContextItem, ContextItemDetailView } from "../types";
+import type { ContextItem, ContextItemSummaryView } from "../types";
 
 type ContextItemsListProps = {
   contextItems: ContextItem[];
   focusedContextItemId: string | null;
 };
 
+const WIDE_CONTEXT_LAYOUT_COLUMNS = 100;
+
 export function ContextItemsList({
   contextItems,
   focusedContextItemId,
 }: ContextItemsListProps) {
+  const { width } = useTerminalDimensions();
   if (contextItems.length === 0) {
     return null;
   }
 
   const focusedItem = getContextItemById(contextItems, focusedContextItemId);
   const focusedActions = focusedItem?.getActions() ?? [];
+  const useSidePane = width >= WIDE_CONTEXT_LAYOUT_COLUMNS;
 
   return (
     <box
-      title="Context"
-      bottomTitle={
-        focusedActions.length === 0
-          ? undefined
-          : focusedActions.map(formatAction).join(" · ")
-      }
-      bottomTitleAlignment="right"
-      borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
+      style={{ flexDirection: "column", gap: 1, paddingLeft: 1, width: "100%" }}
     >
-      {contextItems.map((item) => {
-        const isFocused = item.id === focusedContextItemId;
-        const summary = item.getSummaryView();
+      <text style={{ fg: "gray" }}>
+        {focusedActions.length === 0
+          ? "Context"
+          : `Context  ${focusedActions.map(formatAction).join(" · ")}`}
+      </text>
+      <box
+        style={{
+          flexDirection: useSidePane ? "row" : "column",
+          gap: 2,
+          width: "100%",
+        }}
+      >
+        <box
+          style={{
+            flexDirection: "column",
+            width: useSidePane ? "58%" : "100%",
+          }}
+        >
+          {contextItems.map((item) => {
+            const isFocused = item.id === focusedContextItemId;
+            const summary = item.getSummaryView();
 
-        return (
-          <box key={item.id} style={{ flexDirection: "column" }}>
-            <text style={isFocused ? { bg: "blue", fg: "white" } : undefined}>
-              {isFocused ? `> ${summary.title}` : `  ${summary.title}`}
-            </text>
-            {summary.detail === undefined ? null : (
-              <text style={{ fg: "gray" }}>{`    ${summary.detail}`}</text>
-            )}
-          </box>
-        );
-      })}
-      {focusedItem === null ? null : <ContextItemDetail item={focusedItem} />}
+            return (
+              <ContextItemRow
+                key={item.id}
+                focused={isFocused}
+                summary={summary}
+              />
+            );
+          })}
+        </box>
+        {focusedItem === null ? null : (
+          <FocusedContextItemSummary
+            item={focusedItem}
+            sidePane={useSidePane}
+          />
+        )}
+      </box>
     </box>
   );
 }
 
-function ContextItemDetail({ item }: { item: ContextItem }) {
-  const [detail, setDetail] = useState<ContextItemDetailView | null>(null);
+function ContextItemRow({
+  focused,
+  summary,
+}: {
+  focused: boolean;
+  summary: ContextItemSummaryView;
+}) {
+  const shortSummary = getShortSummary(summary);
 
-  useEffect(() => {
-    let cancelled = false;
-    setDetail(null);
-    void item.getDetailView({ root: process.cwd() }).then((nextDetail) => {
-      if (!cancelled) {
-        setDetail(nextDetail);
-      }
-    });
+  return (
+    <box style={{ flexDirection: "column" }}>
+      <text
+        truncate
+        wrapMode="none"
+        style={focused ? { bg: "blue", fg: "white" } : undefined}
+      >
+        {focused ? `> ${summary.label}` : `  ${summary.label}`}
+      </text>
+      {shortSummary === null ? null : (
+        <text truncate wrapMode="none" style={{ fg: "gray" }}>
+          {`    ${shortSummary}`}
+        </text>
+      )}
+    </box>
+  );
+}
 
-    return () => {
-      cancelled = true;
-    };
-  }, [item]);
-
-  if (detail === null) {
+function FocusedContextItemSummary({
+  item,
+  sidePane,
+}: {
+  item: ContextItem;
+  sidePane: boolean;
+}) {
+  const summary = item.getSummaryView();
+  if (summary.detail === undefined) {
     return null;
   }
 
   return (
     <box
-      title={detail.title}
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
-        marginTop: 1,
-        padding: 1,
+        marginTop: sidePane ? 0 : 1,
+        width: sidePane ? "40%" : "100%",
       }}
     >
-      {detail.kind === "diff" ? (
-        <scrollbox style={{ height: 12, width: "100%" }}>
-          <text>{detail.summary}</text>
-          <diff
-            diff={detail.diffText}
-            view="unified"
-            showLineNumbers
-            wrapMode="none"
-            style={{ width: "100%" }}
-          />
-        </scrollbox>
-      ) : (
-        <scrollbox style={{ height: 12, width: "100%" }}>
-          <text>{detail.content}</text>
-        </scrollbox>
-      )}
+      <text style={{ fg: "gray" }}>Summary</text>
+      <text>{summary.detail}</text>
     </box>
   );
+}
+
+function getShortSummary(summary: ContextItemSummaryView): string | null {
+  if (summary.status === "ready" && summary.title !== summary.label) {
+    return summary.title;
+  }
+
+  if (summary.status === "pending") {
+    return "Summarizing…";
+  }
+
+  return null;
 }
 
 function formatAction(action: ReturnType<ContextItem["getActions"]>[number]) {

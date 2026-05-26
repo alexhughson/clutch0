@@ -1,23 +1,27 @@
 import {
   createAgentSession,
   defineTool,
-  type AgentSessionEvent,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { RelevantFileCandidate } from "../../app/appTypes";
+import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
+import {
+  createAgentToolBlock,
+  formatPiAgentOutputUpdate,
+} from "../../lib/agentOutput/piAgentOutputAdapter";
 
 export type RunPiFileSearchAgentOptions = {
   goal: string;
   hints: readonly string[];
-  onActivity?: (line: string) => void;
+  onAgentOutput?: (update: AgentOutputUpdate) => void;
   root?: string;
 };
 
 export async function runPiFileSearchAgent({
   goal,
   hints,
-  onActivity,
+  onAgentOutput,
   root = process.cwd(),
 }: RunPiFileSearchAgentOptions): Promise<RelevantFileCandidate[]> {
   let submittedFiles: RelevantFileCandidate[] | null = null;
@@ -48,7 +52,14 @@ export async function runPiFileSearchAgent({
     }),
     execute: async (_toolCallId, params) => {
       submittedFiles = normalizeCandidates(params.files);
-      onActivity?.(`submit_relevant_files: ${submittedFiles.length} file(s)`);
+      onAgentOutput?.({
+        block: createAgentToolBlock({
+          phase: "end",
+          summary: `${submittedFiles.length} file(s)`,
+          toolName: "submit_relevant_files",
+        }),
+        kind: "append-block",
+      });
       return {
         content: [
           {
@@ -69,14 +80,21 @@ export async function runPiFileSearchAgent({
   });
 
   const unsubscribe = session.subscribe((event) => {
-    const activityLine = formatAgentActivity(event);
-    if (activityLine !== null) {
-      onActivity?.(activityLine);
+    const update = formatPiAgentOutputUpdate(event);
+    if (update !== null) {
+      onAgentOutput?.(update);
     }
   });
 
   try {
-    onActivity?.("pi: starting file search agent");
+    onAgentOutput?.({
+      block: createAgentToolBlock({
+        phase: "start",
+        summary: "file search agent",
+        toolName: "pi",
+      }),
+      kind: "append-block",
+    });
     await session.prompt(formatSearchPrompt({ goal, hints }));
   } finally {
     unsubscribe();
@@ -84,84 +102,6 @@ export async function runPiFileSearchAgent({
   }
 
   return submittedFiles ?? [];
-}
-
-function formatAgentActivity(event: AgentSessionEvent): string | null {
-  switch (event.type) {
-    case "agent_start":
-      return "pi: agent started";
-    case "agent_end":
-      return event.willRetry ? "pi: agent ended; retrying" : "pi: agent done";
-    case "turn_start":
-      return "pi: thinking";
-    case "turn_end":
-      return `pi: turn complete (${event.toolResults.length} tool result(s))`;
-    case "message_update":
-      if (event.assistantMessageEvent.type === "text_delta") {
-        return formatDelta("assistant", event.assistantMessageEvent.delta);
-      }
-
-      if (event.assistantMessageEvent.type === "thinking_delta") {
-        return formatDelta("thinking", event.assistantMessageEvent.delta);
-      }
-
-      return null;
-    case "tool_execution_start":
-      return `tool ${event.toolName}: ${formatSnippet(event.args)}`;
-    case "tool_execution_update":
-      return `tool ${event.toolName} update: ${formatSnippet(
-        event.partialResult,
-      )}`;
-    case "tool_execution_end":
-      return `tool ${event.toolName}: ${event.isError ? "error" : "done"}`;
-    case "auto_retry_start":
-      return `pi: retry ${event.attempt}/${event.maxAttempts} after ${event.errorMessage}`;
-    case "auto_retry_end":
-      return event.success
-        ? "pi: retry succeeded"
-        : `pi: retry failed${event.finalError ? `: ${event.finalError}` : ""}`;
-    case "compaction_start":
-      return `pi: compaction started (${event.reason})`;
-    case "compaction_end":
-      return event.errorMessage === undefined
-        ? `pi: compaction ended (${event.reason})`
-        : `pi: compaction error: ${event.errorMessage}`;
-    default:
-      return null;
-  }
-}
-
-function formatDelta(label: string, delta: string): string | null {
-  const trimmed = delta.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  return `${label}: ${trimmed}`;
-}
-
-function formatSnippet(value: unknown): string {
-  if (typeof value === "string") {
-    return truncate(value);
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  try {
-    return truncate(JSON.stringify(value));
-  } catch {
-    return truncate(String(value));
-  }
-}
-
-function truncate(value: string): string {
-  return value.length > 160 ? `${value.slice(0, 157)}...` : value;
 }
 
 function formatSearchPrompt({

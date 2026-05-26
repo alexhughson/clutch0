@@ -21,3 +21,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   ...createInitialAppState(),
   actions: createAppActions({ set, get }),
 }));
+
+useAppStore.subscribe((state, previousState) => {
+  if (state.workspace.contextItems !== previousState.workspace.contextItems) {
+    state.actions.contextSummaries.ensureWorkspaceSummaries();
+  }
+});
