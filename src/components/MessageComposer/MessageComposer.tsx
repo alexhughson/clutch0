@@ -1,5 +1,6 @@
 import type { ComposeScreenState } from "../../store/appStore";
 import type { FilePath } from "../../types";
+import { FilteredCommandsList } from "../FilteredCommandsList";
 import { FilteredFilesList } from "../FilteredFilesList";
 import { useMessageComposerController } from "./useMessageComposerController";
 
@@ -12,7 +13,7 @@ export function MessageComposer({
   composeScreen,
   filePaths,
 }: MessageComposerProps) {
-  const { fileSuggestions, inputHandlers, message } =
+  const { commandSuggestions, fileSuggestions, inputHandlers, message } =
     useMessageComposerController({
       composeScreen,
       filePaths,
@@ -41,6 +42,14 @@ export function MessageComposer({
           fileSelector={fileSuggestions.fileSelector}
           highlightedFilePath={fileSuggestions.highlightedFilePath}
           visibleFilePaths={fileSuggestions.visibleFilePaths}
+        />
+      )}
+
+      {fileSuggestions !== null || commandSuggestions === null ? null : (
+        <FilteredCommandsList
+          commandSelector={commandSuggestions.commandSelector}
+          highlightedCommandName={commandSuggestions.highlightedCommandName}
+          visibleCommands={commandSuggestions.visibleCommands}
         />
       )}
     </>

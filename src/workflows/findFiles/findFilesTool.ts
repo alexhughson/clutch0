@@ -22,6 +22,14 @@ export const findRelevantFilesTool: Tool = {
 };
 
 export const findFilesWorkflowTool: LlmWorkflowToolController = {
+  slashCommand: {
+    description:
+      "Ask the LLM to find project files relevant to a goal, then open the interactive file picker.",
+    name: "find",
+    promptDirective:
+      "The user invoked /find. Decide the best arguments from the user request and call the find_relevant_files tool. Do not answer with guessed file names.",
+    title: "Find relevant files",
+  },
   tool: findRelevantFilesTool,
   async routeToolCall({ toolCall }) {
     if (toolCall.name !== FIND_RELEVANT_FILES_TOOL_NAME) {

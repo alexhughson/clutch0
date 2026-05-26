@@ -5,7 +5,11 @@ import { handleLlmInteractionResult } from "../llmTools/handleLlmInteractionResu
 
 export function startLlmRequest(
   question: string,
-  options: { replacement?: ContextItemReplacementTarget } = {},
+  options: {
+    allowedToolNames?: readonly string[];
+    commandDirective?: string;
+    replacement?: ContextItemReplacementTarget;
+  } = {},
 ) {
   const currentState = useAppStore.getState();
   const contextItems = currentState.workspace.contextItems.filter(
@@ -25,6 +29,8 @@ export function startLlmRequest(
   }
 
   void streamLlmInteraction({
+    allowedToolNames: options.allowedToolNames,
+    commandDirective: options.commandDirective,
     question,
     contextItems,
     focusedContextItemId,

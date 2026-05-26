@@ -1,7 +1,11 @@
 import type { KeyEvent } from "@opentui/core";
 import { getContextItemById } from "../../lib/context/contextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
-import { NoFileSelector } from "../../lib/inputLineParser";
+import {
+  NoFileSelector,
+  NoSlashCommandSelector,
+  type SlashCommandSelectorMatch,
+} from "../../lib/inputLineParser";
 import { applySavedDiffContextItem } from "../../workflows/contextItems/contextItemEffects";
 import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
 import { removeStringRange } from "../../lib/stringRange";
@@ -15,9 +19,17 @@ import type {
 } from "../../types";
 import { getMessageComposerKeyAction } from "./messageComposerKeymap";
 import {
+  getCommandSuggestionStateFromComposeScreen,
   getCursorPositionAfterInput,
   getFileSuggestionStateFromComposeScreen,
+  moveCommandHighlight,
+  type CommandSuggestionState,
+  type FileSuggestionState,
 } from "./messageComposerModel";
+import {
+  getLlmSlashCommand,
+  parseLlmSlashCommandInvocation,
+} from "../../workflows/llmTools/toolRegistry";
 
 export function updateMessage({ nextMessage }: { nextMessage: string }) {
   const currentState = useAppStore.getState();
@@ -57,12 +69,16 @@ export function updateCursorPosition({
 export function handleMessageComposerKeyDown({
   event,
   filePaths,
+  highlightedCommandName,
   highlightedFilePath,
+  setHighlightedCommandName,
   setHighlightedFilePath,
 }: {
   event: KeyEvent;
   filePaths: readonly FilePath[];
+  highlightedCommandName: string | null;
   highlightedFilePath: HighlightedFilePath;
+  setHighlightedCommandName: (highlightedCommandName: string | null) => void;
   setHighlightedFilePath: (highlightedFilePath: HighlightedFilePath) => void;
 }) {
   const action = getMessageComposerKeyAction(event);
@@ -75,22 +91,68 @@ export function handleMessageComposerKeyDown({
     return;
   }
 
-  const suggestionState = getFileSuggestionStateFromComposeScreen({
+  const fileSuggestionState = getFileSuggestionStateFromComposeScreen({
     filePaths,
     highlightedFilePath,
     screen: currentState.workspace,
   });
 
-  if (suggestionState.fileSelectorMatch === NoFileSelector) {
-    handleContextOrSubmitAction({ action, event });
+  if (fileSuggestionState.fileSelectorMatch !== NoFileSelector) {
+    handleFileSuggestionAction({
+      action,
+      event,
+      highlightedFilePath: fileSuggestionState.highlightedFilePath,
+      setHighlightedFilePath,
+      suggestionState: {
+        ...fileSuggestionState,
+        fileSelectorMatch: fileSuggestionState.fileSelectorMatch,
+      },
+    });
     return;
   }
 
-  if (action === "confirm") {
+  const commandSuggestionState = getCommandSuggestionStateFromComposeScreen({
+    highlightedCommandName,
+    screen: currentState.workspace,
+  });
+
+  if (commandSuggestionState.commandSelectorMatch !== NoSlashCommandSelector) {
+    handleCommandSuggestionAction({
+      action,
+      event,
+      highlightedCommandName: commandSuggestionState.highlightedCommandName,
+      setHighlightedCommandName,
+      suggestionState: {
+        ...commandSuggestionState,
+        commandSelectorMatch: commandSuggestionState.commandSelectorMatch,
+      },
+    });
+    return;
+  }
+
+  handleContextOrSubmitAction({ action, event });
+}
+
+function handleFileSuggestionAction({
+  action,
+  event,
+  highlightedFilePath,
+  setHighlightedFilePath,
+  suggestionState,
+}: {
+  action: ReturnType<typeof getMessageComposerKeyAction>;
+  event: KeyEvent;
+  highlightedFilePath: HighlightedFilePath;
+  setHighlightedFilePath: (highlightedFilePath: HighlightedFilePath) => void;
+  suggestionState: FileSuggestionState & {
+    fileSelectorMatch: FileSelectorMatch;
+  };
+}) {
+  if (action === "confirm" || action === "accept-suggestion") {
     acceptFileSelection({
       event,
       fileSelectorMatch: suggestionState.fileSelectorMatch,
-      highlightedFilePath: suggestionState.highlightedFilePath,
+      highlightedFilePath,
       setHighlightedFilePath,
     });
     return;
@@ -111,6 +173,50 @@ export function handleMessageComposerKeyDown({
     setHighlightedFilePath,
     visibleFilePaths: suggestionState.visibleFilePaths,
   });
+}
+
+function handleCommandSuggestionAction({
+  action,
+  event,
+  highlightedCommandName,
+  setHighlightedCommandName,
+  suggestionState,
+}: {
+  action: ReturnType<typeof getMessageComposerKeyAction>;
+  event: KeyEvent;
+  highlightedCommandName: string | null;
+  setHighlightedCommandName: (highlightedCommandName: string | null) => void;
+  suggestionState: CommandSuggestionState & {
+    commandSelectorMatch: SlashCommandSelectorMatch;
+  };
+}) {
+  if (action === "confirm" || action === "accept-suggestion") {
+    acceptCommandSelection({
+      commandSelectorMatch: suggestionState.commandSelectorMatch,
+      event,
+      highlightedCommandName,
+      setHighlightedCommandName,
+    });
+    return;
+  }
+
+  if (action !== "select-next-file" && action !== "select-previous-file") {
+    return;
+  }
+
+  if (suggestionState.visibleCommands.length === 0) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  setHighlightedCommandName(
+    moveCommandHighlight({
+      direction: action === "select-next-file" ? "next" : "previous",
+      highlightedCommandName: suggestionState.highlightedCommandName,
+      visibleCommands: suggestionState.visibleCommands,
+    }),
+  );
 }
 
 /** Removes the typed @selector after adding the highlighted file. */
@@ -147,6 +253,46 @@ function acceptFileSelection({
   });
 }
 
+function acceptCommandSelection({
+  commandSelectorMatch,
+  event,
+  highlightedCommandName,
+  setHighlightedCommandName,
+}: {
+  commandSelectorMatch: SlashCommandSelectorMatch;
+  event: KeyEvent;
+  highlightedCommandName: string | null;
+  setHighlightedCommandName: (highlightedCommandName: string | null) => void;
+}) {
+  if (highlightedCommandName === null) {
+    return;
+  }
+
+  const command = getLlmSlashCommand(highlightedCommandName);
+  if (command === null) {
+    return;
+  }
+
+  const currentState = useAppStore.getState();
+  if (currentState.activeTask !== null) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  setHighlightedCommandName(null);
+
+  const nextMessage = replaceStringRange(
+    currentState.workspace.composer.message,
+    commandSelectorMatch,
+    `/${command.name} `,
+  );
+  currentState.actions.compose.setComposerState({
+    cursorPosition: commandSelectorMatch.start + command.name.length + 2,
+    message: nextMessage,
+  });
+}
+
 function moveHighlightedFile({
   direction,
   event,
@@ -169,6 +315,14 @@ function moveHighlightedFile({
       visibleFilePaths,
     }),
   );
+}
+
+function replaceStringRange(
+  value: string,
+  range: { end: number; start: number },
+  replacement: string,
+): string {
+  return `${value.slice(0, range.start)}${replacement}${value.slice(range.end)}`;
 }
 
 function handleContextOrSubmitAction({
@@ -242,10 +396,19 @@ function submitQuestion(event: KeyEvent) {
     return;
   }
 
+  const slashCommandInvocation = parseLlmSlashCommandInvocation(question);
+  const requestQuestion = slashCommandInvocation?.input ?? question;
+  if (requestQuestion.length === 0) {
+    return;
+  }
+
   event.preventDefault();
   event.stopPropagation();
 
-  startLlmRequest(question);
+  startLlmRequest(requestQuestion, {
+    allowedToolNames: slashCommandInvocation?.command.allowedToolNames,
+    commandDirective: slashCommandInvocation?.command.promptDirective,
+  });
 }
 
 function runFocusedContextItemAction(actionId: string) {

@@ -3,12 +3,23 @@ import { filterFiles } from "../../lib/fileFilter";
 import { getHighlightedFilePathForVisibleFiles } from "../../lib/fileSelection";
 import {
   getFileSelectorMatchAtCursor,
+  getSlashCommandSelectorMatchAtCursor,
   NoFileSelector,
+  NoSlashCommandSelector,
   type FileSelectorMatchResult,
+  type SlashCommandSelectorMatchResult,
 } from "../../lib/inputLineParser";
 import type { ComposeScreenState } from "../../store/appStore";
 import { getSelectedFilePaths } from "../../lib/context/contextItems";
 import type { ContextItem, FilePath, HighlightedFilePath } from "../../types";
+import { getLlmSlashCommands } from "../../workflows/llmTools/toolRegistry";
+import type { LlmSlashCommand } from "../../workflows/llmTools/types";
+
+export type CommandSuggestionState = {
+  commandSelectorMatch: SlashCommandSelectorMatchResult;
+  highlightedCommandName: string | null;
+  visibleCommands: LlmSlashCommand[];
+};
 
 export type FileSuggestionState = {
   fileSelectorMatch: FileSelectorMatchResult;
@@ -125,6 +136,45 @@ export function getFileSuggestionStateFromComposeScreen({
   });
 }
 
+export function getCommandSuggestionState({
+  cursorPosition,
+  highlightedCommandName,
+  message,
+}: {
+  cursorPosition: number;
+  highlightedCommandName: string | null;
+  message: string;
+}): CommandSuggestionState {
+  const commandSelectorMatch = getSlashCommandSelectorMatchAtCursor(
+    message,
+    cursorPosition,
+  );
+  const visibleCommands = getVisibleCommands({ commandSelectorMatch });
+
+  return {
+    commandSelectorMatch,
+    highlightedCommandName: getHighlightedCommandName({
+      highlightedCommandName,
+      visibleCommands,
+    }),
+    visibleCommands,
+  };
+}
+
+export function getCommandSuggestionStateFromComposeScreen({
+  highlightedCommandName,
+  screen,
+}: {
+  highlightedCommandName: string | null;
+  screen: ComposeScreenState;
+}): CommandSuggestionState {
+  return getCommandSuggestionState({
+    cursorPosition: screen.composer.cursorPosition,
+    highlightedCommandName,
+    message: screen.composer.message,
+  });
+}
+
 function getVisibleFilePaths({
   filePaths,
   fileSelectorMatch,
@@ -147,6 +197,75 @@ function getVisibleFilePaths({
     0,
     MAX_VISIBLE_FILE_SUGGESTIONS,
   );
+}
+
+function getVisibleCommands({
+  commandSelectorMatch,
+}: {
+  commandSelectorMatch: SlashCommandSelectorMatchResult;
+}): LlmSlashCommand[] {
+  if (commandSelectorMatch === NoSlashCommandSelector) {
+    return [];
+  }
+
+  const commandsByName = new Map(
+    getLlmSlashCommands().map((command) => [command.name, command]),
+  );
+
+  return filterFiles(
+    commandSelectorMatch.commandSelector,
+    getLlmSlashCommands().map((command) => command.name),
+  )
+    .slice(0, MAX_VISIBLE_FILE_SUGGESTIONS)
+    .flatMap((commandName) => {
+      const command = commandsByName.get(commandName);
+      return command === undefined ? [] : [command];
+    });
+}
+
+function getHighlightedCommandName({
+  highlightedCommandName,
+  visibleCommands,
+}: {
+  highlightedCommandName: string | null;
+  visibleCommands: readonly LlmSlashCommand[];
+}): string | null {
+  if (visibleCommands.length === 0) {
+    return null;
+  }
+
+  if (
+    highlightedCommandName !== null &&
+    visibleCommands.some((command) => command.name === highlightedCommandName)
+  ) {
+    return highlightedCommandName;
+  }
+
+  return visibleCommands[0]?.name ?? null;
+}
+
+export function moveCommandHighlight({
+  direction,
+  highlightedCommandName,
+  visibleCommands,
+}: {
+  direction: "next" | "previous";
+  highlightedCommandName: string | null;
+  visibleCommands: readonly LlmSlashCommand[];
+}): string | null {
+  if (visibleCommands.length === 0) {
+    return null;
+  }
+
+  const currentIndex = visibleCommands.findIndex(
+    (command) => command.name === highlightedCommandName,
+  );
+  const nextIndex =
+    direction === "next"
+      ? (Math.max(0, currentIndex) + 1) % visibleCommands.length
+      : (currentIndex <= 0 ? visibleCommands.length : currentIndex) - 1;
+
+  return visibleCommands[nextIndex]?.name ?? null;
 }
 
 function clamp(value: number, min: number, max: number): number {

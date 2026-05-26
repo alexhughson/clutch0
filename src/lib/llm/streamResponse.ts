@@ -15,6 +15,8 @@ import {
 import type { LlmWorkflowToolResult } from "../../workflows/llmTools/types";
 
 export type StreamLlmResponseOptions = {
+  allowedToolNames?: readonly string[];
+  commandDirective?: string;
   question: string;
   contextItems: readonly ContextItem[];
   focusedContextItemId?: string | null;
@@ -38,6 +40,8 @@ export async function streamLlmResponse(
 }
 
 export async function streamLlmInteraction({
+  allowedToolNames,
+  commandDirective,
   question,
   contextItems,
   focusedContextItemId,
@@ -46,12 +50,12 @@ export async function streamLlmInteraction({
   onDelta,
 }: StreamLlmResponseOptions): Promise<StreamLlmInteractionResult> {
   const { context } = await buildLlmContext({
-    question,
+    question: formatQuestionForCommand({ commandDirective, question }),
     contextItems,
     focusedContextItemId,
     root,
     systemPrompt: patchAwareSystemPrompt,
-    tools: getLlmWorkflowTools(),
+    tools: getLlmWorkflowTools({ allowedToolNames }),
   });
   const model = resolveLlmModel();
   const eventStream = stream(model, context, { signal });
@@ -76,6 +80,7 @@ export async function streamLlmInteraction({
   const finalText = getAssistantText(finalMessage);
   const responseText = finalText.length > 0 ? finalText : streamedText;
   const workflowResult = await routeLlmWorkflowToolCalls({
+    allowedToolNames,
     root,
     toolCalls: getAssistantToolCalls(finalMessage),
   });
@@ -91,6 +96,20 @@ export async function streamLlmInteraction({
     kind: "text",
     responseText,
   };
+}
+
+function formatQuestionForCommand({
+  commandDirective,
+  question,
+}: {
+  commandDirective?: string;
+  question: string;
+}): string {
+  if (commandDirective === undefined) {
+    return question;
+  }
+
+  return `${commandDirective}\n\nUser request:\n${question}`;
 }
 
 function getAssistantText(message: AssistantMessage): string {

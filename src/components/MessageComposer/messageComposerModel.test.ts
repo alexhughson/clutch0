@@ -1,9 +1,14 @@
 import { expect, test } from "bun:test";
 import { createFileContextItem } from "../../lib/context/contextItems";
-import { NoFileSelector } from "../../lib/inputLineParser";
 import {
+  NoFileSelector,
+  NoSlashCommandSelector,
+} from "../../lib/inputLineParser";
+import {
+  getCommandSuggestionState,
   getCursorPositionAfterInput,
   getFileSuggestionState,
+  moveCommandHighlight,
 } from "./messageComposerModel";
 
 const filePaths = ["src/index.tsx", "src/lib/fileFilter.ts", "README.md"];
@@ -54,6 +59,52 @@ test("does not derive file suggestions without an active selector", () => {
   expect(suggestionState.fileSelectorMatch).toBe(NoFileSelector);
   expect(suggestionState.visibleFilePaths).toEqual([]);
   expect(suggestionState.highlightedFilePath).toBeNull();
+});
+
+test("derives visible commands for the active slash selector", () => {
+  const suggestionState = getCommandSuggestionState({
+    cursorPosition: "/fi".length,
+    highlightedCommandName: null,
+    message: "/fi",
+  });
+
+  expect(suggestionState.commandSelectorMatch).toEqual({
+    commandSelector: "fi",
+    start: 0,
+    end: 3,
+  });
+  expect(
+    suggestionState.visibleCommands.map((command) => command.name),
+  ).toEqual(["find"]);
+  expect(suggestionState.highlightedCommandName).toBe("find");
+});
+
+test("does not derive command suggestions without an active slash selector", () => {
+  const suggestionState = getCommandSuggestionState({
+    cursorPosition: "hello".length,
+    highlightedCommandName: "find",
+    message: "hello",
+  });
+
+  expect(suggestionState.commandSelectorMatch).toBe(NoSlashCommandSelector);
+  expect(suggestionState.visibleCommands).toEqual([]);
+  expect(suggestionState.highlightedCommandName).toBeNull();
+});
+
+test("moves command highlight through visible commands", () => {
+  const suggestionState = getCommandSuggestionState({
+    cursorPosition: "/".length,
+    highlightedCommandName: null,
+    message: "/",
+  });
+
+  expect(
+    moveCommandHighlight({
+      direction: "next",
+      highlightedCommandName: "ask",
+      visibleCommands: suggestionState.visibleCommands,
+    }),
+  ).toBe("find");
 });
 
 test("keeps cursor near a mid-line insertion", () => {

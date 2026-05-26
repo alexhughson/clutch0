@@ -3,7 +3,10 @@ import {
   fileSelectorExamples,
   getFileSelectorAtCursor,
   getFileSelectorMatchAtCursor,
+  getSlashCommandSelectorMatchAtCursor,
   NoFileSelector,
+  NoSlashCommandSelector,
+  slashCommandSelectorExamples,
 } from "./inputLineParser";
 
 test("gets the active file selector at the cursor", () => {
@@ -41,4 +44,35 @@ test("gets an empty file selector range", () => {
 
 test("does not get a file selector range outside a selector", () => {
   expect(getFileSelectorMatchAtCursor("hey @file", 4)).toBe(NoFileSelector);
+});
+
+test("gets the active slash command selector at the cursor", () => {
+  for (const [markedInputLine, expected] of slashCommandSelectorExamples) {
+    const cursorPosition = markedInputLine.indexOf("|");
+    const inputLine = markedInputLine.replace("|", "");
+    const match = getSlashCommandSelectorMatchAtCursor(
+      inputLine,
+      cursorPosition,
+    );
+
+    expect(
+      match === NoSlashCommandSelector
+        ? NoSlashCommandSelector
+        : match.commandSelector,
+    ).toBe(expected);
+  }
+});
+
+test("gets a slash command selector range", () => {
+  const markedInputLine = "/fi|nd there";
+  const cursorPosition = markedInputLine.indexOf("|");
+  const inputLine = markedInputLine.replace("|", "");
+
+  expect(
+    getSlashCommandSelectorMatchAtCursor(inputLine, cursorPosition),
+  ).toEqual({
+    commandSelector: "find",
+    start: 0,
+    end: 5,
+  });
 });

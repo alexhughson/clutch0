@@ -1,6 +1,9 @@
 import type { CursorChangeEvent, KeyEvent } from "@opentui/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { NoFileSelector } from "../../lib/inputLineParser";
+import {
+  NoFileSelector,
+  NoSlashCommandSelector,
+} from "../../lib/inputLineParser";
 import type { ComposeScreenState } from "../../store/appStore";
 import type { FilePath, HighlightedFilePath } from "../../types";
 import {
@@ -9,7 +12,9 @@ import {
   updateMessage,
 } from "./messageComposerActions";
 import {
+  getCommandSuggestionState,
   getFileSuggestionState,
+  type CommandSuggestionState,
   type FileSuggestionState,
 } from "./messageComposerModel";
 
@@ -22,8 +27,11 @@ export function useMessageComposerController({
 }) {
   const [highlightedFilePath, setHighlightedFilePath] =
     useState<HighlightedFilePath>(null);
+  const [highlightedCommandName, setHighlightedCommandName] = useState<
+    string | null
+  >(null);
 
-  const suggestionState = useMemo(
+  const fileSuggestionState = useMemo(
     () =>
       getFileSuggestionState({
         cursorPosition: composeScreen.composer.cursorPosition,
@@ -41,11 +49,40 @@ export function useMessageComposerController({
     ],
   );
 
+  const commandSuggestionState = useMemo(
+    () =>
+      fileSuggestionState.fileSelectorMatch === NoFileSelector
+        ? getCommandSuggestionState({
+            cursorPosition: composeScreen.composer.cursorPosition,
+            highlightedCommandName,
+            message: composeScreen.composer.message,
+          })
+        : ({
+            commandSelectorMatch: NoSlashCommandSelector,
+            highlightedCommandName: null,
+            visibleCommands: [],
+          } satisfies CommandSuggestionState),
+    [
+      composeScreen.composer.cursorPosition,
+      composeScreen.composer.message,
+      fileSuggestionState.fileSelectorMatch,
+      highlightedCommandName,
+    ],
+  );
+
   useEffect(() => {
-    if (highlightedFilePath !== suggestionState.highlightedFilePath) {
-      setHighlightedFilePath(suggestionState.highlightedFilePath);
+    if (highlightedFilePath !== fileSuggestionState.highlightedFilePath) {
+      setHighlightedFilePath(fileSuggestionState.highlightedFilePath);
     }
-  }, [highlightedFilePath, suggestionState.highlightedFilePath]);
+  }, [highlightedFilePath, fileSuggestionState.highlightedFilePath]);
+
+  useEffect(() => {
+    if (
+      highlightedCommandName !== commandSuggestionState.highlightedCommandName
+    ) {
+      setHighlightedCommandName(commandSuggestionState.highlightedCommandName);
+    }
+  }, [highlightedCommandName, commandSuggestionState.highlightedCommandName]);
 
   const handleInput = useCallback((nextMessage: string) => {
     updateMessage({ nextMessage });
@@ -60,21 +97,40 @@ export function useMessageComposerController({
       handleMessageComposerKeyDown({
         event,
         filePaths,
-        highlightedFilePath: suggestionState.highlightedFilePath,
+        highlightedCommandName: commandSuggestionState.highlightedCommandName,
+        highlightedFilePath: fileSuggestionState.highlightedFilePath,
+        setHighlightedCommandName,
         setHighlightedFilePath,
       });
     },
-    [filePaths, suggestionState.highlightedFilePath],
+    [
+      commandSuggestionState.highlightedCommandName,
+      filePaths,
+      fileSuggestionState.highlightedFilePath,
+    ],
   );
 
   return {
-    fileSuggestions: getFileSuggestions(suggestionState),
+    commandSuggestions: getCommandSuggestions(commandSuggestionState),
+    fileSuggestions: getFileSuggestions(fileSuggestionState),
     inputHandlers: {
       onCursorChange: handleCursorChange,
       onInput: handleInput,
       onKeyDown: handleKeyDown,
     },
     message: composeScreen.composer.message,
+  };
+}
+
+function getCommandSuggestions(suggestionState: CommandSuggestionState) {
+  if (suggestionState.commandSelectorMatch === NoSlashCommandSelector) {
+    return null;
+  }
+
+  return {
+    commandSelector: suggestionState.commandSelectorMatch.commandSelector,
+    highlightedCommandName: suggestionState.highlightedCommandName,
+    visibleCommands: suggestionState.visibleCommands,
   };
 }
 

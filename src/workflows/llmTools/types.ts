@@ -12,7 +12,16 @@ export type LlmWorkflowToolResult =
       kind: "find-files";
     };
 
+export type LlmSlashCommand = {
+  readonly allowedToolNames: readonly string[];
+  readonly description: string;
+  readonly name: string;
+  readonly promptDirective: string;
+  readonly title: string;
+};
+
 export interface LlmWorkflowToolController {
+  readonly slashCommand?: Omit<LlmSlashCommand, "allowedToolNames">;
   readonly tool: Tool;
   routeToolCall(options: {
     root?: string;
