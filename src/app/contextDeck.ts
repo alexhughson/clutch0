@@ -1,3 +1,4 @@
+import { getContextItemDisplayOrder } from "../lib/context/contextItemDisplay";
 import { hasContextItem } from "../lib/context/contextItems";
 import type { ContextItem } from "../types";
 import type { ComposeScreenState } from "./appTypes";
@@ -17,11 +18,12 @@ export class ContextDeck {
   }
 
   focus(direction: "next" | "previous"): ContextDeck {
-    if (this.contextItems.length === 0) {
+    const displayOrder = getContextItemDisplayOrder(this.contextItems);
+    if (displayOrder.length === 0) {
       return new ContextDeck(this.contextItems, null);
     }
 
-    const currentIndex = this.contextItems.findIndex(
+    const currentIndex = displayOrder.findIndex(
       (item) => item.id === this.focusedContextItemId,
     );
     const offset = direction === "next" ? 1 : -1;
@@ -29,13 +31,12 @@ export class ContextDeck {
       currentIndex === -1
         ? direction === "next"
           ? 0
-          : this.contextItems.length - 1
-        : (currentIndex + offset + this.contextItems.length) %
-          this.contextItems.length;
+          : displayOrder.length - 1
+        : (currentIndex + offset + displayOrder.length) % displayOrder.length;
 
     return new ContextDeck(
       this.contextItems,
-      this.contextItems[nextIndex]?.id ?? null,
+      displayOrder[nextIndex]?.id ?? null,
     );
   }
 

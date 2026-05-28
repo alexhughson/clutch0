@@ -1,8 +1,17 @@
+import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useMemo, useState } from "react";
 import type { ContextItemViewerTaskState } from "../../app/appTypes";
+import { AgentOutputLog } from "../../components/AgentOutputLog";
+import {
+  HighlightedCode,
+  HighlightedDiff,
+  HighlightedMarkdown,
+} from "../../components/SyntaxHighlightedContent";
+import { getContextItemById } from "../../lib/context/contextItems";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
+import { sendAgentAskMessage } from "../agentAsk/agentAskSessionRegistry";
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
 import { applySavedDiffContextItem } from "./contextItemEffects";
 
@@ -12,28 +21,34 @@ export function ContextItemViewerScreen({
   screen: ContextItemViewerTaskState;
 }) {
   const actions = useAppStore((state) => state.actions);
+  const item = useAppStore((state) =>
+    getContextItemById(state.workspace.contextItems, screen.itemId),
+  );
   const [detail, setDetail] = useState<ContextItemDetailView | null>(null);
   const canAct = screen.applyStatus !== "applying";
+  const canRunItemActions = canAct && detail?.kind !== "agent-output";
   const itemActions = useMemo(
-    () => screen.item.getActions().filter((action) => action.id !== "open"),
-    [screen.item],
+    () => item?.getActions().filter((action) => action.id !== "open") ?? [],
+    [item],
   );
 
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
-    void screen.item
-      .getDetailView({ root: process.cwd() })
-      .then((nextDetail) => {
-        if (!cancelled) {
-          setDetail(nextDetail);
-        }
-      });
+    if (item === null) {
+      return;
+    }
+
+    void item.getDetailView({ root: process.cwd() }).then((nextDetail) => {
+      if (!cancelled) {
+        setDetail(nextDetail);
+      }
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [screen.item]);
+  }, [item]);
 
   useKeyboard((event) => {
     if (!canAct) {
@@ -44,6 +59,10 @@ export function ContextItemViewerScreen({
       event.preventDefault();
       event.stopPropagation();
       actions.navigation.showComposer();
+      return;
+    }
+
+    if (!canRunItemActions) {
       return;
     }
 
@@ -59,8 +78,14 @@ export function ContextItemViewerScreen({
 
   return (
     <box
-      title={detail?.title ?? screen.item.getListLabel()}
-      bottomTitle={canAct ? getBottomTitle(itemActions) : undefined}
+      title={detail?.title ?? item?.getListLabel() ?? "Context item"}
+      bottomTitle={
+        canRunItemActions
+          ? getBottomTitle(itemActions)
+          : canAct
+            ? "Esc back"
+            : undefined
+      }
       bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{
@@ -77,7 +102,9 @@ export function ContextItemViewerScreen({
       {screen.applyErrorMessage === undefined ? null : (
         <text style={{ fg: "red" }}>{screen.applyErrorMessage}</text>
       )}
-      {detail === null ? (
+      {item === null ? (
+        <text style={{ fg: "red" }}>Context item no longer exists.</text>
+      ) : detail === null ? (
         <text>Loading...</text>
       ) : (
         <DetailView detail={detail} />
@@ -87,23 +114,32 @@ export function ContextItemViewerScreen({
 }
 
 function DetailView({ detail }: { detail: ContextItemDetailView }) {
+  if (detail.kind === "agent-output") {
+    return <AgentDetailView detail={detail} />;
+  }
+
+  if (detail.kind === "code") {
+    return (
+      <scrollbox style={{ height: 40, width: "100%" }}>
+        <HighlightedCode content={detail.content} filePath={detail.filePath} />
+      </scrollbox>
+    );
+  }
+
+  if (detail.kind === "markdown") {
+    return (
+      <scrollbox style={{ height: 40, width: "100%" }}>
+        <HighlightedMarkdown content={detail.content} />
+      </scrollbox>
+    );
+  }
+
   if (detail.kind === "diff") {
     return (
       <>
         <text>{detail.summary}</text>
         <scrollbox style={{ height: 38, width: "100%" }}>
-          <diff
-            diff={detail.diffText}
-            view="unified"
-            showLineNumbers
-            wrapMode="none"
-            addedBg="#12351f"
-            removedBg="#3a1717"
-            addedSignColor="#4ade80"
-            removedSignColor="#f87171"
-            lineNumberFg="#666666"
-            style={{ width: "100%" }}
-          />
+          <HighlightedDiff diff={detail.diffText} />
         </scrollbox>
       </>
     );
@@ -113,6 +149,65 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
     <scrollbox style={{ height: 40, width: "100%" }}>
       <text>{detail.content}</text>
     </scrollbox>
+  );
+}
+
+function AgentDetailView({
+  detail,
+}: {
+  detail: Extract<ContextItemDetailView, { kind: "agent-output" }>;
+}) {
+  const [message, setMessage] = useState("");
+
+  return (
+    <box style={{ flexDirection: "column", gap: 1 }}>
+      <text>{`Prompt: ${detail.prompt}`}</text>
+      <text style={{ fg: detail.status === "error" ? "red" : "gray" }}>
+        {detail.status === "running"
+          ? "Agent running…"
+          : detail.status === "error"
+            ? `Agent error: ${detail.errorMessage ?? "unknown error"}`
+            : "Agent idle"}
+      </text>
+      <AgentOutputLog blocks={detail.blocks} height={32} />
+      <box
+        title="Follow-up"
+        borderStyle="rounded"
+        style={{ border: true, height: 3 }}
+      >
+        <input
+          value={message}
+          placeholder="Send a follow-up to this agent session"
+          focused
+          onInput={setMessage}
+          onKeyDown={(event: KeyEvent) => {
+            if (!isEnterKey(event.name)) {
+              return;
+            }
+
+            const nextMessage = message.trim();
+            if (nextMessage.length === 0) {
+              return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            setMessage("");
+            void sendAgentAskMessage({
+              itemId: detail.itemId,
+              message: nextMessage,
+            });
+          }}
+          style={{ width: "100%" }}
+        />
+      </box>
+    </box>
+  );
+}
+
+function isEnterKey(keyName: string): boolean {
+  return (
+    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
   );
 }
 

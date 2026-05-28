@@ -6,9 +6,12 @@ import type {
   LlmRequestState,
 } from "../../app/appTypes";
 import {
+  createLiveLlmResponseContextItem,
   createSavedDiffContextItem,
   createSavedLlmResponseContextItem,
+  getContextItemById,
   hasContextItem,
+  LiveLlmResponseContextItem,
 } from "../../lib/context/contextItems";
 import type { PatchReviewState } from "../../lib/patch/types";
 
@@ -26,25 +29,9 @@ export function createResponseActions({
 }): AppActions["response"] {
   return {
     appendDelta: ({ delta, requestId }) =>
-      set((state) =>
-        isActiveInProgressLlmRequest(state, requestId)
-          ? setActiveLlmRequest(state, {
-              ...state.activeTask.request,
-              responseText: state.activeTask.request.responseText + delta,
-              status: "streaming",
-            })
-          : state,
-      ),
+      set((state) => appendResponseDelta(state, requestId, delta)),
     fail: ({ errorMessage, requestId }) =>
-      set((state) =>
-        isActiveInProgressLlmRequest(state, requestId)
-          ? setActiveLlmRequest(state, {
-              ...state.activeTask.request,
-              errorMessage,
-              status: "error",
-            })
-          : state,
-      ),
+      set((state) => failResponse(state, requestId, errorMessage)),
     failPatchApply: ({ errorMessage, requestId }) =>
       set((state) =>
         updatePatchApplyState(state, requestId, {
@@ -63,14 +50,14 @@ export function createResponseActions({
     saveTextToContext: ({ requestId }) =>
       set((state) => saveTextToContext(state, requestId)),
     setPatch: ({ patch, requestId }) =>
-      set((state) => {
-        const request = getActiveLlmRequest(state, requestId);
-        if (request === null) {
-          return state;
-        }
-
-        return setPatchOnActiveRequest(state, request, patch);
-      }),
+      set((state) =>
+        setPatchOnActiveRequest(
+          state,
+          getActiveLlmRequest(state, requestId),
+          patch,
+          requestId,
+        ),
+      ),
     startPatchApply: ({ requestId }) =>
       set((state) =>
         updatePatchApplyState(state, requestId, {
@@ -81,14 +68,69 @@ export function createResponseActions({
   };
 }
 
+function appendResponseDelta(
+  state: AppState,
+  requestId: number,
+  delta: string,
+): Partial<AppState> | AppState {
+  const activeUpdate = isActiveInProgressLlmRequest(state, requestId)
+    ? setActiveLlmRequest(state, {
+        ...state.activeTask.request,
+        responseText: state.activeTask.request.responseText + delta,
+        status: "streaming",
+      })
+    : {};
+  const nextState = { ...state, ...activeUpdate };
+
+  return updateLiveLlmResponseItem(nextState, requestId, (item) =>
+    item.withOutput(item.output + delta),
+  );
+}
+
+function failResponse(
+  state: AppState,
+  requestId: number,
+  errorMessage: string,
+): Partial<AppState> | AppState {
+  const activeUpdate = isActiveInProgressLlmRequest(state, requestId)
+    ? setActiveLlmRequest(state, {
+        ...state.activeTask.request,
+        errorMessage,
+        status: "error",
+      })
+    : {};
+  const nextState = { ...state, ...activeUpdate };
+
+  return updateLiveLlmResponseItem(nextState, requestId, (item) =>
+    item.withError(errorMessage),
+  );
+}
+
 function finishResponse(
   state: AppState,
   requestId: number,
   responseText: string,
   responseKind: "patch" | "text",
 ): Partial<AppState> | AppState {
+  const liveItem = getLiveLlmResponseItemByRequestId(state, requestId);
   if (!isActiveInProgressLlmRequest(state, requestId)) {
-    return state;
+    if (liveItem === null || responseKind !== "text") {
+      return state;
+    }
+
+    const item = createSavedLlmResponseContextItem({
+      createdAt: liveItem.createdAt,
+      id: liveItem.id,
+      output: responseText,
+      prompt: liveItem.prompt,
+      sourceRequestId: requestId,
+    });
+
+    return {
+      workspace: ContextDeck.fromComposeScreen(state.workspace)
+        .replace(item)
+        .applyTo(state.workspace),
+    };
   }
 
   const request: LlmRequestState = {
@@ -96,6 +138,29 @@ function finishResponse(
     responseText,
     status: "done",
   };
+
+  if (liveItem !== null && responseKind === "text") {
+    const item = createSavedLlmResponseContextItem({
+      createdAt: liveItem.createdAt,
+      id: liveItem.id,
+      output: responseText,
+      prompt: request.question,
+      sourceRequestId: request.id,
+    });
+
+    return {
+      activeTask: {
+        ...state.activeTask,
+        request: {
+          ...request,
+          savedContextItemId: item.id,
+        },
+      },
+      workspace: ContextDeck.fromComposeScreen(state.workspace)
+        .replace(item)
+        .applyTo(state.workspace),
+    };
+  }
 
   if (
     responseKind !== "text" ||
@@ -132,13 +197,71 @@ function finishResponse(
 
 function setPatchOnActiveRequest(
   state: AppState,
-  request: LlmRequestState,
+  request: LlmRequestState | null,
   patch: PatchReviewState,
+  requestId: number,
 ): Partial<AppState> | AppState {
+  const liveItem = getLiveLlmResponseItemByRequestId(state, requestId);
+  if (request === null) {
+    if (liveItem === null) {
+      return state;
+    }
+
+    if (patch.status !== "valid") {
+      return updateLiveLlmResponseItem(state, requestId, (item) =>
+        item.withError(formatPatchValidationErrors(patch)),
+      );
+    }
+
+    const item = createSavedDiffContextItem({
+      createdAt: liveItem.createdAt,
+      diffText: patch.diffText,
+      id: liveItem.id,
+      prompt: liveItem.prompt,
+      proposal: patch.proposal,
+      sourceRequestId: requestId,
+      summary: patch.proposal.summary,
+    });
+
+    return {
+      workspace: ContextDeck.fromComposeScreen(state.workspace)
+        .replace(item)
+        .applyTo(state.workspace),
+    };
+  }
+
   const requestWithPatch: LlmRequestState = {
     ...request,
     patch,
   };
+
+  if (liveItem !== null && patch.status === "valid") {
+    const item = createSavedDiffContextItem({
+      createdAt: liveItem.createdAt,
+      diffText: patch.diffText,
+      id: liveItem.id,
+      prompt: requestWithPatch.question,
+      proposal: patch.proposal,
+      sourceRequestId: requestWithPatch.id,
+      summary: patch.proposal.summary,
+    });
+
+    return {
+      activeTask:
+        state.activeTask?.kind === "response"
+          ? {
+              ...state.activeTask,
+              request: {
+                ...requestWithPatch,
+                savedContextItemId: item.id,
+              },
+            }
+          : state.activeTask,
+      workspace: ContextDeck.fromComposeScreen(state.workspace)
+        .replace(item)
+        .applyTo(state.workspace),
+    };
+  }
 
   if (
     state.activeTask?.kind !== "response" ||
@@ -268,11 +391,32 @@ function saveTextToContext(
   if (
     state.activeTask?.kind !== "response" ||
     request === null ||
-    request.status !== "done" ||
     request.patch !== undefined ||
-    request.responseText.trim().length === 0 ||
     request.savedContextItemId !== undefined
   ) {
+    return state;
+  }
+
+  if (request.status === "loading" || request.status === "streaming") {
+    const itemId = `saved:${state.nextContextItemId}`;
+    const item = createLiveLlmResponseContextItem({
+      createdAt: Date.now(),
+      id: itemId,
+      output: request.responseText,
+      prompt: request.question,
+      sourceRequestId: request.id,
+    });
+
+    return {
+      activeTask: null,
+      nextContextItemId: state.nextContextItemId + 1,
+      workspace: ContextDeck.fromComposeScreen(state.workspace)
+        .add(item)
+        .applyTo(state.workspace),
+    };
+  }
+
+  if (request.status !== "done" || request.responseText.trim().length === 0) {
     return state;
   }
 
@@ -298,6 +442,47 @@ function saveTextToContext(
       .add(item)
       .applyTo(state.workspace),
   };
+}
+
+function formatPatchValidationErrors(patch: PatchReviewState): string {
+  if (patch.status !== "invalid") {
+    return "Patch could not be applied cleanly.";
+  }
+
+  return patch.errors
+    .map((error) => `${error.path || "<unknown>"}: ${error.message}`)
+    .join("\n");
+}
+
+function updateLiveLlmResponseItem(
+  state: AppState,
+  requestId: number,
+  update: (item: LiveLlmResponseContextItem) => LiveLlmResponseContextItem,
+): Partial<AppState> | AppState {
+  const item = getLiveLlmResponseItemByRequestId(state, requestId);
+  if (item === null) {
+    return state;
+  }
+
+  return {
+    ...state,
+    workspace: ContextDeck.fromComposeScreen(state.workspace)
+      .replace(update(item))
+      .applyTo(state.workspace),
+  };
+}
+
+function getLiveLlmResponseItemByRequestId(
+  state: AppState,
+  requestId: number,
+): LiveLlmResponseContextItem | null {
+  const item = state.workspace.contextItems.find(
+    (contextItem) =>
+      contextItem instanceof LiveLlmResponseContextItem &&
+      contextItem.sourceRequestId === requestId,
+  );
+
+  return item instanceof LiveLlmResponseContextItem ? item : null;
 }
 
 function isActiveInProgressLlmRequest(

@@ -18,7 +18,7 @@ export function createContextItemsActions({
     failSavedDiffApply: ({ errorMessage, itemId }) =>
       set((state) =>
         state.activeTask?.kind === "context-item-viewer" &&
-        state.activeTask.item.id === itemId
+        state.activeTask.itemId === itemId
           ? {
               activeTask: {
                 ...state.activeTask,
@@ -49,7 +49,7 @@ function openContextItem(
   return {
     activeTask: {
       applyStatus: "idle",
-      item,
+      itemId: item.id,
       kind: "context-item-viewer",
     },
   };
@@ -68,7 +68,7 @@ function startSavedDiffApply(
     activeTask: {
       applyErrorMessage: undefined,
       applyStatus: "applying",
-      item,
+      itemId: item.id,
       kind: "context-item-viewer",
     },
   };

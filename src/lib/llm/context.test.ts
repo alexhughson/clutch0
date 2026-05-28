@@ -6,6 +6,7 @@ import {
   createFileContextItem,
   createSavedDiffContextItem,
   createSavedLlmResponseContextItem,
+  PiAgentContextItem,
 } from "../context/contextItems";
 import { buildLlmContext, MAX_FILE_CONTEXT_CHARACTERS } from "./context";
 
@@ -104,6 +105,69 @@ test("builds LLM context from saved responses and diffs", async () => {
   expect(getUserContent(context)).toContain("The answer is 42.");
   expect(getUserContent(context)).toContain("<saved_diff");
   expect(getUserContent(context)).toContain("Update answer");
+});
+
+test("agent session context includes only the latest assistant message", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  const { context } = await buildLlmContext({
+    contextItems: [
+      new PiAgentContextItem(
+        "agent:1",
+        "Investigate routing",
+        [
+          {
+            id: "status:1",
+            kind: "status",
+            message: "pi: thinking",
+            timestamp: 1,
+          },
+          {
+            id: "stream:1",
+            kind: "stream",
+            streamKind: "assistant",
+            text: "First answer.",
+            timestamp: 2,
+          },
+          {
+            id: "tool:1",
+            kind: "tool",
+            phase: "start",
+            summary: "read src/index.ts",
+            timestamp: 3,
+            toolName: "read",
+          },
+          {
+            id: "stream:2",
+            kind: "stream",
+            streamKind: "thinking",
+            text: "Private reasoning",
+            timestamp: 4,
+          },
+          {
+            id: "stream:3",
+            kind: "stream",
+            streamKind: "assistant",
+            text: "Latest answer.",
+            timestamp: 5,
+          },
+        ],
+        "idle",
+        1_700_000_000_000,
+      ),
+    ],
+    question: "Use agent context",
+    root,
+  });
+
+  const userContent = getUserContent(context);
+  expect(userContent).toContain("<prompt>\nInvestigate routing\n</prompt>");
+  expect(userContent).toContain(
+    "<latest_agent_message>\nLatest answer.\n</latest_agent_message>",
+  );
+  expect(userContent).not.toContain("First answer.");
+  expect(userContent).not.toContain("Private reasoning");
+  expect(userContent).not.toContain("read src/index.ts");
+  expect(userContent).not.toContain("pi: thinking");
 });
 
 test("skips paths outside the root", async () => {

@@ -1,7 +1,13 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
+import type {
+  AgentOutputBlock,
+  AgentOutputUpdate,
+} from "../agentOutput/agentOutputTypes";
+import { applyAgentOutputUpdate } from "../agentOutput/agentOutputReducer";
 import type { PatchProposal } from "../patch/types";
+import type { ShellCommandResult } from "../shell/shellCommand";
 import type {
   ContextItem,
   ContextItemAction,
@@ -87,7 +93,8 @@ export class FileContextItem implements ContextItem {
         file.status === "included"
           ? `${file.content}${file.truncated ? "\n[File truncated.]" : ""}`
           : (file.errorMessage ?? "Unable to read file."),
-      kind: "text" as const,
+      filePath: this.filePath,
+      kind: "code" as const,
       title: this.filePath,
     };
   }
@@ -179,7 +186,7 @@ export class SavedLlmResponseContextItem implements ContextItem {
   async getDetailView() {
     return {
       content: this.output,
-      kind: "text" as const,
+      kind: "markdown" as const,
       title: `Output for: ${summarize(this.prompt)}`,
     };
   }
@@ -190,6 +197,313 @@ export class SavedLlmResponseContextItem implements ContextItem {
     return {
       consumedFileCharacters: 0,
       text: `<llm_response${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString() })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<output>\n${truncateContent(this.output, MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n</llm_response>`,
+    };
+  }
+}
+
+export class ShellCommandOutputContextItem implements ContextItem {
+  readonly type = "shell-command-output";
+
+  constructor(
+    readonly id: string,
+    readonly result: ShellCommandResult,
+    readonly sourceRequestId: number,
+    readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: summarize(formatShellCommandOutput(this.result)),
+      title: `Command: ${summarize(this.result.command)}`,
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): ShellCommandOutputContextItem {
+    return new ShellCommandOutputContextItem(
+      this.id,
+      this.result,
+      this.sourceRequestId,
+      this.createdAt,
+      summaryState,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    const sourceText = `Command:\n${truncateContent(this.result.command, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nOutput:\n${truncateContent(formatShellCommandOutput(this.result), MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `Command: ${summarize(this.result.command)}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
+  }
+
+  async getDetailView() {
+    return {
+      content: formatShellCommandOutput(this.result),
+      kind: "text" as const,
+      title: `Command: ${summarize(this.result.command)}`,
+    };
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<shell_command_output${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), command: this.result.command, exit_code: this.result.exitCode ?? "signal", signal: this.result.signal })}>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</shell_command_output>`,
+    };
+  }
+}
+
+export class LiveLlmResponseContextItem implements ContextItem {
+  readonly type = "llm-response-live";
+
+  constructor(
+    readonly id: string,
+    readonly prompt: string,
+    readonly output: string,
+    readonly sourceRequestId: number,
+    readonly createdAt: number,
+    readonly status: "error" | "running",
+    readonly errorMessage: string | undefined = undefined,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail:
+        this.status === "error"
+          ? `Error: ${this.errorMessage ?? "Request failed."}`
+          : summarize(this.output || "Waiting for response…"),
+      title: `Running prompt: ${summarize(this.prompt)}`,
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): LiveLlmResponseContextItem {
+    return new LiveLlmResponseContextItem(
+      this.id,
+      this.prompt,
+      this.output,
+      this.sourceRequestId,
+      this.createdAt,
+      this.status,
+      this.errorMessage,
+      summaryState,
+    );
+  }
+
+  withOutput(output: string): LiveLlmResponseContextItem {
+    return new LiveLlmResponseContextItem(
+      this.id,
+      this.prompt,
+      output,
+      this.sourceRequestId,
+      this.createdAt,
+      this.status,
+      this.errorMessage,
+      this.summaryState,
+    );
+  }
+
+  withError(errorMessage: string): LiveLlmResponseContextItem {
+    return new LiveLlmResponseContextItem(
+      this.id,
+      this.prompt,
+      this.output,
+      this.sourceRequestId,
+      this.createdAt,
+      "error",
+      errorMessage,
+      this.summaryState,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    if (this.status === "running") {
+      return null;
+    }
+
+    const sourceText = `Prompt:\n${truncateContent(this.prompt, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nStatus: ${this.status}\n\nOutput:\n${truncateContent(this.output, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nError:\n${this.errorMessage ?? ""}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `Prompt result: ${summarize(this.prompt)}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
+  }
+
+  async getDetailView() {
+    const statusLine =
+      this.status === "running"
+        ? "[Request still running.]"
+        : `[Request failed: ${this.errorMessage ?? "unknown error"}]`;
+
+    return {
+      content: `${statusLine}\n\n${this.output}`,
+      kind: "markdown" as const,
+      title: `Running prompt: ${summarize(this.prompt)}`,
+    };
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<live_llm_response${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), status: this.status })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<output>\n${truncateContent(this.output, MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n${this.errorMessage === undefined ? "" : `<error>\n${truncateContent(this.errorMessage, MAX_SAVED_CONTEXT_CHARACTERS)}\n</error>\n`}</live_llm_response>`,
+    };
+  }
+}
+
+export class PiAgentContextItem implements ContextItem {
+  readonly type = "pi-agent";
+
+  constructor(
+    readonly id: string,
+    readonly prompt: string,
+    readonly blocks: readonly AgentOutputBlock[],
+    readonly status: "error" | "idle" | "running",
+    readonly createdAt: number,
+    readonly errorMessage: string | undefined = undefined,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail:
+        this.status === "running"
+          ? "Agent is running…"
+          : summarize(formatAgentOutputBlocks(this.blocks)),
+      title: `Agent: ${summarize(this.prompt)}`,
+    });
+  }
+
+  withSummaryState(summaryState: ContextItemSummaryState): PiAgentContextItem {
+    return new PiAgentContextItem(
+      this.id,
+      this.prompt,
+      this.blocks,
+      this.status,
+      this.createdAt,
+      this.errorMessage,
+      summaryState,
+    );
+  }
+
+  withAgentOutputUpdate(update: AgentOutputUpdate): PiAgentContextItem {
+    return new PiAgentContextItem(
+      this.id,
+      this.prompt,
+      applyAgentOutputUpdate(this.blocks, update),
+      this.status,
+      this.createdAt,
+      this.errorMessage,
+      this.summaryState,
+    );
+  }
+
+  withStatus(
+    status: "error" | "idle" | "running",
+    errorMessage?: string,
+  ): PiAgentContextItem {
+    return new PiAgentContextItem(
+      this.id,
+      this.prompt,
+      this.blocks,
+      status,
+      this.createdAt,
+      errorMessage,
+      this.summaryState,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    if (this.status === "running") {
+      return null;
+    }
+
+    const output = formatAgentOutputBlocks(this.blocks);
+    if (output.trim().length === 0 && this.errorMessage === undefined) {
+      return null;
+    }
+
+    const sourceText = `Prompt:\n${truncateContent(this.prompt, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nStatus: ${this.status}\n\nOutput:\n${truncateContent(output, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nError:\n${this.errorMessage ?? ""}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `Agent: ${summarize(this.prompt)}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
+  }
+
+  async getDetailView() {
+    return {
+      blocks: this.blocks,
+      errorMessage: this.errorMessage,
+      itemId: this.id,
+      kind: "agent-output" as const,
+      prompt: this.prompt,
+      status: this.status,
+      title: `Agent: ${summarize(this.prompt)}`,
+    };
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    const latestMessage = getLatestAgentAssistantMessage(this.blocks);
+
+    return {
+      consumedFileCharacters: 0,
+      text: `<pi_agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), status: this.status })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<latest_agent_message>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</latest_agent_message>\n</pi_agent_session>`,
     };
   }
 }
@@ -286,6 +600,41 @@ export function createFileContextItem(filePath: FilePath): FileContextItem {
   return new FileContextItem(filePath);
 }
 
+export function createLiveLlmResponseContextItem({
+  createdAt,
+  id,
+  output = "",
+  prompt,
+  sourceRequestId,
+}: {
+  createdAt: number;
+  id: string;
+  output?: string;
+  prompt: string;
+  sourceRequestId: number;
+}): LiveLlmResponseContextItem {
+  return new LiveLlmResponseContextItem(
+    id,
+    prompt,
+    output,
+    sourceRequestId,
+    createdAt,
+    "running",
+  );
+}
+
+export function createPiAgentContextItem({
+  createdAt,
+  id,
+  prompt,
+}: {
+  createdAt: number;
+  id: string;
+  prompt: string;
+}): PiAgentContextItem {
+  return new PiAgentContextItem(id, prompt, [], "running", createdAt);
+}
+
 export function createSavedLlmResponseContextItem({
   createdAt,
   id,
@@ -303,6 +652,25 @@ export function createSavedLlmResponseContextItem({
     id,
     prompt,
     output,
+    sourceRequestId,
+    createdAt,
+  );
+}
+
+export function createShellCommandOutputContextItem({
+  createdAt,
+  id,
+  result,
+  sourceRequestId,
+}: {
+  createdAt: number;
+  id: string;
+  result: ShellCommandResult;
+  sourceRequestId: number;
+}): ShellCommandOutputContextItem {
+  return new ShellCommandOutputContextItem(
+    id,
+    result,
     sourceRequestId,
     createdAt,
   );
@@ -473,6 +841,49 @@ async function readFileContext({
       errorMessage: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+function getLatestAgentAssistantMessage(
+  blocks: readonly AgentOutputBlock[],
+): string | null {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    if (block?.kind === "stream" && block.streamKind === "assistant") {
+      return block.text;
+    }
+  }
+
+  return null;
+}
+
+function formatAgentOutputBlocks(blocks: readonly AgentOutputBlock[]): string {
+  return blocks
+    .map((block) => {
+      if (block.kind === "status") {
+        return block.message;
+      }
+
+      if (block.kind === "tool") {
+        const suffix = block.summary.length === 0 ? "" : `: ${block.summary}`;
+        return `tool ${block.toolName} ${block.phase}${suffix}`;
+      }
+
+      return `${block.streamKind}: ${block.text}`;
+    })
+    .join("\n");
+}
+
+function formatShellCommandOutput(result: ShellCommandResult): string {
+  const metadata = [
+    `$ ${result.command}`,
+    `exit code: ${result.exitCode ?? "signal"}`,
+    result.signal === undefined ? null : `signal: ${result.signal}`,
+    `duration: ${result.durationMs}ms`,
+    result.timedOut ? "timed out" : null,
+    result.truncated ? "output truncated" : null,
+  ].filter((line): line is string => line !== null);
+
+  return `${metadata.join("\n")}\n\nstdout:\n${result.stdout}\n\nstderr:\n${result.stderr}`;
 }
 
 function formatFile(

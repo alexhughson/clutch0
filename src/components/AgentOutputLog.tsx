@@ -1,4 +1,5 @@
 import type { AgentOutputBlock } from "../lib/agentOutput/agentOutputTypes";
+import { HighlightedMarkdown } from "./SyntaxHighlightedContent";
 
 type AgentOutputLogProps = {
   blocks: readonly AgentOutputBlock[];
@@ -45,14 +46,14 @@ function AgentOutputBlockView({ block }: { block: AgentOutputBlock }) {
     );
   }
 
-  const label = block.streamKind === "thinking" ? "thinking" : "assistant";
+  if (block.streamKind === "thinking") {
+    return <text style={{ fg: "gray" }}>{`thinking: ${block.text}`}</text>;
+  }
+
   return (
     <box style={{ flexDirection: "column" }}>
-      <text
-        style={{ fg: block.streamKind === "thinking" ? "gray" : undefined }}
-      >
-        {`${label}: ${block.text}`}
-      </text>
+      <text style={{ fg: "gray" }}>assistant:</text>
+      <HighlightedMarkdown content={block.text} />
     </box>
   );
 }

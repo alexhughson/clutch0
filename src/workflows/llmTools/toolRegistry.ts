@@ -1,6 +1,8 @@
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
+import { createFileWorkflowTool } from "../createFile/createFileWorkflowTool";
 import { findFilesWorkflowTool } from "../findFiles/findFilesTool";
 import { patchWorkflowTool } from "./patchWorkflowTool";
+import { shellCommandWorkflowTool } from "./shellCommandWorkflowTool";
 import type {
   LlmSlashCommand,
   LlmWorkflowToolController,
@@ -13,9 +15,21 @@ export type LlmSlashCommandInvocation = {
 };
 
 const workflowToolControllers: readonly LlmWorkflowToolController[] = [
+  createFileWorkflowTool,
   findFilesWorkflowTool,
   patchWorkflowTool,
+  shellCommandWorkflowTool,
 ];
+
+const agentAskSlashCommand: LlmSlashCommand = {
+  allowedToolNames: [],
+  description:
+    "Ask a long-running pi sub-agent and save its session as context.",
+  name: "agent-ask",
+  promptDirective: "",
+  taskKind: "agent-ask",
+  title: "Ask pi agent",
+};
 
 const askSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
@@ -24,6 +38,15 @@ const askSlashCommand: LlmSlashCommand = {
   promptDirective:
     "The user invoked /ask. Answer the user's question directly. Do not call workflow tools.",
   title: "Ask a question",
+};
+
+const showContextSlashCommand: LlmSlashCommand = {
+  allowedToolNames: [],
+  description: "Preview the rendered LLM context for debugging.",
+  name: "show-context",
+  promptDirective: "",
+  taskKind: "show-context",
+  title: "Show rendered context",
 };
 
 export function getLlmWorkflowTools({
@@ -39,6 +62,8 @@ export function getLlmWorkflowTools({
 export function getLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
+    agentAskSlashCommand,
+    showContextSlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
       controller.slashCommand === undefined
         ? []
@@ -104,7 +129,9 @@ function getLlmWorkflowToolControllers({
   allowedToolNames?: readonly string[];
 } = {}): readonly LlmWorkflowToolController[] {
   if (allowedToolNames === undefined) {
-    return workflowToolControllers;
+    return workflowToolControllers.filter(
+      (controller) => controller.enabledByDefault !== false,
+    );
   }
 
   const allowedToolNameSet = new Set(allowedToolNames);

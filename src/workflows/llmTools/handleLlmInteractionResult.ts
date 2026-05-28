@@ -52,6 +52,19 @@ const llmInteractionResultHandlers: LlmInteractionResultHandler[] = [
       });
     },
   },
+  {
+    kind: "create-file",
+    handle: ({ actions, requestId, result }) => {
+      if (result.kind !== "create-file") {
+        return;
+      }
+
+      actions.createFile.showReview({
+        requestId,
+        validation: result.validation,
+      });
+    },
+  },
 ];
 
 export function handleLlmInteractionResult({

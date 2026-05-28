@@ -1,5 +1,9 @@
 import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
+import {
+  HighlightedDiff,
+  HighlightedMarkdown,
+} from "./SyntaxHighlightedContent";
 import { applyPatchProposal } from "../lib/patch/patchEngine";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
 
@@ -50,7 +54,12 @@ function TextResponse({ request }: { request: LlmRequestState }) {
       style={{ border: true, flexDirection: "column", padding: 1 }}
     >
       {request.responseText.length > 0 ? (
-        <text>{request.responseText}</text>
+        <scrollbox style={{ height: 36, width: "100%" }}>
+          <HighlightedMarkdown
+            content={request.responseText}
+            streaming={request.status === "loading"}
+          />
+        </scrollbox>
       ) : (
         <text>
           {request.status === "loading" ? "Waiting for model..." : ""}
@@ -88,18 +97,7 @@ function PatchReview({ request }: { request: LlmRequestState }) {
             width: "100%",
           }}
         >
-          <diff
-            diff={patch.diffText}
-            view="unified"
-            showLineNumbers
-            wrapMode="none"
-            addedBg="#12351f"
-            removedBg="#3a1717"
-            addedSignColor="#4ade80"
-            removedSignColor="#f87171"
-            lineNumberFg="#666666"
-            style={{ width: "100%" }}
-          />
+          <HighlightedDiff diff={patch.diffText} />
         </scrollbox>
       ) : (
         <box style={{ flexDirection: "column" }}>
@@ -150,6 +148,16 @@ function handleTextResponseKey({
   event: KeyEvent;
   request: LlmRequestState;
 }) {
+  if (
+    (request.status === "loading" || request.status === "streaming") &&
+    event.name === "s"
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.response.saveTextToContext({ requestId: request.id });
+    return;
+  }
+
   if (request.status === "loading" || request.status === "streaming") {
     return;
   }
@@ -227,7 +235,9 @@ function handlePatchReviewKey({
 
 function getTextResponseHotkeys(request: LlmRequestState): string | undefined {
   if (request.status === "loading" || request.status === "streaming") {
-    return undefined;
+    return request.savedContextItemId === undefined
+      ? "s save to context"
+      : undefined;
   }
 
   if (request.status === "error") {

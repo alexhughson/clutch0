@@ -75,7 +75,7 @@ test("finishing saved diff apply closes the task and removes the diff", () => {
     actions: {} as AppActions,
     activeTask: {
       applyStatus: "applying",
-      item: diff,
+      itemId: diff.id,
       kind: "context-item-viewer",
     },
     nextContextItemId: 2,

@@ -104,7 +104,7 @@ test("moves command highlight through visible commands", () => {
       highlightedCommandName: "ask",
       visibleCommands: suggestionState.visibleCommands,
     }),
-  ).toBe("find");
+  ).toBe("agent-ask");
 });
 
 test("keeps cursor near a mid-line insertion", () => {

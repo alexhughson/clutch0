@@ -11,7 +11,7 @@ export const patchWorkflowTool: LlmWorkflowToolController = {
     description: "Ask the LLM to propose a code edit using the patch workflow.",
     name: "edit",
     promptDirective:
-      "The user invoked /edit. Use the propose_patch tool to propose code edits if the request is actionable with the available context. If more context is needed, explain what is missing.",
+      "The user invoked /edit. If the request is actionable with the available context, you must call the propose_patch tool with exact edits. Do not answer with a prose-only implementation plan when you can produce a patch. If more context is needed, briefly explain what is missing instead of calling the tool.",
     title: "Edit code",
   },
   tool: proposePatchTool,

@@ -6,8 +6,11 @@ import {
   NoSlashCommandSelector,
   type SlashCommandSelectorMatch,
 } from "../../lib/inputLineParser";
+import { startAgentAskRequest } from "../../workflows/agentAsk/startAgentAskRequest";
 import { applySavedDiffContextItem } from "../../workflows/contextItems/contextItemEffects";
 import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
+import { startShellCommandRequest } from "../../workflows/shellCommand/startShellCommandRequest";
+import { startShowContextRequest } from "../../workflows/showContext/startShowContextRequest";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
@@ -398,12 +401,32 @@ function submitQuestion(event: KeyEvent) {
 
   const slashCommandInvocation = parseLlmSlashCommandInvocation(question);
   const requestQuestion = slashCommandInvocation?.input ?? question;
-  if (requestQuestion.length === 0) {
+  if (
+    requestQuestion.length === 0 &&
+    slashCommandInvocation?.command.taskKind !== "show-context"
+  ) {
     return;
   }
 
   event.preventDefault();
   event.stopPropagation();
+
+  if (slashCommandInvocation?.command.taskKind === "show-context") {
+    startShowContextRequest(requestQuestion);
+    return;
+  }
+
+  if (slashCommandInvocation?.command.taskKind === "agent-ask") {
+    startAgentAskRequest(requestQuestion);
+    return;
+  }
+
+  if (slashCommandInvocation?.command.taskKind === "shell-command") {
+    startShellCommandRequest(requestQuestion, {
+      commandDirective: slashCommandInvocation.command.promptDirective,
+    });
+    return;
+  }
 
   startLlmRequest(requestQuestion, {
     allowedToolNames: slashCommandInvocation?.command.allowedToolNames,

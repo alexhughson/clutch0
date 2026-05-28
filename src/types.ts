@@ -1,3 +1,5 @@
+import type { AgentOutputBlock } from "./lib/agentOutput/agentOutputTypes";
+
 export type FilePath = string;
 
 export interface ContextItem {
@@ -64,7 +66,27 @@ export type GetContextItemSummaryInputOptions = {
 export type ContextItemDetailView =
   | {
       content: string;
+      filePath?: string;
+      kind: "code";
+      title: string;
+    }
+  | {
+      content: string;
+      kind: "markdown";
+      title: string;
+    }
+  | {
+      content: string;
       kind: "text";
+      title: string;
+    }
+  | {
+      blocks: readonly AgentOutputBlock[];
+      errorMessage?: string;
+      itemId: string;
+      kind: "agent-output";
+      prompt: string;
+      status: "error" | "idle" | "running";
       title: string;
     }
   | {
