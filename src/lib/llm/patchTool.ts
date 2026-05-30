@@ -1,4 +1,5 @@
 import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
+import { invariant } from "../invariant";
 import type { PatchProposal } from "../patch/types";
 
 export const PROPOSE_PATCH_TOOL_NAME = "propose_patch";
@@ -31,39 +32,47 @@ export const proposePatchTool: Tool = {
   }),
 };
 
-export function getPatchProposalFromToolCalls(
-  toolCalls: readonly ToolCall[],
-): PatchProposal | null {
-  const toolCall = toolCalls.find(
-    (call) => call.name === PROPOSE_PATCH_TOOL_NAME,
+export function patchProposalFromToolCall(toolCall: ToolCall): PatchProposal {
+  invariant(
+    toolCall.name === PROPOSE_PATCH_TOOL_NAME,
+    `propose_patch received unexpected tool ${toolCall.name}`,
   );
-  if (toolCall === undefined) {
-    return null;
-  }
 
-  return normalizePatchProposal(toolCall.arguments);
-}
-
-function normalizePatchProposal(
-  arguments_: Record<string, unknown>,
-): PatchProposal {
-  const summary =
-    typeof arguments_.summary === "string"
-      ? arguments_.summary
-      : "Proposed changes";
-  const rawEdits = Array.isArray(arguments_.edits) ? arguments_.edits : [];
+  const arguments_ = toolCall.arguments;
+  invariant(
+    typeof arguments_.summary === "string",
+    "propose_patch.summary must be a string.",
+  );
+  invariant(
+    Array.isArray(arguments_.edits),
+    "propose_patch.edits must be an array.",
+  );
 
   return {
-    summary,
-    edits: rawEdits
-      .filter(
-        (edit): edit is Record<string, unknown> =>
-          typeof edit === "object" && edit !== null,
-      )
-      .map((edit) => ({
-        path: typeof edit.path === "string" ? edit.path : "",
-        oldText: typeof edit.oldText === "string" ? edit.oldText : "",
-        newText: typeof edit.newText === "string" ? edit.newText : "",
-      })),
+    summary: arguments_.summary,
+    edits: arguments_.edits.map((edit, index) => {
+      invariant(
+        typeof edit === "object" && edit !== null,
+        `propose_patch.edits[${index}] must be an object.`,
+      );
+      invariant(
+        typeof edit.path === "string",
+        `propose_patch.edits[${index}].path must be a string.`,
+      );
+      invariant(
+        typeof edit.oldText === "string",
+        `propose_patch.edits[${index}].oldText must be a string.`,
+      );
+      invariant(
+        typeof edit.newText === "string",
+        `propose_patch.edits[${index}].newText must be a string.`,
+      );
+
+      return {
+        path: edit.path,
+        oldText: edit.oldText,
+        newText: edit.newText,
+      };
+    }),
   };
 }

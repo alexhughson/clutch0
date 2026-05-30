@@ -1,0 +1,1 @@
+The user invoked /edit. If the request is actionable with the available context, you must call the propose_patch tool with exact edits. Do not answer with a prose-only implementation plan when you can produce a patch. If more context is needed, briefly explain what is missing instead of calling the tool.

@@ -22,6 +22,10 @@ export type ContextItemReplacementTarget = {
   expectedResult: "diff" | "text";
 };
 
+export type ShellCommandReplacementTarget = {
+  contextItemId: string;
+};
+
 type LlmRequestBase = {
   contextItems: ContextItem[];
   focusedContextItemId: string | null;
@@ -105,6 +109,7 @@ export type ShellCommandTaskState = {
   id: number;
   kind: "shell-command";
   prompt: string;
+  replacement?: ShellCommandReplacementTarget;
   result?: ShellCommandResult;
   savedContextItemId?: string;
   status: "done" | "error" | "running";
@@ -193,7 +198,10 @@ export type AppActions = {
       result: ShellCommandResult;
     }) => void;
     saveOutputToContext: (options: { requestId: number }) => void;
-    start: (options: { prompt: string }) => number | null;
+    start: (options: {
+      prompt: string;
+      replacement?: ShellCommandReplacementTarget;
+    }) => number | null;
   };
   findFiles: {
     addAllCandidates: () => void;

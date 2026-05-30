@@ -1,0 +1,4 @@
+{{commandDirective}}
+
+User request:
+{{question}}

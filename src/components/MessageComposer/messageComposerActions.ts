@@ -1,4 +1,5 @@
 import type { KeyEvent } from "@opentui/core";
+import { getContextItemActionForKeyEvent } from "../../lib/context/contextItemActions";
 import { getContextItemById } from "../../lib/context/contextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import {
@@ -9,7 +10,10 @@ import {
 import { startAgentAskRequest } from "../../workflows/agentAsk/startAgentAskRequest";
 import { applySavedDiffContextItem } from "../../workflows/contextItems/contextItemEffects";
 import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
-import { startShellCommandRequest } from "../../workflows/shellCommand/startShellCommandRequest";
+import {
+  startShellCommandRequest,
+  startShellCommandRerun,
+} from "../../workflows/shellCommand/startShellCommandRequest";
 import { startShowContextRequest } from "../../workflows/showContext/startShowContextRequest";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
@@ -85,9 +89,6 @@ export function handleMessageComposerKeyDown({
   setHighlightedFilePath: (highlightedFilePath: HighlightedFilePath) => void;
 }) {
   const action = getMessageComposerKeyAction(event);
-  if (action === null) {
-    return;
-  }
 
   const currentState = useAppStore.getState();
   if (currentState.activeTask !== null) {
@@ -359,32 +360,7 @@ function handleContextOrSubmitAction({
     return;
   }
 
-  if (action === "apply-focused-context-item") {
-    event.preventDefault();
-    event.stopPropagation();
-    runFocusedContextItemAction("apply");
-    return;
-  }
-
-  if (action === "open-focused-context-item") {
-    event.preventDefault();
-    event.stopPropagation();
-    runFocusedContextItemAction("open");
-    return;
-  }
-
-  if (action === "remove-focused-context-item") {
-    event.preventDefault();
-    event.stopPropagation();
-    runFocusedContextItemAction("remove");
-    return;
-  }
-
-  if (action === "rerun-focused-context-item") {
-    event.preventDefault();
-    event.stopPropagation();
-    runFocusedContextItemAction("rerun");
-  }
+  runFocusedContextItemActionForKey(event);
 }
 
 function submitQuestion(event: KeyEvent) {
@@ -403,7 +379,8 @@ function submitQuestion(event: KeyEvent) {
   const requestQuestion = slashCommandInvocation?.input ?? question;
   if (
     requestQuestion.length === 0 &&
-    slashCommandInvocation?.command.taskKind !== "show-context"
+    slashCommandInvocation?.command.taskKind !== "show-context" &&
+    slashCommandInvocation?.command.taskKind !== "agent-skill"
   ) {
     return;
   }
@@ -421,6 +398,11 @@ function submitQuestion(event: KeyEvent) {
     return;
   }
 
+  if (slashCommandInvocation?.command.taskKind === "agent-skill") {
+    startAgentAskRequest(question);
+    return;
+  }
+
   if (slashCommandInvocation?.command.taskKind === "shell-command") {
     startShellCommandRequest(requestQuestion, {
       commandDirective: slashCommandInvocation.command.promptDirective,
@@ -434,7 +416,7 @@ function submitQuestion(event: KeyEvent) {
   });
 }
 
-function runFocusedContextItemAction(actionId: string) {
+function runFocusedContextItemActionForKey(event: KeyEvent) {
   const currentState = useAppStore.getState();
   if (currentState.activeTask !== null) {
     return;
@@ -444,13 +426,20 @@ function runFocusedContextItemAction(actionId: string) {
     currentState.workspace.contextItems,
     currentState.workspace.focusedContextItemId,
   );
-  const action = focusedItem
-    ?.getActions()
-    .find((candidate) => candidate.id === actionId);
-  if (action === undefined) {
+  if (focusedItem === null) {
     return;
   }
 
+  const action = getContextItemActionForKeyEvent({
+    actions: focusedItem.getActions(),
+    event,
+  });
+  if (action === null) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
   runContextItemAction(action);
 }
 
@@ -472,5 +461,7 @@ function runContextItemAction(action: ContextItemAction) {
           expectedResult,
         },
       }),
+    rerunShellCommand: ({ command, replaceContextItemId }) =>
+      startShellCommandRerun({ command, replaceContextItemId }),
   });
 }

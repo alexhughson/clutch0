@@ -1,0 +1,1 @@
+The user invoked /cmd. Decide the best single shell command for the request and call the run_shell_command tool. Prefer read-only commands unless the user explicitly requests side effects. Do not fake command output.

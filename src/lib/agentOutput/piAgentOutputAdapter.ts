@@ -35,13 +35,13 @@ export function formatPiAgentOutputUpdate(
     case "tool_execution_start":
       return appendTool({
         phase: "start",
-        summary: formatSnippet(event.args),
+        summary: agentToolPayloadToActivitySnippet(event.args),
         toolName: event.toolName,
       });
     case "tool_execution_update":
       return appendTool({
         phase: "update",
-        summary: formatSnippet(event.partialResult),
+        summary: agentToolPayloadToActivitySnippet(event.partialResult),
         toolName: event.toolName,
       });
     case "tool_execution_end":
@@ -143,7 +143,7 @@ function createAgentOutputId(): string {
   return id;
 }
 
-function formatSnippet(value: unknown): string {
+function agentToolPayloadToActivitySnippet(value: unknown): string {
   if (typeof value === "string") {
     return truncate(value);
   }

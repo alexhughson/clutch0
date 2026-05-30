@@ -8,19 +8,11 @@ import type {
   GeneratedContextItemSummary,
 } from "../../types";
 import { resolveLlmModel } from "./model";
+import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;
 const MAX_ONE_LINE_CHARACTERS = 100;
 const MAX_DETAILS_CHARACTERS = 700;
-
-const contextItemSummarySystemPrompt = `You summarize individual context items for a terminal UI.
-Return only strict JSON with this shape:
-{"oneLine":"short one-line summary","details":"longer summary"}
-Rules:
-- oneLine must be concise and useful in a list.
-- details must explain why the item may matter as context.
-- Do not include markdown fences.
-- Do not invent details not present in the input.`;
 
 export type ContextItemSummaryGenerator = (
   input: ContextItemSummarizationInput,
@@ -32,7 +24,11 @@ export async function generateContextItemSummary(
   const message = await complete(resolveLlmModel(), {
     messages: [
       {
-        content: `Summarize this context item.\n\nType: ${input.type}\nLabel: ${input.label}\n\nContent:\n${input.content.slice(0, MAX_SUMMARY_INPUT_CHARACTERS)}`,
+        content: renderPrompt("context-summary/user.md", {
+          content: input.content.slice(0, MAX_SUMMARY_INPUT_CHARACTERS),
+          label: input.label,
+          type: input.type,
+        }),
         role: "user",
         timestamp: Date.now(),
       },

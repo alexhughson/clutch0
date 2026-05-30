@@ -143,7 +143,7 @@ async function runSummaryWorker({
     const summary = await generateSummary(input);
     finishSummaryWorker(set, input.itemId, workerId, summary);
   } catch (error) {
-    failSummaryWorker(set, input, workerId, formatThrownValue(error));
+    failSummaryWorker(set, input, workerId, summaryFailureMessage(error));
   }
 }
 
@@ -240,6 +240,6 @@ function getSummaryWorkerId(input: ContextItemSummarizationInput): string {
   return `summary:${input.itemId}:${input.sourceHash.slice(0, 16)}`;
 }
 
-function formatThrownValue(error: unknown): string {
+function summaryFailureMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }

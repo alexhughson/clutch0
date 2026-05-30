@@ -20,7 +20,10 @@ export function HighlightedCode({
   return (
     <code
       content={content}
-      filetype={filetype ?? getFiletypeForPath(filePath)}
+      filetype={
+        filetype ??
+        (filePath === undefined ? undefined : pathToFiletype(filePath))
+      }
       syntaxStyle={getSharedSyntaxStyle()}
       treeSitterClient={getSharedTreeSitterClient()}
       wrapMode="none"
@@ -65,14 +68,6 @@ export function HighlightedMarkdown({
       style={{ width: "100%" }}
     />
   );
-}
-
-function getFiletypeForPath(filePath: string | undefined): string | undefined {
-  if (filePath === undefined) {
-    return undefined;
-  }
-
-  return pathToFiletype(filePath);
 }
 
 function getSharedTreeSitterClient(): ReturnType<typeof getTreeSitterClient> {

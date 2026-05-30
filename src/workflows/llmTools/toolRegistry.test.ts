@@ -12,6 +12,7 @@ import {
   getLlmWorkflowTools,
   parseLlmSlashCommandInvocation,
   routeLlmWorkflowToolCalls,
+  setAgentAskSkillSlashCommands,
 } from "./toolRegistry";
 
 test("routes find relevant files tool calls to the find files workflow", async () => {
@@ -92,8 +93,8 @@ test("routes shell command tool calls and captures output", async () => {
   });
 });
 
-test("does not expose shell commands to unrestricted LLM requests", async () => {
-  expect(getLlmWorkflowTools().map((tool) => tool.name)).not.toContain(
+test("exposes shell commands to unrestricted LLM requests", async () => {
+  expect(getLlmWorkflowTools().map((tool) => tool.name)).toContain(
     RUN_SHELL_COMMAND_TOOL_NAME,
   );
 
@@ -110,7 +111,14 @@ test("does not expose shell commands to unrestricted LLM requests", async () => 
     ],
   });
 
-  expect(result).toBeNull();
+  expect(result).toMatchObject({
+    kind: "command-output",
+    result: {
+      command: "printf clutch-cmd",
+      exitCode: 0,
+      stdout: "clutch-cmd",
+    },
+  });
 });
 
 test("restricts workflow tools by allowed tool names", () => {
@@ -122,6 +130,24 @@ test("restricts workflow tools by allowed tool names", () => {
       allowedToolNames: [FIND_RELEVANT_FILES_TOOL_NAME],
     }).map((tool) => tool.name),
   ).toEqual([FIND_RELEVANT_FILES_TOOL_NAME]);
+  expect(() =>
+    getLlmWorkflowTools({ allowedToolNames: ["missing_tool"] }),
+  ).toThrow("Allowed workflow tool is not registered");
+});
+
+test("rejects malformed workflow tool calls", async () => {
+  await expect(
+    routeLlmWorkflowToolCalls({
+      toolCalls: [
+        {
+          type: "toolCall",
+          id: "tool-1",
+          name: FIND_RELEVANT_FILES_TOOL_NAME,
+          arguments: {},
+        } satisfies ToolCall,
+      ],
+    }),
+  ).rejects.toThrow("find_relevant_files.goal must be a non-empty string");
 });
 
 test("derives slash commands from workflow tools plus ask", () => {
@@ -166,4 +192,29 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
     input: "auth routing",
   });
   expect(parseLlmSlashCommandInvocation("/wat auth routing")).toBeNull();
+});
+
+test("parses agent skill slash commands", () => {
+  setAgentAskSkillSlashCommands([
+    {
+      allowedToolNames: [],
+      description: "Use project review instructions.",
+      name: "skill:project-review",
+      promptDirective: "",
+      taskKind: "agent-skill",
+      title: "Skill: project-review",
+    },
+  ]);
+
+  expect(
+    parseLlmSlashCommandInvocation("/skill:project-review auth routing"),
+  ).toMatchObject({
+    command: {
+      name: "skill:project-review",
+      taskKind: "agent-skill",
+    },
+    input: "auth routing",
+  });
+
+  setAgentAskSkillSlashCommands([]);
 });

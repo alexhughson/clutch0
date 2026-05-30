@@ -100,10 +100,21 @@ export type GetContextItemDetailViewOptions = {
   root: string;
 };
 
+export type ContextItemActionShortcut = {
+  ctrl?: boolean;
+  display: string;
+  hyper?: boolean;
+  meta?: boolean;
+  name: string;
+  option?: boolean;
+  shift?: boolean;
+  super?: boolean;
+};
+
 export type ContextItemAction = {
   id: string;
-  key?: string;
   label: string;
+  shortcut?: ContextItemActionShortcut;
   run: (context: ContextItemActionContext) => Promise<void> | void;
 };
 
@@ -114,6 +125,10 @@ export type ContextItemActionContext = {
   rerunPrompt: (options: {
     expectedResult: "diff" | "text";
     prompt: string;
+    replaceContextItemId: string;
+  }) => void;
+  rerunShellCommand: (options: {
+    command: string;
     replaceContextItemId: string;
   }) => void;
 };

@@ -8,6 +8,10 @@ import {
   formatPiAgentOutputUpdate,
 } from "../../lib/agentOutput/piAgentOutputAdapter";
 import { useAppStore } from "../../store/appStore";
+import {
+  activateAgentAskTools,
+  createAgentAskResourceLoader,
+} from "./agentAskResources";
 
 type AgentAskHandle = {
   session: AgentSession;
@@ -26,11 +30,14 @@ export async function startAgentAskSession({
   root?: string;
 }) {
   try {
+    const resourceLoader = await createAgentAskResourceLoader({ root });
     const { session } = await createAgentSession({
       cwd: root,
+      noTools: "builtin",
+      resourceLoader,
       sessionManager: SessionManager.inMemory(root),
-      tools: ["read", "grep", "find", "ls"],
     });
+    activateAgentAskTools(session);
 
     const unsubscribe = session.subscribe((event) => {
       const update = formatPiAgentOutputUpdate(event);

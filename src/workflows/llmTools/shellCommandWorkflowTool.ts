@@ -1,4 +1,6 @@
 import { Type, type Tool } from "@earendil-works/pi-ai";
+import { invariant } from "../../lib/invariant";
+import { shellCommandPromptDirective } from "../../lib/llm/prompts";
 import { runShellCommand } from "../../lib/shell/shellCommand";
 import type { LlmWorkflowToolController } from "./types";
 
@@ -17,34 +19,44 @@ export const runShellCommandTool: Tool = {
 };
 
 export const shellCommandWorkflowTool: LlmWorkflowToolController = {
+  resultKind: "command-output",
   slashCommand: {
     description:
       "Ask the LLM to choose and run a shell command, then save the output as context.",
     name: "cmd",
-    promptDirective:
-      "The user invoked /cmd. Decide the best single shell command for the request and call the run_shell_command tool. Prefer read-only commands unless the user explicitly requests side effects. Do not fake command output.",
+    promptDirective: shellCommandPromptDirective,
     taskKind: "shell-command",
     title: "Run shell command",
   },
-  enabledByDefault: false,
+  enabledByDefault: true,
   tool: runShellCommandTool,
+  handleResult({ actions, requestId, result }) {
+    invariant(
+      result.kind === "command-output",
+      `run_shell_command cannot handle ${result.kind} results`,
+    );
+    actions.shellCommand.finish({
+      requestId,
+      result: result.result,
+    });
+  },
   async routeToolCall({ root, toolCall }) {
-    if (toolCall.name !== RUN_SHELL_COMMAND_TOOL_NAME) {
-      return null;
-    }
-
-    const command =
-      typeof toolCall.arguments.command === "string"
-        ? toolCall.arguments.command.trim()
-        : "";
-
-    if (command.length === 0) {
-      return null;
-    }
+    invariant(
+      toolCall.name === RUN_SHELL_COMMAND_TOOL_NAME,
+      `run_shell_command routed unexpected tool ${toolCall.name}`,
+    );
+    invariant(
+      typeof toolCall.arguments.command === "string" &&
+        toolCall.arguments.command.trim().length > 0,
+      "run_shell_command.command must be a non-empty string.",
+    );
 
     return {
       kind: "command-output" as const,
-      result: await runShellCommand({ command, root }),
+      result: await runShellCommand({
+        command: toolCall.arguments.command.trim(),
+        root,
+      }),
     };
   },
 };

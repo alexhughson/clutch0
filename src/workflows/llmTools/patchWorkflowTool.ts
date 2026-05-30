@@ -1,30 +1,45 @@
-import { validatePatchProposal } from "../../lib/patch/patchEngine";
+import { invariant } from "../../lib/invariant";
+import { editCommandPromptDirective } from "../../lib/llm/prompts";
 import {
-  getPatchProposalFromToolCalls,
+  patchProposalFromToolCall,
   PROPOSE_PATCH_TOOL_NAME,
   proposePatchTool,
 } from "../../lib/llm/patchTool";
+import { validatePatchProposal } from "../../lib/patch/patchEngine";
 import type { LlmWorkflowToolController } from "./types";
 
 export const patchWorkflowTool: LlmWorkflowToolController = {
+  resultKind: "patch",
   slashCommand: {
     description: "Ask the LLM to propose a code edit using the patch workflow.",
     name: "edit",
-    promptDirective:
-      "The user invoked /edit. If the request is actionable with the available context, you must call the propose_patch tool with exact edits. Do not answer with a prose-only implementation plan when you can produce a patch. If more context is needed, briefly explain what is missing instead of calling the tool.",
+    promptDirective: editCommandPromptDirective,
     title: "Edit code",
   },
   tool: proposePatchTool,
+  handleResult({ actions, requestId, result }) {
+    invariant(
+      result.kind === "patch",
+      `propose_patch cannot handle ${result.kind} results`,
+    );
+
+    actions.response.finish({
+      requestId,
+      responseKind: "patch",
+      responseText: result.responseText,
+    });
+    actions.response.setPatch({
+      patch: { ...result.patch, applyStatus: "pending" },
+      requestId,
+    });
+  },
   async routeToolCall({ root, toolCall }) {
-    if (toolCall.name !== PROPOSE_PATCH_TOOL_NAME) {
-      return null;
-    }
+    invariant(
+      toolCall.name === PROPOSE_PATCH_TOOL_NAME,
+      `propose_patch routed unexpected tool ${toolCall.name}`,
+    );
 
-    const proposal = getPatchProposalFromToolCalls([toolCall]);
-    if (proposal === null) {
-      return null;
-    }
-
+    const proposal = patchProposalFromToolCall(toolCall);
     return {
       kind: "patch",
       patch: await validatePatchProposal({ proposal, root }),

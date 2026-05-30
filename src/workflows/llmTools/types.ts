@@ -1,3 +1,4 @@
+import type { AppActions } from "../../app/appTypes";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import type { CreateFileValidationResult } from "../../lib/createFile/createFile";
 import type { PatchValidationResult } from "../../lib/patch/types";
@@ -27,16 +28,26 @@ export type LlmSlashCommand = {
   readonly description: string;
   readonly name: string;
   readonly promptDirective: string;
-  readonly taskKind?: "agent-ask" | "shell-command" | "show-context";
+  readonly taskKind?:
+    | "agent-ask"
+    | "agent-skill"
+    | "shell-command"
+    | "show-context";
   readonly title: string;
 };
 
 export interface LlmWorkflowToolController {
   readonly enabledByDefault?: boolean;
+  readonly resultKind: LlmWorkflowToolResult["kind"];
   readonly slashCommand?: Omit<LlmSlashCommand, "allowedToolNames">;
   readonly tool: Tool;
+  handleResult(options: {
+    actions: AppActions;
+    requestId: number;
+    result: LlmWorkflowToolResult & { responseText: string };
+  }): void;
   routeToolCall(options: {
     root?: string;
     toolCall: ToolCall;
-  }): Promise<LlmWorkflowToolResult | null>;
+  }): Promise<LlmWorkflowToolResult>;
 }

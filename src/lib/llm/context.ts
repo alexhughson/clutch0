@@ -9,7 +9,7 @@ import {
 } from "../context/contextItems";
 import { loadFileList } from "../fileListLoader";
 import type { ContextItem, LlmFileContext } from "../../types";
-import { defaultSystemPrompt } from "./prompts";
+import { defaultSystemPrompt, renderPrompt } from "./prompts";
 
 const execFileAsync = promisify(execFile);
 
@@ -127,7 +127,12 @@ function formatUserMessage({
       ? "No focused context item."
       : focusedContextItem.getListLabel();
 
-  return `Question:\n${question}\n\nFocused context item:\n${focusedContextText}\n\nSelected context:\n${selectedContextText}\n\nAutomatic context:\n${automaticContextText}`;
+  return renderPrompt("context/user-message.md", {
+    automaticContext: automaticContextText,
+    focusedContextItem: focusedContextText,
+    question,
+    selectedContext: selectedContextText,
+  });
 }
 
 type AutomaticContextBlock = {
@@ -141,8 +146,8 @@ async function buildAutomaticContext({
   root: string;
 }): Promise<AutomaticContextBlock[]> {
   const [agents, diff, directoryTree] = await Promise.all([
-    readAgentsContext({ root }),
-    readCurrentDiffContext({ root }),
+    readOptionalAgentsContext({ root }),
+    readOptionalCurrentDiffContext({ root }),
     readDirectoryTreeContext({ root }),
   ]);
 
@@ -151,7 +156,7 @@ async function buildAutomaticContext({
   );
 }
 
-async function readAgentsContext({
+async function readOptionalAgentsContext({
   root,
 }: {
   root: string;
@@ -166,12 +171,16 @@ async function readAgentsContext({
       name: "AGENTS.md",
       content: truncateContent(content, MAX_AGENTS_CONTEXT_CHARACTERS),
     };
-  } catch {
-    return null;
+  } catch (error) {
+    if (isFileNotFoundError(error)) {
+      return null;
+    }
+
+    throw error;
   }
 }
 
-async function readCurrentDiffContext({
+async function readOptionalCurrentDiffContext({
   root,
 }: {
   root: string;
@@ -242,6 +251,14 @@ function formatAutomaticContext(
         `<automatic_context name=${JSON.stringify(block.name)}>\n${block.content}\n</automatic_context>`,
     )
     .join("\n\n");
+}
+
+function isFileNotFoundError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
 }
 
 function truncateContent(content: string, maxCharacters: number): string {

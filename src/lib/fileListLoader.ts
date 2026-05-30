@@ -41,20 +41,13 @@ export async function loadFileList({
   return filePaths.sort();
 }
 
-/** Silently skips unreadable directories so one permission error does not abort. */
 async function walkDirectory(
   root: string,
   directory: string,
   exclusionFilters: readonly FileExclusionFilter[],
   filePaths: string[],
 ): Promise<void> {
-  let entries;
-
-  try {
-    entries = await readdir(directory, { withFileTypes: true });
-  } catch {
-    return;
-  }
+  const entries = await readdir(directory, { withFileTypes: true });
 
   for (const entry of entries) {
     if (entry.isSymbolicLink()) {

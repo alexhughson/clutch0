@@ -1,6 +1,9 @@
+import type { AppActions } from "../../app/appTypes";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import { createFileWorkflowTool } from "../createFile/createFileWorkflowTool";
 import { findFilesWorkflowTool } from "../findFiles/findFilesTool";
+import { invariant } from "../../lib/invariant";
+import { askCommandPromptDirective } from "../../lib/llm/prompts";
 import { patchWorkflowTool } from "./patchWorkflowTool";
 import { shellCommandWorkflowTool } from "./shellCommandWorkflowTool";
 import type {
@@ -14,12 +17,14 @@ export type LlmSlashCommandInvocation = {
   input: string;
 };
 
-const workflowToolControllers: readonly LlmWorkflowToolController[] = [
+const workflowToolControllers = createWorkflowToolControllers([
   createFileWorkflowTool,
   findFilesWorkflowTool,
   patchWorkflowTool,
   shellCommandWorkflowTool,
-];
+]);
+
+let agentAskSkillSlashCommands: readonly LlmSlashCommand[] = [];
 
 const agentAskSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
@@ -35,8 +40,7 @@ const askSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
   description: "Ask a normal question without allowing workflow tools.",
   name: "ask",
-  promptDirective:
-    "The user invoked /ask. Answer the user's question directly. Do not call workflow tools.",
+  promptDirective: askCommandPromptDirective,
   title: "Ask a question",
 };
 
@@ -59,10 +63,18 @@ export function getLlmWorkflowTools({
   );
 }
 
+export function setAgentAskSkillSlashCommands(
+  commands: readonly LlmSlashCommand[],
+) {
+  assertNoSlashCommandNameCollisions(commands);
+  agentAskSkillSlashCommands = [...commands];
+}
+
 export function getLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
     agentAskSlashCommand,
+    ...agentAskSkillSlashCommands,
     showContextSlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
       controller.slashCommand === undefined
@@ -109,18 +121,46 @@ export async function routeLlmWorkflowToolCalls({
   root?: string;
   toolCalls: readonly ToolCall[];
 }): Promise<LlmWorkflowToolResult | null> {
+  if (toolCalls.length === 0) {
+    return null;
+  }
+
   const controllers = getLlmWorkflowToolControllers({ allowedToolNames });
+  const controllersByToolName = new Map(
+    controllers.map((controller) => [controller.tool.name, controller]),
+  );
 
   for (const toolCall of toolCalls) {
-    for (const controller of controllers) {
-      const result = await controller.routeToolCall({ root, toolCall });
-      if (result !== null) {
-        return result;
-      }
-    }
+    const controller = controllersByToolName.get(toolCall.name);
+    invariant(
+      controller !== undefined,
+      `LLM called unregistered or disallowed workflow tool: ${toolCall.name}`,
+    );
+
+    return await controller.routeToolCall({ root, toolCall });
   }
 
   return null;
+}
+
+export function handleLlmWorkflowResult({
+  actions,
+  requestId,
+  result,
+}: {
+  actions: AppActions;
+  requestId: number;
+  result: LlmWorkflowToolResult & { responseText: string };
+}) {
+  const controller = workflowToolControllers.find(
+    (candidate) => candidate.resultKind === result.kind,
+  );
+  invariant(
+    controller !== undefined,
+    `No workflow tool controller handles result kind: ${result.kind}`,
+  );
+
+  controller.handleResult({ actions, requestId, result });
 }
 
 function getLlmWorkflowToolControllers({
@@ -134,8 +174,75 @@ function getLlmWorkflowToolControllers({
     );
   }
 
-  const allowedToolNameSet = new Set(allowedToolNames);
-  return workflowToolControllers.filter((controller) =>
-    allowedToolNameSet.has(controller.tool.name),
+  const controllersByName = new Map(
+    workflowToolControllers.map((controller) => [
+      controller.tool.name,
+      controller,
+    ]),
   );
+
+  return allowedToolNames.map((toolName) => {
+    const controller = controllersByName.get(toolName);
+    invariant(
+      controller !== undefined,
+      `Allowed workflow tool is not registered: ${toolName}`,
+    );
+    return controller;
+  });
+}
+
+function assertNoSlashCommandNameCollisions(
+  commands: readonly LlmSlashCommand[],
+) {
+  const existingNames = new Set(
+    getBaseLlmSlashCommands().map((command) => command.name),
+  );
+
+  for (const command of commands) {
+    invariant(
+      !existingNames.has(command.name),
+      `Duplicate slash command name: ${command.name}`,
+    );
+    existingNames.add(command.name);
+  }
+}
+
+function getBaseLlmSlashCommands(): LlmSlashCommand[] {
+  return [
+    askSlashCommand,
+    agentAskSlashCommand,
+    showContextSlashCommand,
+    ...workflowToolControllers.flatMap((controller) =>
+      controller.slashCommand === undefined
+        ? []
+        : [
+            {
+              ...controller.slashCommand,
+              allowedToolNames: [controller.tool.name],
+            },
+          ],
+    ),
+  ];
+}
+
+function createWorkflowToolControllers(
+  controllers: readonly LlmWorkflowToolController[],
+): readonly LlmWorkflowToolController[] {
+  const toolNames = new Set<string>();
+  const resultKinds = new Set<LlmWorkflowToolResult["kind"]>();
+
+  for (const controller of controllers) {
+    invariant(
+      !toolNames.has(controller.tool.name),
+      `Duplicate workflow tool name: ${controller.tool.name}`,
+    );
+    invariant(
+      !resultKinds.has(controller.resultKind),
+      `Duplicate workflow result kind: ${controller.resultKind}`,
+    );
+    toolNames.add(controller.tool.name);
+    resultKinds.add(controller.resultKind);
+  }
+
+  return controllers;
 }

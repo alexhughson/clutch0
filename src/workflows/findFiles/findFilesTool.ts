@@ -1,4 +1,6 @@
 import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
+import { invariant } from "../../lib/invariant";
+import { findCommandPromptDirective } from "../../lib/llm/prompts";
 import type { LlmWorkflowToolController } from "../llmTools/types";
 
 export const FIND_RELEVANT_FILES_TOOL_NAME = "find_relevant_files";
@@ -22,35 +24,56 @@ export const findRelevantFilesTool: Tool = {
 };
 
 export const findFilesWorkflowTool: LlmWorkflowToolController = {
+  resultKind: "find-files",
   slashCommand: {
     description:
       "Ask the LLM to find project files relevant to a goal, then open the interactive file picker.",
     name: "find",
-    promptDirective:
-      "The user invoked /find. Decide the best arguments from the user request and call the find_relevant_files tool. Do not answer with guessed file names.",
+    promptDirective: findCommandPromptDirective,
     title: "Find relevant files",
   },
   tool: findRelevantFilesTool,
+  handleResult({ actions, result }) {
+    invariant(
+      result.kind === "find-files",
+      `find_relevant_files cannot handle ${result.kind} results`,
+    );
+    actions.findFiles.showSearch({
+      goal: result.goal,
+      hints: result.hints,
+    });
+  },
   async routeToolCall({ toolCall }) {
-    if (toolCall.name !== FIND_RELEVANT_FILES_TOOL_NAME) {
-      return null;
-    }
+    invariant(
+      toolCall.name === FIND_RELEVANT_FILES_TOOL_NAME,
+      `find_relevant_files routed unexpected tool ${toolCall.name}`,
+    );
 
-    return normalizeFindFilesToolCall(toolCall);
+    return findFilesRequestFromToolCall(toolCall);
   },
 };
 
-function normalizeFindFilesToolCall(toolCall: ToolCall) {
+function findFilesRequestFromToolCall(toolCall: ToolCall) {
+  const arguments_ = toolCall.arguments;
+  invariant(
+    typeof arguments_.goal === "string" && arguments_.goal.trim().length > 0,
+    "find_relevant_files.goal must be a non-empty string.",
+  );
+
+  if (arguments_.hints !== undefined) {
+    invariant(
+      Array.isArray(arguments_.hints),
+      "find_relevant_files.hints must be an array of strings when provided.",
+    );
+    invariant(
+      arguments_.hints.every((hint) => typeof hint === "string"),
+      "find_relevant_files.hints must contain only strings.",
+    );
+  }
+
   return {
-    goal:
-      typeof toolCall.arguments.goal === "string"
-        ? toolCall.arguments.goal
-        : "Find files relevant to the user's request.",
-    hints: Array.isArray(toolCall.arguments.hints)
-      ? toolCall.arguments.hints.filter(
-          (hint): hint is string => typeof hint === "string",
-        )
-      : [],
+    goal: arguments_.goal,
+    hints: arguments_.hints ?? [],
     kind: "find-files" as const,
   };
 }

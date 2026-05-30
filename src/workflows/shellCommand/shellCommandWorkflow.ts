@@ -1,5 +1,9 @@
 import { ContextDeck } from "../../app/contextDeck";
-import type { AppActions, AppState } from "../../app/appTypes";
+import type {
+  AppActions,
+  AppState,
+  ShellCommandReplacementTarget,
+} from "../../app/appTypes";
 import { createShellCommandOutputContextItem } from "../../lib/context/contextItems";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 
@@ -26,17 +30,20 @@ export function createShellCommandActions({
       set((state) => finishShellCommand(state, requestId, result)),
     saveOutputToContext: ({ requestId }) =>
       set((state) => saveShellCommandOutputToContext(state, requestId)),
-    start: ({ prompt }) => startShellCommand({ get, prompt, set }),
+    start: ({ prompt, replacement }) =>
+      startShellCommand({ get, prompt, replacement, set }),
   };
 }
 
 function startShellCommand({
   get,
   prompt,
+  replacement,
   set,
 }: {
   get: GetAppState;
   prompt: string;
+  replacement?: ShellCommandReplacementTarget;
   set: SetAppState;
 }): number | null {
   const state = get();
@@ -50,6 +57,7 @@ function startShellCommand({
       id: requestId,
       kind: "shell-command",
       prompt,
+      replacement,
       status: "running",
     },
     nextLlmRequestId: requestId + 1,
@@ -64,11 +72,47 @@ function finishShellCommand(
   result: ShellCommandResult,
 ): Partial<AppState> | AppState {
   if (
+    state.activeTask?.kind === "response" &&
+    state.activeTask.request.id === requestId
+  ) {
+    return {
+      activeTask: {
+        id: requestId,
+        kind: "shell-command",
+        prompt: state.activeTask.request.question,
+        result,
+        status: "done",
+      },
+    };
+  }
+
+  if (
     state.activeTask?.kind !== "shell-command" ||
     state.activeTask.id !== requestId ||
     state.activeTask.status !== "running"
   ) {
     return state;
+  }
+
+  if (state.activeTask.replacement !== undefined) {
+    const item = createShellCommandOutputContextItem({
+      createdAt: Date.now(),
+      id: state.activeTask.replacement.contextItemId,
+      result,
+      sourceRequestId: requestId,
+    });
+
+    return {
+      activeTask: {
+        ...state.activeTask,
+        result,
+        savedContextItemId: item.id,
+        status: "done",
+      },
+      workspace: ContextDeck.fromComposeScreen(state.workspace)
+        .replace(item)
+        .applyTo(state.workspace),
+    };
   }
 
   return {

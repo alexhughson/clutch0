@@ -7,7 +7,7 @@ import {
 import type { ContextItem } from "../../types";
 import { buildLlmContext } from "./context";
 import { resolveLlmModel } from "./model";
-import { patchAwareSystemPrompt } from "./prompts";
+import { patchAwareSystemPrompt, renderPrompt } from "./prompts";
 import {
   getLlmWorkflowTools,
   routeLlmWorkflowToolCalls,
@@ -109,7 +109,10 @@ function formatQuestionForCommand({
     return question;
   }
 
-  return `${commandDirective}\n\nUser request:\n${question}`;
+  return renderPrompt("context/command-user-message.md", {
+    commandDirective,
+    question,
+  });
 }
 
 function getAssistantText(message: AssistantMessage): string {

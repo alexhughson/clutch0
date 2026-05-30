@@ -5,6 +5,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { RelevantFileCandidate } from "../../app/appTypes";
+import { renderPrompt } from "../../lib/llm/prompts";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import {
   createAgentToolBlock,
@@ -113,7 +114,10 @@ function formatSearchPrompt({
 }): string {
   const hintsText = hints.length === 0 ? "No extra hints." : hints.join("\n");
 
-  return `Find files relevant to this goal:\n${goal}\n\nHints:\n${hintsText}\n\nUse only read-only search tools. Do not edit files. When you have a concise candidate list, call submit_relevant_files with the best files. Prefer files directly relevant to implementation over generated or dependency files.`;
+  return renderPrompt("agents/file-search.md", {
+    goal,
+    hints: hintsText,
+  });
 }
 
 function normalizeCandidates(

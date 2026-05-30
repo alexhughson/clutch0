@@ -8,11 +8,15 @@ import {
   HighlightedDiff,
   HighlightedMarkdown,
 } from "../../components/SyntaxHighlightedContent";
-import { getContextItemById } from "../../lib/context/contextItems";
+import {
+  getContextItemById,
+  PiAgentContextItem,
+} from "../../lib/context/contextItems";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
 import { sendAgentAskMessage } from "../agentAsk/agentAskSessionRegistry";
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
+import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
 import { applySavedDiffContextItem } from "./contextItemEffects";
 
 export function ContextItemViewerScreen({
@@ -25,8 +29,11 @@ export function ContextItemViewerScreen({
     getContextItemById(state.workspace.contextItems, screen.itemId),
   );
   const [detail, setDetail] = useState<ContextItemDetailView | null>(null);
+  const liveAgentDetail =
+    item instanceof PiAgentContextItem ? item.getLiveDetailView() : null;
+  const visibleDetail = liveAgentDetail ?? detail;
   const canAct = screen.applyStatus !== "applying";
-  const canRunItemActions = canAct && detail?.kind !== "agent-output";
+  const canRunItemActions = canAct && visibleDetail?.kind !== "agent-output";
   const itemActions = useMemo(
     () => item?.getActions().filter((action) => action.id !== "open") ?? [],
     [item],
@@ -35,7 +42,7 @@ export function ContextItemViewerScreen({
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
-    if (item === null) {
+    if (item === null || item instanceof PiAgentContextItem) {
       return;
     }
 
@@ -104,10 +111,10 @@ export function ContextItemViewerScreen({
       )}
       {item === null ? (
         <text style={{ fg: "red" }}>Context item no longer exists.</text>
-      ) : detail === null ? (
+      ) : visibleDetail === null ? (
         <text>Loading...</text>
       ) : (
-        <DetailView detail={detail} />
+        <DetailView detail={visibleDetail} />
       )}
     </box>
   );
@@ -261,5 +268,7 @@ function runContextItemAction(action: ContextItemAction) {
           expectedResult,
         },
       }),
+    rerunShellCommand: ({ command, replaceContextItemId }) =>
+      startShellCommandRerun({ command, replaceContextItemId }),
   });
 }

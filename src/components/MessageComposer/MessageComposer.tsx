@@ -1,3 +1,5 @@
+import { formatContextItemAction } from "../../lib/context/contextItemActions";
+import { getContextItemById } from "../../lib/context/contextItems";
 import type { ComposeScreenState } from "../../store/appStore";
 import type { FilePath } from "../../types";
 import { FilteredCommandsList } from "../FilteredCommandsList";
@@ -18,11 +20,22 @@ export function MessageComposer({
       composeScreen,
       filePaths,
     });
+  const focusedItem = getContextItemById(
+    composeScreen.contextItems,
+    composeScreen.focusedContextItemId,
+  );
+  const focusedActions = focusedItem?.getActions() ?? [];
 
   return (
     <>
       <box
         title="Message"
+        bottomTitle={
+          focusedActions.length === 0
+            ? undefined
+            : focusedActions.map(formatContextItemAction).join(" · ")
+        }
+        bottomTitleAlignment="right"
         borderStyle="rounded"
         style={{ border: true, height: 3 }}
       >

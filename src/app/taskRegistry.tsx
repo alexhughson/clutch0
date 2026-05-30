@@ -1,65 +1,28 @@
 import type { ReactNode } from "react";
 import { LlmResponseScreen } from "../components/LlmResponseScreen";
+import { assertNever } from "../lib/invariant";
 import { ContextItemViewerScreen } from "../workflows/contextItems/ContextItemViewerScreen";
 import { CreateFileScreen } from "../workflows/createFile/CreateFileScreen";
 import { FindFilesScreen } from "../workflows/findFiles/FindFilesScreen";
 import { ShellCommandScreen } from "../workflows/shellCommand/ShellCommandScreen";
 import { ShowContextScreen } from "../workflows/showContext/ShowContextScreen";
-import type {
-  AppTask,
-  ContextItemViewerTaskState,
-  CreateFileTaskState,
-  FindFilesTaskState,
-  ResponseTaskState,
-  ShellCommandTaskState,
-  ShowContextTaskState,
-} from "./appTypes";
-
-type TaskController = {
-  kind: AppTask["kind"];
-  render: (task: AppTask) => ReactNode;
-};
-
-const taskControllers: TaskController[] = [
-  {
-    kind: "response",
-    render: (task) => (
-      <LlmResponseScreen request={(task as ResponseTaskState).request} />
-    ),
-  },
-  {
-    kind: "find-files",
-    render: (task) => <FindFilesScreen screen={task as FindFilesTaskState} />,
-  },
-  {
-    kind: "create-file",
-    render: (task) => <CreateFileScreen task={task as CreateFileTaskState} />,
-  },
-  {
-    kind: "context-item-viewer",
-    render: (task) => (
-      <ContextItemViewerScreen screen={task as ContextItemViewerTaskState} />
-    ),
-  },
-  {
-    kind: "shell-command",
-    render: (task) => (
-      <ShellCommandScreen task={task as ShellCommandTaskState} />
-    ),
-  },
-  {
-    kind: "show-context",
-    render: (task) => <ShowContextScreen task={task as ShowContextTaskState} />,
-  },
-];
+import type { AppTask } from "./appTypes";
 
 export function renderTask(task: AppTask): ReactNode {
-  const controller = taskControllers.find(
-    (candidate) => candidate.kind === task.kind,
-  );
-  if (controller === undefined) {
-    return null;
+  switch (task.kind) {
+    case "response":
+      return <LlmResponseScreen request={task.request} />;
+    case "find-files":
+      return <FindFilesScreen screen={task} />;
+    case "create-file":
+      return <CreateFileScreen task={task} />;
+    case "context-item-viewer":
+      return <ContextItemViewerScreen screen={task} />;
+    case "shell-command":
+      return <ShellCommandScreen task={task} />;
+    case "show-context":
+      return <ShowContextScreen task={task} />;
+    default:
+      return assertNever(task, "Unhandled app task");
   }
-
-  return controller.render(task);
 }

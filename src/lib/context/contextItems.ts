@@ -11,6 +11,7 @@ import type { ShellCommandResult } from "../shell/shellCommand";
 import type {
   ContextItem,
   ContextItemAction,
+  ContextItemDetailView,
   ContextItemSummaryState,
   FilePath,
   FormattedContextItem,
@@ -240,7 +241,14 @@ export class ShellCommandOutputContextItem implements ContextItem {
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      rerunShellCommandAction({
+        command: this.result.command,
+        replaceContextItemId: this.id,
+      }),
+      removeContextItemAction(this.id),
+    ];
   }
 
   async getSummarizationInput() {
@@ -484,7 +492,10 @@ export class PiAgentContextItem implements ContextItem {
     };
   }
 
-  async getDetailView() {
+  getLiveDetailView(): Extract<
+    ContextItemDetailView,
+    { kind: "agent-output" }
+  > {
     return {
       blocks: this.blocks,
       errorMessage: this.errorMessage,
@@ -494,6 +505,10 @@ export class PiAgentContextItem implements ContextItem {
       status: this.status,
       title: `Agent: ${summarize(this.prompt)}`,
     };
+  }
+
+  async getDetailView() {
+    return this.getLiveDetailView();
   }
 
   async formatForLlm({
@@ -733,8 +748,8 @@ export function getContextItemById(
 function openContextItemAction(itemId: string): ContextItemAction {
   return {
     id: "open",
-    key: "Ctrl+o",
     label: "open",
+    shortcut: { ctrl: true, display: "Ctrl+o", name: "o" },
     run: (context) => context.openContextItem(itemId),
   };
 }
@@ -742,8 +757,8 @@ function openContextItemAction(itemId: string): ContextItemAction {
 function applySavedDiffAction(itemId: string): ContextItemAction {
   return {
     id: "apply",
-    key: "Ctrl+y",
     label: "apply",
+    shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
     run: (context) => context.applySavedDiff(itemId),
   };
 }
@@ -751,8 +766,8 @@ function applySavedDiffAction(itemId: string): ContextItemAction {
 function removeContextItemAction(itemId: string): ContextItemAction {
   return {
     id: "remove",
-    key: "Ctrl+x",
     label: "remove",
+    shortcut: { ctrl: true, display: "Ctrl+x", name: "x" },
     run: (context) => context.removeContextItem(itemId),
   };
 }
@@ -768,10 +783,26 @@ function rerunPromptAction({
 }): ContextItemAction {
   return {
     id: "rerun",
-    key: "Ctrl+r",
     label: "rerun",
+    shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
     run: (context) =>
       context.rerunPrompt({ expectedResult, prompt, replaceContextItemId }),
+  };
+}
+
+function rerunShellCommandAction({
+  command,
+  replaceContextItemId,
+}: {
+  command: string;
+  replaceContextItemId: string;
+}): ContextItemAction {
+  return {
+    id: "rerun",
+    label: "rerun",
+    shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
+    run: (context) =>
+      context.rerunShellCommand({ command, replaceContextItemId }),
   };
 }
 

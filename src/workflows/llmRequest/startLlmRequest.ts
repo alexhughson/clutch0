@@ -1,7 +1,7 @@
 import type { ContextItemReplacementTarget } from "../../app/appTypes";
 import { streamLlmInteraction } from "../../lib/llm/streamResponse";
 import { useAppStore } from "../../store/appStore";
-import { handleLlmInteractionResult } from "../llmTools/handleLlmInteractionResult";
+import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
 
 export function startLlmRequest(
   question: string,
@@ -39,7 +39,16 @@ export function startLlmRequest(
     },
   }).then(
     (result) => {
-      handleLlmInteractionResult({
+      if (result.kind === "text") {
+        useAppStore.getState().actions.response.finish({
+          requestId,
+          responseKind: "text",
+          responseText: result.responseText,
+        });
+        return;
+      }
+
+      handleLlmWorkflowResult({
         actions: useAppStore.getState().actions,
         requestId,
         result,

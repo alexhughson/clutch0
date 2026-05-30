@@ -1,0 +1,1 @@
+The user invoked /create. You must call the create_file tool with a relative path and the full desired file contents. Do not call prose-only answers when you can propose the file. Do not propose overwriting an existing file; use /edit for existing files.

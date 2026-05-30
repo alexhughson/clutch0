@@ -1,6 +1,8 @@
 import { streamLlmInteraction } from "../../lib/llm/streamResponse";
+import { runShellCommand } from "../../lib/shell/shellCommand";
 import { useAppStore } from "../../store/appStore";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "../llmTools/shellCommandWorkflowTool";
+import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
 
 export function startShellCommandRequest(
   prompt: string,
@@ -20,7 +22,7 @@ export function startShellCommandRequest(
     question: prompt,
   }).then(
     (result) => {
-      if (result.kind !== "command-output") {
+      if (result.kind === "text") {
         useAppStore.getState().actions.shellCommand.fail({
           errorMessage:
             "The model did not run a shell command. Try a more specific /cmd request.",
@@ -29,9 +31,41 @@ export function startShellCommandRequest(
         return;
       }
 
+      handleLlmWorkflowResult({
+        actions: useAppStore.getState().actions,
+        requestId,
+        result,
+      });
+    },
+    (error: unknown) => {
+      useAppStore.getState().actions.shellCommand.fail({
+        errorMessage: error instanceof Error ? error.message : String(error),
+        requestId,
+      });
+    },
+  );
+}
+
+export function startShellCommandRerun({
+  command,
+  replaceContextItemId,
+}: {
+  command: string;
+  replaceContextItemId: string;
+}) {
+  const requestId = useAppStore.getState().actions.shellCommand.start({
+    prompt: command,
+    replacement: { contextItemId: replaceContextItemId },
+  });
+  if (requestId === null) {
+    return;
+  }
+
+  void runShellCommand({ command }).then(
+    (result) => {
       useAppStore.getState().actions.shellCommand.finish({
         requestId,
-        result: result.result,
+        result,
       });
     },
     (error: unknown) => {

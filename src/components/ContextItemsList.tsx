@@ -20,7 +20,6 @@ export function ContextItemsList({
   }
 
   const focusedItem = getContextItemById(contextItems, focusedContextItemId);
-  const focusedActions = focusedItem?.getActions() ?? [];
   const useSidePane = width >= WIDE_CONTEXT_LAYOUT_COLUMNS;
   const displayEntries = getContextItemDisplayEntries(contextItems);
 
@@ -28,11 +27,7 @@ export function ContextItemsList({
     <box
       style={{ flexDirection: "column", gap: 1, paddingLeft: 1, width: "100%" }}
     >
-      <text style={{ fg: "gray" }}>
-        {focusedActions.length === 0
-          ? "Context"
-          : `Context  ${focusedActions.map(formatAction).join(" · ")}`}
-      </text>
+      <text style={{ fg: "gray" }}>Context</text>
       <box
         style={{
           flexDirection: useSidePane ? "row" : "column",
@@ -169,10 +164,4 @@ function getShortSummary(summary: ContextItemSummaryView): string | null {
   }
 
   return null;
-}
-
-function formatAction(action: ReturnType<ContextItem["getActions"]>[number]) {
-  return action.key === undefined
-    ? action.label
-    : `${action.key} ${action.label}`;
 }
