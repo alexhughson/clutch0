@@ -29,11 +29,21 @@ let agentAskSkillSlashCommands: readonly LlmSlashCommand[] = [];
 const agentAskSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
   description:
-    "Ask a long-running pi sub-agent and save its session as context.",
+    "Ask a long-running read-only pi sub-agent and save its session as context.",
   name: "agent-ask",
   promptDirective: "",
   taskKind: "agent-ask",
   title: "Ask pi agent",
+};
+
+const agentEditSlashCommand: LlmSlashCommand = {
+  allowedToolNames: [],
+  description:
+    "Ask a writable pi sub-agent to edit a sandbox copy and save its diff as context.",
+  name: "agent-edit",
+  promptDirective: "",
+  taskKind: "agent-edit",
+  title: "Edit in pi agent sandbox",
 };
 
 const askSlashCommand: LlmSlashCommand = {
@@ -74,6 +84,7 @@ export function getLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
     agentAskSlashCommand,
+    agentEditSlashCommand,
     ...agentAskSkillSlashCommands,
     showContextSlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
@@ -211,6 +222,7 @@ function getBaseLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
     agentAskSlashCommand,
+    agentEditSlashCommand,
     showContextSlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
       controller.slashCommand === undefined

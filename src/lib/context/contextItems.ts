@@ -9,6 +9,8 @@ import { applyAgentOutputUpdate } from "../agentOutput/agentOutputReducer";
 import type { PatchProposal } from "../patch/types";
 import type { ShellCommandResult } from "../shell/shellCommand";
 import type {
+  AgentAskMode,
+  AgentSandboxContext,
   ContextItem,
   ContextItemAction,
   ContextItemDetailView,
@@ -408,6 +410,8 @@ export class PiAgentContextItem implements ContextItem {
     readonly createdAt: number,
     readonly errorMessage: string | undefined = undefined,
     private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+    readonly mode: AgentAskMode = "ask",
+    readonly sandbox: AgentSandboxContext | undefined = undefined,
   ) {}
 
   getListLabel(): string {
@@ -424,7 +428,7 @@ export class PiAgentContextItem implements ContextItem {
         this.status === "running"
           ? "Agent is running…"
           : summarize(formatAgentOutputBlocks(this.blocks)),
-      title: `Agent: ${summarize(this.prompt)}`,
+      title: `${this.mode === "edit" ? "Agent edit" : "Agent"}: ${summarize(this.prompt)}`,
     });
   }
 
@@ -437,6 +441,8 @@ export class PiAgentContextItem implements ContextItem {
       this.createdAt,
       this.errorMessage,
       summaryState,
+      this.mode,
+      this.sandbox,
     );
   }
 
@@ -449,6 +455,8 @@ export class PiAgentContextItem implements ContextItem {
       this.createdAt,
       this.errorMessage,
       this.summaryState,
+      this.mode,
+      this.sandbox,
     );
   }
 
@@ -464,11 +472,33 @@ export class PiAgentContextItem implements ContextItem {
       this.createdAt,
       errorMessage,
       this.summaryState,
+      this.mode,
+      this.sandbox,
+    );
+  }
+
+  withSandbox(sandbox: AgentSandboxContext): PiAgentContextItem {
+    return new PiAgentContextItem(
+      this.id,
+      this.prompt,
+      this.blocks,
+      this.status,
+      this.createdAt,
+      this.errorMessage,
+      this.summaryState,
+      this.mode,
+      sandbox,
     );
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      ...(this.mode === "edit" && this.status !== "running"
+        ? [saveAgentSandboxDiffAction(this.id)]
+        : []),
+      removeContextItemAction(this.id),
+    ];
   }
 
   async getSummarizationInput() {
@@ -502,8 +532,9 @@ export class PiAgentContextItem implements ContextItem {
       itemId: this.id,
       kind: "agent-output" as const,
       prompt: this.prompt,
+      sandbox: this.sandbox,
       status: this.status,
-      title: `Agent: ${summarize(this.prompt)}`,
+      title: `${this.mode === "edit" ? "Agent edit" : "Agent"}: ${summarize(this.prompt)}`,
     };
   }
 
@@ -518,7 +549,7 @@ export class PiAgentContextItem implements ContextItem {
 
     return {
       consumedFileCharacters: 0,
-      text: `<pi_agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), status: this.status })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<latest_agent_message>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</latest_agent_message>\n</pi_agent_session>`,
+      text: `<pi_agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), mode: this.mode, sandbox_path: this.sandbox?.path, sandbox_diff_status: this.sandbox?.diffStatus, status: this.status })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<latest_agent_message>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</latest_agent_message>\n</pi_agent_session>`,
     };
   }
 }
@@ -611,6 +642,87 @@ export class SavedDiffContextItem implements ContextItem {
   }
 }
 
+export class SavedAgentSandboxDiffContextItem implements ContextItem {
+  readonly type = "agent-sandbox-diff";
+
+  constructor(
+    readonly id: string,
+    readonly sourceAgentItemId: string,
+    readonly prompt: string,
+    readonly summary: string,
+    readonly diffText: string,
+    readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: summarize(this.summary.length > 0 ? this.summary : this.prompt),
+      title: `Agent diff: ${summarize(this.prompt)}`,
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): SavedAgentSandboxDiffContextItem {
+    return new SavedAgentSandboxDiffContextItem(
+      this.id,
+      this.sourceAgentItemId,
+      this.prompt,
+      this.summary,
+      this.diffText,
+      this.createdAt,
+      summaryState,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [
+      openContextItemAction(this.id),
+      applyAgentSandboxDiffAction(this.id),
+      removeContextItemAction(this.id),
+    ];
+  }
+
+  async getSummarizationInput() {
+    const sourceText = `Prompt:\n${truncateContent(this.prompt, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nSummary:\n${truncateContent(this.summary, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nDiff:\n${truncateContent(this.diffText, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `Agent diff: ${summarize(this.prompt)}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
+  }
+
+  async getDetailView() {
+    return {
+      diffText: this.diffText,
+      kind: "diff" as const,
+      summary: this.summary,
+      title: `Agent diff: ${summarize(this.prompt)}`,
+    };
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<agent_sandbox_diff${formatAttributes({ focused, source_agent_item_id: this.sourceAgentItemId, created_at: new Date(this.createdAt).toISOString() })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<summary>\n${truncateContent(this.summary, MAX_SAVED_CONTEXT_CHARACTERS)}\n</summary>\n<diff>\n${truncateContent(this.diffText, MAX_SAVED_CONTEXT_CHARACTERS)}\n</diff>\n</agent_sandbox_diff>`,
+    };
+  }
+}
+
 export function createFileContextItem(filePath: FilePath): FileContextItem {
   return new FileContextItem(filePath);
 }
@@ -641,13 +753,24 @@ export function createLiveLlmResponseContextItem({
 export function createPiAgentContextItem({
   createdAt,
   id,
+  mode = "ask",
   prompt,
 }: {
   createdAt: number;
   id: string;
+  mode?: AgentAskMode;
   prompt: string;
 }): PiAgentContextItem {
-  return new PiAgentContextItem(id, prompt, [], "running", createdAt);
+  return new PiAgentContextItem(
+    id,
+    prompt,
+    [],
+    "running",
+    createdAt,
+    undefined,
+    undefined,
+    mode,
+  );
 }
 
 export function createSavedLlmResponseContextItem({
@@ -719,6 +842,31 @@ export function createSavedDiffContextItem({
   );
 }
 
+export function createSavedAgentSandboxDiffContextItem({
+  createdAt,
+  diffText,
+  id,
+  prompt,
+  sourceAgentItemId,
+  summary,
+}: {
+  createdAt: number;
+  diffText: string;
+  id: string;
+  prompt: string;
+  sourceAgentItemId: string;
+  summary: string;
+}): SavedAgentSandboxDiffContextItem {
+  return new SavedAgentSandboxDiffContextItem(
+    id,
+    sourceAgentItemId,
+    prompt,
+    summary,
+    diffText,
+    createdAt,
+  );
+}
+
 export function getFileContextItemId(filePath: FilePath): string {
   return `file:${filePath}`;
 }
@@ -760,6 +908,24 @@ function applySavedDiffAction(itemId: string): ContextItemAction {
     label: "apply",
     shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
     run: (context) => context.applySavedDiff(itemId),
+  };
+}
+
+function applyAgentSandboxDiffAction(itemId: string): ContextItemAction {
+  return {
+    id: "apply",
+    label: "apply",
+    shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
+    run: (context) => context.applyAgentSandboxDiff(itemId),
+  };
+}
+
+function saveAgentSandboxDiffAction(itemId: string): ContextItemAction {
+  return {
+    id: "save-agent-diff",
+    label: "add diff to context",
+    shortcut: { ctrl: true, display: "Ctrl+d", name: "d" },
+    run: (context) => context.saveAgentSandboxDiff(itemId),
   };
 }
 

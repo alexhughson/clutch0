@@ -30,6 +30,7 @@ export type LlmSlashCommand = {
   readonly promptDirective: string;
   readonly taskKind?:
     | "agent-ask"
+    | "agent-edit"
     | "agent-skill"
     | "shell-command"
     | "show-context";

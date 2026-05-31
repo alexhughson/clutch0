@@ -55,6 +55,34 @@ test("agent ask activates read-only builtins while preserving extension tools", 
   ).toEqual(["project_lookup", "read", "grep", "find", "ls"]);
 });
 
+test("agent edit activates writable builtins in the sandbox", () => {
+  expect(
+    getAgentAskActiveToolNames({
+      activeToolNames: ["project_lookup"],
+      allToolNames: [
+        "read",
+        "bash",
+        "edit",
+        "write",
+        "grep",
+        "find",
+        "ls",
+        "project_lookup",
+      ],
+      mode: "edit",
+    }),
+  ).toEqual([
+    "project_lookup",
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "bash",
+    "edit",
+    "write",
+  ]);
+});
+
 test("agent ask fails when expected read-only builtins are unavailable", () => {
   expect(() =>
     getAgentAskActiveToolNames({

@@ -7,7 +7,14 @@ import {
   NoSlashCommandSelector,
   type SlashCommandSelectorMatch,
 } from "../../lib/inputLineParser";
-import { startAgentAskRequest } from "../../workflows/agentAsk/startAgentAskRequest";
+import {
+  disposeAgentAskSession,
+  saveAgentSandboxDiffToContext,
+} from "../../workflows/agentAsk/agentAskSessionRegistry";
+import {
+  startAgentAskRequest,
+  startAgentEditRequest,
+} from "../../workflows/agentAsk/startAgentAskRequest";
 import { applySavedDiffContextItem } from "../../workflows/contextItems/contextItemEffects";
 import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
 import {
@@ -398,6 +405,11 @@ function submitQuestion(event: KeyEvent) {
     return;
   }
 
+  if (slashCommandInvocation?.command.taskKind === "agent-edit") {
+    startAgentEditRequest(requestQuestion);
+    return;
+  }
+
   if (slashCommandInvocation?.command.taskKind === "agent-skill") {
     startAgentAskRequest(question);
     return;
@@ -446,7 +458,11 @@ function runFocusedContextItemActionForKey(event: KeyEvent) {
 function runContextItemAction(action: ContextItemAction) {
   void action.run({
     removeContextItem: (itemId) => {
+      disposeAgentAskSession(itemId);
       useAppStore.getState().actions.compose.removeContextItem({ itemId });
+    },
+    applyAgentSandboxDiff: (itemId) => {
+      void applySavedDiffContextItem(itemId);
     },
     applySavedDiff: (itemId) => {
       void applySavedDiffContextItem(itemId);
@@ -463,5 +479,8 @@ function runContextItemAction(action: ContextItemAction) {
       }),
     rerunShellCommand: ({ command, replaceContextItemId }) =>
       startShellCommandRerun({ command, replaceContextItemId }),
+    saveAgentSandboxDiff: (itemId) => {
+      void saveAgentSandboxDiffToContext(itemId);
+    },
   });
 }

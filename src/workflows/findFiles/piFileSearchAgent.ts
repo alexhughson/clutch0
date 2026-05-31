@@ -5,14 +5,18 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { RelevantFileCandidate } from "../../app/appTypes";
+import { buildAgentContextSnapshot } from "../../lib/llm/agentContext";
 import { renderPrompt } from "../../lib/llm/prompts";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
+import type { ContextItem } from "../../types";
 import {
   createAgentToolBlock,
   formatPiAgentOutputUpdate,
 } from "../../lib/agentOutput/piAgentOutputAdapter";
 
 export type RunPiFileSearchAgentOptions = {
+  contextItems: readonly ContextItem[];
+  focusedContextItemId: string | null;
   goal: string;
   hints: readonly string[];
   onAgentOutput?: (update: AgentOutputUpdate) => void;
@@ -20,6 +24,8 @@ export type RunPiFileSearchAgentOptions = {
 };
 
 export async function runPiFileSearchAgent({
+  contextItems,
+  focusedContextItemId,
   goal,
   hints,
   onAgentOutput,
@@ -96,7 +102,12 @@ export async function runPiFileSearchAgent({
       }),
       kind: "append-block",
     });
-    await session.prompt(formatSearchPrompt({ goal, hints }));
+    const context = await buildAgentContextSnapshot({
+      contextItems,
+      focusedContextItemId,
+      root,
+    });
+    await session.prompt(formatSearchPrompt({ context, goal, hints }));
   } finally {
     unsubscribe();
     session.dispose();
@@ -106,15 +117,18 @@ export async function runPiFileSearchAgent({
 }
 
 function formatSearchPrompt({
+  context,
   goal,
   hints,
 }: {
+  context: string;
   goal: string;
   hints: readonly string[];
 }): string {
   const hintsText = hints.length === 0 ? "No extra hints." : hints.join("\n");
 
   return renderPrompt("agents/file-search.md", {
+    context,
     goal,
     hints: hintsText,
   });

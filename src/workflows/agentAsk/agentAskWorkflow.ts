@@ -2,6 +2,7 @@ import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
 import {
   createPiAgentContextItem,
+  createSavedAgentSandboxDiffContextItem,
   getContextItemById,
   PiAgentContextItem,
 } from "../../lib/context/contextItems";
@@ -23,6 +24,10 @@ export function createAgentAskActions({
   set: SetAppState;
 }): AppActions["agentAsk"] {
   return {
+    attachSandbox: ({ itemId, sandbox }) =>
+      set((state) =>
+        replacePiAgentItem(state, itemId, (item) => item.withSandbox(sandbox)),
+      ),
     fail: ({ errorMessage, itemId }) =>
       set((state) =>
         replacePiAgentItem(state, itemId, (item) =>
@@ -39,20 +44,34 @@ export function createAgentAskActions({
           item.withAgentOutputUpdate(update),
         ),
       ),
-    start: ({ prompt }) => startAgentAsk({ get, prompt, set }),
+    saveSandboxDiffToContext: ({ agentItemId, diffText, summary }) =>
+      set((state) =>
+        saveSandboxDiffToContext(state, {
+          agentItemId,
+          diffText,
+          summary,
+        }),
+      ),
+    start: ({ mode, prompt }) => startAgentAsk({ get, mode, prompt, set }),
     startMessage: ({ itemId }) =>
       set((state) =>
         replacePiAgentItem(state, itemId, (item) => item.withStatus("running")),
+      ),
+    updateSandboxDiff: ({ itemId, sandbox }) =>
+      set((state) =>
+        replacePiAgentItem(state, itemId, (item) => item.withSandbox(sandbox)),
       ),
   };
 }
 
 function startAgentAsk({
   get,
+  mode,
   prompt,
   set,
 }: {
   get: GetAppState;
+  mode: "ask" | "edit";
   prompt: string;
   set: SetAppState;
 }): string | null {
@@ -65,6 +84,7 @@ function startAgentAsk({
   const item = createPiAgentContextItem({
     createdAt: Date.now(),
     id: itemId,
+    mode,
     prompt,
   });
 
@@ -81,6 +101,39 @@ function startAgentAsk({
   });
 
   return itemId;
+}
+
+function saveSandboxDiffToContext(
+  state: AppState,
+  {
+    agentItemId,
+    diffText,
+    summary,
+  }: { agentItemId: string; diffText: string; summary: string },
+): Partial<AppState> | AppState {
+  const agentItem = getContextItemById(
+    state.workspace.contextItems,
+    agentItemId,
+  );
+  if (!(agentItem instanceof PiAgentContextItem)) {
+    return state;
+  }
+
+  const diffItem = createSavedAgentSandboxDiffContextItem({
+    createdAt: Date.now(),
+    diffText,
+    id: `agent-diff:${state.nextContextItemId}`,
+    prompt: agentItem.prompt,
+    sourceAgentItemId: agentItemId,
+    summary,
+  });
+
+  return {
+    nextContextItemId: state.nextContextItemId + 1,
+    workspace: ContextDeck.fromComposeScreen(state.workspace)
+      .add(diffItem)
+      .applyTo(state.workspace),
+  };
 }
 
 function replacePiAgentItem(

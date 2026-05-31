@@ -24,7 +24,16 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
     }
 
     let cancelled = false;
+    const state = useAppStore.getState();
+    const contextItems = [...state.workspace.contextItems];
+    const focusedContextItemId = contextItems.some(
+      (item) => item.id === state.workspace.focusedContextItemId,
+    )
+      ? state.workspace.focusedContextItemId
+      : null;
     void runPiFileSearchAgent({
+      contextItems,
+      focusedContextItemId,
       goal: screen.goal,
       hints: screen.hints,
       onAgentOutput: (update) => {

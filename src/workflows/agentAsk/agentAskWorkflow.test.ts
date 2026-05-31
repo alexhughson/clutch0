@@ -29,7 +29,10 @@ function createHarness() {
 test("agent ask creates a live context item and opens it", () => {
   const harness = createHarness();
 
-  const itemId = harness.agentAsk.start({ prompt: "Investigate routing" });
+  const itemId = harness.agentAsk.start({
+    mode: "ask",
+    prompt: "Investigate routing",
+  });
 
   expect(itemId).toBe("agent:1");
   expect(harness.state.activeTask).toEqual({
@@ -44,7 +47,10 @@ test("agent ask creates a live context item and opens it", () => {
 
 test("agent ask output updates the same context item", () => {
   const harness = createHarness();
-  const itemId = harness.agentAsk.start({ prompt: "Investigate routing" });
+  const itemId = harness.agentAsk.start({
+    mode: "ask",
+    prompt: "Investigate routing",
+  });
   expect(itemId).toBe("agent:1");
 
   harness.agentAsk.recordOutput({

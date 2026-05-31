@@ -5,6 +5,7 @@ import {
   type ResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import { invariant } from "../../lib/invariant";
+import type { AgentAskMode } from "../../types";
 import type { LlmSlashCommand } from "../llmTools/types";
 
 const AGENT_ASK_READ_ONLY_BUILTIN_TOOLS = [
@@ -13,6 +14,8 @@ const AGENT_ASK_READ_ONLY_BUILTIN_TOOLS = [
   "find",
   "ls",
 ] as const;
+
+const AGENT_EDIT_WRITABLE_BUILTIN_TOOLS = ["bash", "edit", "write"] as const;
 
 export async function createAgentAskResourceLoader({
   agentDir = getAgentDir(),
@@ -56,11 +59,15 @@ export async function loadAgentAskSkillSlashCommands({
   }));
 }
 
-export function activateAgentAskTools(session: AgentSession) {
+export function activateAgentAskTools(
+  session: AgentSession,
+  mode: AgentAskMode = "ask",
+) {
   session.setActiveToolsByName(
     getAgentAskActiveToolNames({
       activeToolNames: session.getActiveToolNames(),
       allToolNames: session.getAllTools().map((tool) => tool.name),
+      mode,
     }),
   );
 }
@@ -68,14 +75,24 @@ export function activateAgentAskTools(session: AgentSession) {
 export function getAgentAskActiveToolNames({
   activeToolNames,
   allToolNames,
+  mode = "ask",
 }: {
   activeToolNames: readonly string[];
   allToolNames: readonly string[];
+  mode?: AgentAskMode;
 }): string[] {
   const allToolNameSet = new Set(allToolNames);
   const nextActiveToolNameSet = new Set(activeToolNames);
 
-  for (const toolName of AGENT_ASK_READ_ONLY_BUILTIN_TOOLS) {
+  const requiredBuiltinTools =
+    mode === "edit"
+      ? [
+          ...AGENT_ASK_READ_ONLY_BUILTIN_TOOLS,
+          ...AGENT_EDIT_WRITABLE_BUILTIN_TOOLS,
+        ]
+      : AGENT_ASK_READ_ONLY_BUILTIN_TOOLS;
+
+  for (const toolName of requiredBuiltinTools) {
     invariant(
       allToolNameSet.has(toolName),
       `Agent ask expected built-in tool to be available: ${toolName}`,

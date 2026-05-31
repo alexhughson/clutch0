@@ -5,7 +5,12 @@ import type {
 import type { CreateFileValidationResult } from "../lib/createFile/createFile";
 import type { PatchReviewState } from "../lib/patch/types";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
-import type { ContextItem, FilePath } from "../types";
+import type {
+  AgentAskMode,
+  AgentSandboxContext,
+  ContextItem,
+  FilePath,
+} from "../types";
 
 export type AppTask =
   | ContextItemViewerTaskState
@@ -159,14 +164,27 @@ export type AppActions = {
     ensureWorkspaceSummaries: () => void;
   };
   agentAsk: {
+    attachSandbox: (options: {
+      itemId: string;
+      sandbox: AgentSandboxContext;
+    }) => void;
     fail: (options: { errorMessage: string; itemId: string }) => void;
     finish: (options: { itemId: string }) => void;
     recordOutput: (options: {
       itemId: string;
       update: AgentOutputUpdate;
     }) => void;
-    start: (options: { prompt: string }) => string | null;
+    saveSandboxDiffToContext: (options: {
+      agentItemId: string;
+      diffText: string;
+      summary: string;
+    }) => void;
+    start: (options: { mode: AgentAskMode; prompt: string }) => string | null;
     startMessage: (options: { itemId: string }) => void;
+    updateSandboxDiff: (options: {
+      itemId: string;
+      sandbox: AgentSandboxContext;
+    }) => void;
   };
   createFile: {
     failApply: (options: { errorMessage: string; requestId: number }) => void;

@@ -14,7 +14,11 @@ import {
 } from "../../lib/context/contextItems";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
-import { sendAgentAskMessage } from "../agentAsk/agentAskSessionRegistry";
+import {
+  disposeAgentAskSession,
+  saveAgentSandboxDiffToContext,
+  sendAgentAskMessage,
+} from "../agentAsk/agentAskSessionRegistry";
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
 import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
 import { applySavedDiffContextItem } from "./contextItemEffects";
@@ -176,6 +180,12 @@ function AgentDetailView({
             ? `Agent error: ${detail.errorMessage ?? "unknown error"}`
             : "Agent idle"}
       </text>
+      {detail.sandbox === undefined ? null : (
+        <box style={{ flexDirection: "column" }}>
+          <text>{`Sandbox: ${detail.sandbox.path}`}</text>
+          <text>{`Sandbox diff: ${formatSandboxDiffStatus(detail.sandbox)}`}</text>
+        </box>
+      )}
       <AgentOutputLog blocks={detail.blocks} height={32} />
       <box
         title="Follow-up"
@@ -188,6 +198,13 @@ function AgentDetailView({
           focused
           onInput={setMessage}
           onKeyDown={(event: KeyEvent) => {
+            if (event.ctrl && event.name === "d") {
+              event.preventDefault();
+              event.stopPropagation();
+              void saveAgentSandboxDiffToContext(detail.itemId);
+              return;
+            }
+
             if (!isEnterKey(event.name)) {
               return;
             }
@@ -210,6 +227,22 @@ function AgentDetailView({
       </box>
     </box>
   );
+}
+
+function formatSandboxDiffStatus(
+  sandbox: NonNullable<
+    Extract<ContextItemDetailView, { kind: "agent-output" }>["sandbox"]
+  >,
+): string {
+  if (sandbox.diffStatus === "error") {
+    return `error: ${sandbox.errorMessage ?? "unknown error"}`;
+  }
+
+  if (sandbox.summary !== undefined && sandbox.summary.trim().length > 0) {
+    return `${sandbox.diffStatus} — ${sandbox.summary.replace(/\s+/g, " ")}`;
+  }
+
+  return sandbox.diffStatus;
 }
 
 function isEnterKey(keyName: string): boolean {
@@ -251,6 +284,9 @@ function getBottomTitle(actions: readonly ContextItemAction[]): string {
 
 function runContextItemAction(action: ContextItemAction) {
   void action.run({
+    applyAgentSandboxDiff: (itemId) => {
+      void applySavedDiffContextItem(itemId);
+    },
     applySavedDiff: (itemId) => {
       void applySavedDiffContextItem(itemId);
     },
@@ -258,6 +294,7 @@ function runContextItemAction(action: ContextItemAction) {
       useAppStore.getState().actions.contextItems.openContextItem({ itemId });
     },
     removeContextItem: (itemId) => {
+      disposeAgentAskSession(itemId);
       useAppStore.getState().actions.compose.removeContextItem({ itemId });
       useAppStore.getState().actions.navigation.showComposer();
     },
@@ -270,5 +307,8 @@ function runContextItemAction(action: ContextItemAction) {
       }),
     rerunShellCommand: ({ command, replaceContextItemId }) =>
       startShellCommandRerun({ command, replaceContextItemId }),
+    saveAgentSandboxDiff: (itemId) => {
+      void saveAgentSandboxDiffToContext(itemId);
+    },
   });
 }

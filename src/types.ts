@@ -1,6 +1,16 @@
 import type { AgentOutputBlock } from "./lib/agentOutput/agentOutputTypes";
 
 export type FilePath = string;
+export type AgentAskMode = "ask" | "edit";
+
+export type AgentSandboxContext = {
+  baselineTree: string;
+  diffStatus: "clean" | "dirty" | "error" | "unknown";
+  errorMessage?: string;
+  path: string;
+  root: string;
+  summary?: string;
+};
 
 export interface ContextItem {
   readonly id: string;
@@ -86,6 +96,7 @@ export type ContextItemDetailView =
       itemId: string;
       kind: "agent-output";
       prompt: string;
+      sandbox?: AgentSandboxContext;
       status: "error" | "idle" | "running";
       title: string;
     }
@@ -119,6 +130,7 @@ export type ContextItemAction = {
 };
 
 export type ContextItemActionContext = {
+  applyAgentSandboxDiff: (itemId: string) => void;
   applySavedDiff: (itemId: string) => void;
   openContextItem: (itemId: string) => void;
   removeContextItem: (itemId: string) => void;
@@ -131,6 +143,7 @@ export type ContextItemActionContext = {
     command: string;
     replaceContextItemId: string;
   }) => void;
+  saveAgentSandboxDiff: (itemId: string) => void;
 };
 
 export type FormatContextItemForLlmOptions = {
