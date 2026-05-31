@@ -113,7 +113,9 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
       style={{
         border: true,
         flexDirection: "column",
+        flexGrow: 1,
         gap: 1,
+        height: "100%",
         padding: 1,
         width: "100%",
       }}
@@ -144,13 +146,18 @@ function SearchingView({ screen }: { screen: FindFilesScreenState }) {
     <box
       title="Searching"
       borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
+      style={{
+        border: true,
+        flexDirection: "column",
+        flexGrow: 1,
+        padding: 1,
+      }}
     >
       <text>Running a read-only pi agent to find relevant files...</text>
       <AgentOutputLog
         blocks={screen.agentOutput}
         emptyMessage="Waiting for pi activity..."
-        height={24}
+        height={32}
       />
     </box>
   );
@@ -161,7 +168,12 @@ function ErrorView({ errorMessage }: { errorMessage: string }) {
     <box
       title="Search failed"
       borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
+      style={{
+        border: true,
+        flexDirection: "column",
+        flexGrow: 1,
+        padding: 1,
+      }}
     >
       <text style={{ fg: "red" }}>{errorMessage}</text>
     </box>
@@ -183,7 +195,12 @@ function ResultsView({ screen }: { screen: FindFilesScreenState }) {
       <box
         title="Results"
         borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
+        style={{
+          border: true,
+          flexDirection: "column",
+          flexGrow: 1,
+          padding: 1,
+        }}
       >
         <text>No relevant files were found.</text>
       </box>
@@ -194,9 +211,17 @@ function ResultsView({ screen }: { screen: FindFilesScreenState }) {
     <box
       title="Results"
       borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
+      style={{
+        border: true,
+        flexDirection: "column",
+        flexGrow: 1,
+        padding: 1,
+      }}
     >
-      <scrollbox ref={scrollBoxRef} style={{ height: 30, width: "100%" }}>
+      <scrollbox
+        ref={scrollBoxRef}
+        style={{ flexGrow: 1, height: "100%", width: "100%" }}
+      >
         {screen.candidates.map((candidate, index) => {
           const selected = index === screen.selectedIndex;
           const confidence = candidate.confidence ?? "unknown";

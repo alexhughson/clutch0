@@ -26,7 +26,9 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
       style={{
         border: true,
         flexDirection: "column",
+        flexGrow: 1,
         gap: 1,
+        height: "100%",
         padding: 1,
         width: "100%",
       }}
@@ -43,7 +45,13 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
         bottomTitle={getCreateFileHotkeys(task)}
         bottomTitleAlignment="right"
         borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", gap: 1, padding: 1 }}
+        style={{
+          border: true,
+          flexDirection: "column",
+          flexGrow: 1,
+          gap: 1,
+          padding: 1,
+        }}
       >
         <text>{proposal.summary}</text>
         <text>{`Path: ${proposal.path}`}</text>
@@ -57,7 +65,7 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
             ))}
           </box>
         ) : null}
-        <scrollbox style={{ height: 30, width: "100%" }}>
+        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
           <box style={{ flexDirection: "column" }}>
             <text style={{ fg: "gray" }}>Content:</text>
             <HighlightedCode

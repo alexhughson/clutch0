@@ -23,7 +23,9 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
       style={{
         border: true,
         flexDirection: "column",
+        flexGrow: 1,
         gap: 1,
+        height: "100%",
         padding: 1,
         width: "100%",
       }}
@@ -40,7 +42,12 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
         bottomTitle={getShellCommandHotkeys(task)}
         bottomTitleAlignment="right"
         borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
+        style={{
+          border: true,
+          flexDirection: "column",
+          flexGrow: 1,
+          padding: 1,
+        }}
       >
         {task.status === "running" ? (
           <text>Asking the model to choose and run a shell command...</text>
@@ -64,7 +71,7 @@ function ShellCommandResultView({ result }: { result: ShellCommandResult }) {
     <box style={{ flexDirection: "column", gap: 1 }}>
       <text>{`$ ${result.command}`}</text>
       <text>{`exit code: ${result.exitCode ?? "signal"} · duration: ${result.durationMs}ms${result.signal === undefined ? "" : ` · signal: ${result.signal}`}${result.timedOut ? " · timed out" : ""}${result.truncated ? " · truncated" : ""}`}</text>
-      <scrollbox style={{ height: 30, width: "100%" }}>
+      <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
         <box style={{ flexDirection: "column" }}>
           <text style={{ fg: "gray" }}>stdout:</text>
           <text>{result.stdout.length > 0 ? result.stdout : "<empty>"}</text>

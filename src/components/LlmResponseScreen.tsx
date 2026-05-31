@@ -26,7 +26,9 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
       style={{
         border: true,
         flexDirection: "column",
+        flexGrow: 1,
         gap: 1,
+        height: "100%",
         padding: 1,
         width: "100%",
       }}
@@ -51,10 +53,15 @@ function TextResponse({ request }: { request: LlmRequestState }) {
       bottomTitle={getTextResponseHotkeys(request)}
       bottomTitleAlignment="right"
       borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
+      style={{
+        border: true,
+        flexDirection: "column",
+        flexGrow: 1,
+        padding: 1,
+      }}
     >
       {request.responseText.length > 0 ? (
-        <scrollbox style={{ height: 36, width: "100%" }}>
+        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
           <HighlightedMarkdown
             content={request.responseText}
             streaming={request.status === "loading"}
@@ -87,13 +94,19 @@ function PatchReview({ request }: { request: LlmRequestState }) {
       bottomTitle={getPatchReviewHotkeys(request)}
       bottomTitleAlignment="right"
       borderStyle="rounded"
-      style={{ border: true, flexDirection: "column", padding: 1 }}
+      style={{
+        border: true,
+        flexDirection: "column",
+        flexGrow: 1,
+        padding: 1,
+      }}
     >
       <text>{patch.proposal.summary}</text>
       {patch.status === "valid" ? (
         <scrollbox
           style={{
-            height: 30,
+            flexGrow: 1,
+            height: "100%",
             width: "100%",
           }}
         >

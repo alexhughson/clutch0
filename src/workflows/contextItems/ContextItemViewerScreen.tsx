@@ -102,7 +102,9 @@ export function ContextItemViewerScreen({
       style={{
         border: true,
         flexDirection: "column",
+        flexGrow: 1,
         gap: 1,
+        height: "100%",
         padding: 1,
         width: "100%",
       }}
@@ -131,7 +133,7 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
 
   if (detail.kind === "code") {
     return (
-      <scrollbox style={{ height: 40, width: "100%" }}>
+      <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
         <HighlightedCode content={detail.content} filePath={detail.filePath} />
       </scrollbox>
     );
@@ -139,7 +141,7 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
 
   if (detail.kind === "markdown") {
     return (
-      <scrollbox style={{ height: 40, width: "100%" }}>
+      <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
         <HighlightedMarkdown content={detail.content} />
       </scrollbox>
     );
@@ -149,7 +151,7 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
     return (
       <>
         <text>{detail.summary}</text>
-        <scrollbox style={{ height: 38, width: "100%" }}>
+        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
           <HighlightedDiff diff={detail.diffText} />
         </scrollbox>
       </>
@@ -157,7 +159,7 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
   }
 
   return (
-    <scrollbox style={{ height: 40, width: "100%" }}>
+    <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
       <text>{detail.content}</text>
     </scrollbox>
   );

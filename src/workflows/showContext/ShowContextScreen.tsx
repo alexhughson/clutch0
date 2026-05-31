@@ -22,7 +22,9 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
       style={{
         border: true,
         flexDirection: "column",
+        flexGrow: 1,
         gap: 1,
+        height: "100%",
         padding: 1,
         width: "100%",
       }}
@@ -41,14 +43,19 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
         bottomTitle={task.status === "loading" ? undefined : "Esc return"}
         bottomTitleAlignment="right"
         borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
+        style={{
+          border: true,
+          flexDirection: "column",
+          flexGrow: 1,
+          padding: 1,
+        }}
       >
         {task.status === "loading" ? <text>Building context...</text> : null}
         {task.status === "error" ? (
           <text style={{ fg: "red" }}>{task.errorMessage}</text>
         ) : null}
         {task.status === "done" ? (
-          <scrollbox style={{ height: 36, width: "100%" }}>
+          <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
             <text>{task.content ?? ""}</text>
           </scrollbox>
         ) : null}
