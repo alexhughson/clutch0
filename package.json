@@ -1,10 +1,14 @@
 {
-  "name": "clutch",
+  "name": "clutch0",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "clutch": "./src/index.tsx"
+    "clutch0": "./src/index.tsx"
   },
+  "files": [
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "start": "bun run src/index.tsx",
     "test": "bun test",

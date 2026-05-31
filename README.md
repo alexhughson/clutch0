@@ -1,6 +1,26 @@
 # Clutch0
 
-Clutch is a tool for using AI to write code.
+Clutch0 is a tool for using AI to write code.
+
+## Install from a cloned repo
+
+Clutch0 is Bun-first and currently installs from this repository.
+
+```sh
+git clone <repo-url> clutch0
+cd clutch0
+bun install
+bun install -g .
+clutch0
+```
+
+The global command is `clutch0`. Bun must be installed and available on your `PATH`.
+
+For local development without installing globally:
+
+```sh
+bun run start
+```
 
 Clutch tries to make AI coding feel more like driving a standard transmission. You issue the command for each next action rather than an agent loop, anachronistically involving you in tasks that could be automated so that you stay connected to what is happening.
 
@@ -42,14 +62,13 @@ I've had a pretty clear vision of what I wanted to build here for a while, and I
 
 100% of the time, when it was ready to edit itself the code would be incomprehensible to me, and I would spend all my time trying to understand and then unpick slop decisions. So I gave up, this codebase is purely vibe coded, and my intention is to build `clutch` from the ground up with this prototype
 
-
 ## Core loop
 
-Clutch opens on a text box.  You can @mention files to add them to context, and you will accumulate a list of files in context.  Using the text box you can ask to take an action, and the LLM will classify which tool to run and which arguments to use.  Every time you issue a command, the full content of everything in context will be sent to the LLM.
+Clutch opens on a text box. You can @mention files to add them to context, and you will accumulate a list of files in context. Using the text box you can ask to take an action, and the LLM will classify which tool to run and which arguments to use. Every time you issue a command, the full content of everything in context will be sent to the LLM.
 
-Actions are things like "ask the llm", "edit the focused file", "run a command".  The results of actions can be saved into the list of context items, or optionally expose other tools (edit can either save the diff into context, or apply it to a file)
+Actions are things like "ask the llm", "edit the focused file", "run a command". The results of actions can be saved into the list of context items, or optionally expose other tools (edit can either save the diff into context, or apply it to a file)
 
-Each Context item has a one line summary underneath, and a longer summary shown when they are highlighted.  Most can be opened to see the entire content by pressing c
+Each Context item has a one line summary underneath, and a longer summary shown when they are highlighted. Most can be opened to see the entire content by pressing c
 
 ## Tools
 
@@ -59,11 +78,11 @@ Adds a file to the files in context
 
 - ### /ask
 
-Ask the LLM a question.  The answer can be saved into context, and re-run.
+Ask the LLM a question. The answer can be saved into context, and re-run.
 
 - ### /agent-ask
 
-Ask a question of an embedded agent session.  This creates a persistent context item that contains the whole agent history, allowing you to send followup messages.  Only the final message from the agent is included in the general context
+Ask a question of an embedded agent session. This creates a persistent context item that contains the whole agent history, allowing you to send followup messages. Only the final message from the agent is included in the general context
 
 - ### /edit
 
@@ -73,6 +92,6 @@ Edit the selected file according to the instructions you provide.
 
 Create a new file
 
-- ### /find-files 
+- ### /find-files
 
 Launch a pi session to find which files
