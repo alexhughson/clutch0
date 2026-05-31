@@ -4,6 +4,7 @@ export const defaultSystemPrompt = readPrompt("system/default.md");
 export const patchAwareSystemPrompt = readPrompt("system/patch-aware.md");
 
 export const askCommandPromptDirective = readPrompt("commands/ask.md");
+export const addCommandPromptDirective = readPrompt("commands/add.md");
 export const createCommandPromptDirective = readPrompt("commands/create.md");
 export const findCommandPromptDirective = readPrompt("commands/find.md");
 export const editCommandPromptDirective = readPrompt("commands/edit.md");

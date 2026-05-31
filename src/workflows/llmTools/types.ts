@@ -6,6 +6,10 @@ import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 
 export type LlmWorkflowToolResult =
   | {
+      kind: "add-files";
+      paths: string[];
+    }
+  | {
       kind: "patch";
       patch: PatchValidationResult;
     }

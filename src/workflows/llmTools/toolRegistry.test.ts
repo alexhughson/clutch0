@@ -1,9 +1,10 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import type { ToolCall } from "@earendil-works/pi-ai";
 import { PROPOSE_PATCH_TOOL_NAME } from "../../lib/llm/patchTool";
+import { ADD_CONTEXT_FILES_TOOL_NAME } from "../addFiles/addFilesWorkflowTool";
 import { FIND_RELEVANT_FILES_TOOL_NAME } from "../findFiles/findFilesTool";
 import { CREATE_FILE_TOOL_NAME } from "../createFile/createFileWorkflowTool";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "./shellCommandWorkflowTool";
@@ -14,6 +15,31 @@ import {
   routeLlmWorkflowToolCalls,
   setAgentAskSkillSlashCommands,
 } from "./toolRegistry";
+
+test("routes add context files tool calls to the add files workflow", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-add-files-"));
+  await writeFile(join(root, "one.ts"), "export const one = 1;\n", "utf8");
+  await writeFile(join(root, "two.ts"), "export const two = 2;\n", "utf8");
+
+  const result = await routeLlmWorkflowToolCalls({
+    root,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: ADD_CONTEXT_FILES_TOOL_NAME,
+        arguments: {
+          paths: ["one.ts", "two.ts", "one.ts"],
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  expect(result).toEqual({
+    kind: "add-files",
+    paths: ["one.ts", "two.ts"],
+  });
+});
 
 test("routes find relevant files tool calls to the find files workflow", async () => {
   const result = await routeLlmWorkflowToolCalls({
@@ -135,6 +161,31 @@ test("restricts workflow tools by allowed tool names", () => {
   ).toThrow("Allowed workflow tool is not registered");
 });
 
+test("rejects multiple workflow tool calls in one response", async () => {
+  await expect(
+    routeLlmWorkflowToolCalls({
+      toolCalls: [
+        {
+          type: "toolCall",
+          id: "tool-1",
+          name: FIND_RELEVANT_FILES_TOOL_NAME,
+          arguments: {
+            goal: "Find routing code",
+          },
+        } satisfies ToolCall,
+        {
+          type: "toolCall",
+          id: "tool-2",
+          name: FIND_RELEVANT_FILES_TOOL_NAME,
+          arguments: {
+            goal: "Find config code",
+          },
+        } satisfies ToolCall,
+      ],
+    }),
+  ).rejects.toThrow("accepts exactly one tool call per response");
+});
+
 test("rejects malformed workflow tool calls", async () => {
   await expect(
     routeLlmWorkflowToolCalls({
@@ -159,6 +210,7 @@ test("derives slash commands from workflow tools plus ask", () => {
     "agent-edit",
     "config",
     "show-context",
+    "add",
     "create",
     "find",
     "edit",
@@ -175,6 +227,9 @@ test("derives slash commands from workflow tools plus ask", () => {
       ?.allowedToolNames,
   ).toEqual([]);
   expect(
+    commands.find((command) => command.name === "add")?.allowedToolNames,
+  ).toEqual([ADD_CONTEXT_FILES_TOOL_NAME]);
+  expect(
     commands.find((command) => command.name === "create")?.allowedToolNames,
   ).toEqual([CREATE_FILE_TOOL_NAME]);
   expect(
@@ -189,6 +244,13 @@ test("derives slash commands from workflow tools plus ask", () => {
 });
 
 test("parses known slash commands and leaves unknown commands unrestricted", () => {
+  expect(parseLlmSlashCommandInvocation("/add auth routing")).toMatchObject({
+    command: {
+      allowedToolNames: [ADD_CONTEXT_FILES_TOOL_NAME],
+      name: "add",
+    },
+    input: "auth routing",
+  });
   expect(parseLlmSlashCommandInvocation("/find auth routing")).toMatchObject({
     command: {
       allowedToolNames: [FIND_RELEVANT_FILES_TOOL_NAME],

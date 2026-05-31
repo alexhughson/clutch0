@@ -157,6 +157,9 @@ export type AppState = {
 };
 
 export type AppActions = {
+  addFiles: {
+    addToContext: (options: { paths: FilePath[] }) => void;
+  };
   compose: {
     acceptFileSelection: (options: {
       cursorPosition: number;

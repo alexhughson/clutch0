@@ -1,0 +1,1 @@
+The user invoked /add. Choose the existing project files that should be added to context for the request, then call the add_context_files tool once with all selected file paths. Do not answer with guessed file contents.

@@ -1,5 +1,6 @@
 import type { AppActions } from "../../app/appTypes";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
+import { addFilesWorkflowTool } from "../addFiles/addFilesWorkflowTool";
 import { createFileWorkflowTool } from "../createFile/createFileWorkflowTool";
 import { findFilesWorkflowTool } from "../findFiles/findFilesTool";
 import { invariant } from "../../lib/invariant";
@@ -18,6 +19,7 @@ export type LlmSlashCommandInvocation = {
 };
 
 const workflowToolControllers = createWorkflowToolControllers([
+  addFilesWorkflowTool,
   createFileWorkflowTool,
   findFilesWorkflowTool,
   patchWorkflowTool,
@@ -145,23 +147,26 @@ export async function routeLlmWorkflowToolCalls({
   if (toolCalls.length === 0) {
     return null;
   }
+  invariant(
+    toolCalls.length === 1,
+    `LLM workflow routing accepts exactly one tool call per response; received ${toolCalls.length}.`,
+  );
 
   const controllers = getLlmWorkflowToolControllers({ allowedToolNames });
   const controllersByToolName = new Map(
     controllers.map((controller) => [controller.tool.name, controller]),
   );
 
-  for (const toolCall of toolCalls) {
-    const controller = controllersByToolName.get(toolCall.name);
-    invariant(
-      controller !== undefined,
-      `LLM called unregistered or disallowed workflow tool: ${toolCall.name}`,
-    );
+  const [toolCall] = toolCalls;
+  invariant(toolCall !== undefined, "Expected one LLM workflow tool call.");
 
-    return await controller.routeToolCall({ root, toolCall });
-  }
+  const controller = controllersByToolName.get(toolCall.name);
+  invariant(
+    controller !== undefined,
+    `LLM called unregistered or disallowed workflow tool: ${toolCall.name}`,
+  );
 
-  return null;
+  return await controller.routeToolCall({ root, toolCall });
 }
 
 export function handleLlmWorkflowResult({

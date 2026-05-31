@@ -1,4 +1,5 @@
 import type { AppActions, AppState } from "./appTypes";
+import { createAddFilesActions } from "../workflows/addFiles/addFilesWorkflow";
 import { createAgentAskActions } from "../workflows/agentAsk/agentAskWorkflow";
 import { createComposeActions } from "../workflows/compose/composeWorkflow";
 import { createConfigActions } from "../workflows/config/configWorkflow";
@@ -28,6 +29,7 @@ export function createAppActions({
   set: SetAppState;
 }): AppActions {
   return {
+    addFiles: createAddFilesActions({ set }),
     agentAsk: createAgentAskActions({ get, set }),
     compose: createComposeActions({ get, set }),
     config: createConfigActions({ set }),
