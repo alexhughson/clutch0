@@ -157,6 +157,7 @@ test("derives slash commands from workflow tools plus ask", () => {
     "ask",
     "agent-ask",
     "agent-edit",
+    "config",
     "show-context",
     "create",
     "find",
@@ -165,6 +166,9 @@ test("derives slash commands from workflow tools plus ask", () => {
   ]);
   expect(
     commands.find((command) => command.name === "ask")?.allowedToolNames,
+  ).toEqual([]);
+  expect(
+    commands.find((command) => command.name === "config")?.allowedToolNames,
   ).toEqual([]);
   expect(
     commands.find((command) => command.name === "show-context")
@@ -191,6 +195,13 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
       name: "find",
     },
     input: "auth routing",
+  });
+  expect(parseLlmSlashCommandInvocation("/config")).toMatchObject({
+    command: {
+      name: "config",
+      taskKind: "config",
+    },
+    input: "",
   });
   expect(parseLlmSlashCommandInvocation("/wat auth routing")).toBeNull();
 });

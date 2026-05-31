@@ -54,6 +54,15 @@ const askSlashCommand: LlmSlashCommand = {
   title: "Ask a question",
 };
 
+const configSlashCommand: LlmSlashCommand = {
+  allowedToolNames: [],
+  description: "Configure Clutch model providers, models, and API keys.",
+  name: "config",
+  promptDirective: "",
+  taskKind: "config",
+  title: "Configure Clutch",
+};
+
 const showContextSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
   description: "Preview the rendered LLM context for debugging.",
@@ -86,6 +95,7 @@ export function getLlmSlashCommands(): LlmSlashCommand[] {
     agentAskSlashCommand,
     agentEditSlashCommand,
     ...agentAskSkillSlashCommands,
+    configSlashCommand,
     showContextSlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
       controller.slashCommand === undefined

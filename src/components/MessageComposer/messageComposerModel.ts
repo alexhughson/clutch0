@@ -216,11 +216,33 @@ function getVisibleCommands({
     commandSelectorMatch.commandSelector,
     getLlmSlashCommands().map((command) => command.name),
   )
+    .sort((left, right) =>
+      comparePrefixCommandMatch(
+        commandSelectorMatch.commandSelector,
+        left,
+        right,
+      ),
+    )
     .slice(0, MAX_VISIBLE_FILE_SUGGESTIONS)
     .flatMap((commandName) => {
       const command = commandsByName.get(commandName);
       return command === undefined ? [] : [command];
     });
+}
+
+function comparePrefixCommandMatch(
+  selector: string,
+  left: string,
+  right: string,
+): number {
+  const normalizedSelector = selector.toLowerCase();
+  const leftIsPrefix = left.toLowerCase().startsWith(normalizedSelector);
+  const rightIsPrefix = right.toLowerCase().startsWith(normalizedSelector);
+
+  if (leftIsPrefix === rightIsPrefix) {
+    return 0;
+  }
+  return leftIsPrefix ? -1 : 1;
 }
 
 function getHighlightedCommandName({

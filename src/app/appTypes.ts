@@ -4,6 +4,10 @@ import type {
 } from "../lib/agentOutput/agentOutputTypes";
 import type { CreateFileValidationResult } from "../lib/createFile/createFile";
 import type { PatchReviewState } from "../lib/patch/types";
+import type {
+  ClutchModelSelection,
+  SupportedClutchLlmProvider,
+} from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
 import type {
   AgentAskMode,
@@ -14,6 +18,7 @@ import type {
 
 export type AppTask =
   | ContextItemViewerTaskState
+  | ConfigTaskState
   | CreateFileTaskState
   | FindFilesTaskState
   | ResponseTaskState
@@ -91,6 +96,14 @@ export type ContextItemViewerTaskState = {
   kind: "context-item-viewer";
 };
 
+export type ConfigTaskState = {
+  configuredProviders: SupportedClutchLlmProvider[];
+  kind: "config";
+  mode: "first-run" | "settings";
+  primary: ClutchModelSelection;
+  summarization: ClutchModelSelection;
+};
+
 export type CreateFileTaskState = {
   applyErrorMessage?: string;
   applyStatus: "apply-error" | "applying" | "pending";
@@ -162,6 +175,11 @@ export type AppActions = {
   };
   contextSummaries: {
     ensureWorkspaceSummaries: () => void;
+  };
+  config: {
+    closeAfterSave: () => void;
+    openSettings: () => void;
+    openSetup: () => void;
   };
   agentAsk: {
     attachSandbox: (options: {

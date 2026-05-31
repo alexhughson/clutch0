@@ -7,7 +7,7 @@ import type {
   ContextItemSummarizationInput,
   GeneratedContextItemSummary,
 } from "../../types";
-import { resolveLlmModel } from "./model";
+import { resolveConfiguredLlmModel } from "../config/clutchConfig";
 import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;
@@ -21,20 +21,25 @@ export type ContextItemSummaryGenerator = (
 export async function generateContextItemSummary(
   input: ContextItemSummarizationInput,
 ): Promise<GeneratedContextItemSummary> {
-  const message = await complete(resolveLlmModel(), {
-    messages: [
-      {
-        content: renderPrompt("context-summary/user.md", {
-          content: input.content.slice(0, MAX_SUMMARY_INPUT_CHARACTERS),
-          label: input.label,
-          type: input.type,
-        }),
-        role: "user",
-        timestamp: Date.now(),
-      },
-    ],
-    systemPrompt: contextItemSummarySystemPrompt,
-  });
+  const { apiKey, model } = resolveConfiguredLlmModel("summarization");
+  const message = await complete(
+    model,
+    {
+      messages: [
+        {
+          content: renderPrompt("context-summary/user.md", {
+            content: input.content.slice(0, MAX_SUMMARY_INPUT_CHARACTERS),
+            label: input.label,
+            type: input.type,
+          }),
+          role: "user",
+          timestamp: Date.now(),
+        },
+      ],
+      systemPrompt: contextItemSummarySystemPrompt,
+    },
+    { apiKey },
+  );
 
   const parsed = parseSummaryResponse(getAssistantText(message));
   return {

@@ -387,7 +387,8 @@ function submitQuestion(event: KeyEvent) {
   if (
     requestQuestion.length === 0 &&
     slashCommandInvocation?.command.taskKind !== "show-context" &&
-    slashCommandInvocation?.command.taskKind !== "agent-skill"
+    slashCommandInvocation?.command.taskKind !== "agent-skill" &&
+    slashCommandInvocation?.command.taskKind !== "config"
   ) {
     return;
   }
@@ -397,6 +398,11 @@ function submitQuestion(event: KeyEvent) {
 
   if (slashCommandInvocation?.command.taskKind === "show-context") {
     startShowContextRequest(requestQuestion);
+    return;
+  }
+
+  if (slashCommandInvocation?.command.taskKind === "config") {
+    currentState.actions.config.openSettings();
     return;
   }
 

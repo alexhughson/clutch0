@@ -75,7 +75,7 @@ test("derives visible commands for the active slash selector", () => {
   });
   expect(
     suggestionState.visibleCommands.map((command) => command.name),
-  ).toEqual(["find"]);
+  ).toEqual(["find", "config"]);
   expect(suggestionState.highlightedCommandName).toBe("find");
 });
 

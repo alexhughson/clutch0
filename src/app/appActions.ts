@@ -1,6 +1,7 @@
 import type { AppActions, AppState } from "./appTypes";
 import { createAgentAskActions } from "../workflows/agentAsk/agentAskWorkflow";
 import { createComposeActions } from "../workflows/compose/composeWorkflow";
+import { createConfigActions } from "../workflows/config/configWorkflow";
 import { createContextItemsActions } from "../workflows/contextItems/contextItemsWorkflow";
 import { createContextSummariesActions } from "../workflows/contextSummaries/contextSummariesWorkflow";
 import { createCreateFileActions } from "../workflows/createFile/createFileWorkflow";
@@ -29,6 +30,7 @@ export function createAppActions({
   return {
     agentAsk: createAgentAskActions({ get, set }),
     compose: createComposeActions({ get, set }),
+    config: createConfigActions({ set }),
     contextSummaries: createContextSummariesActions({ get, set }),
     contextItems: createContextItemsActions({ set }),
     createFile: createCreateFileActions({ set }),

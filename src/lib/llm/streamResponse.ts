@@ -6,7 +6,7 @@ import {
 } from "@earendil-works/pi-ai";
 import type { ContextItem } from "../../types";
 import { buildLlmContext } from "./context";
-import { resolveLlmModel } from "./model";
+import { resolveConfiguredLlmModel } from "../config/clutchConfig";
 import { patchAwareSystemPrompt, renderPrompt } from "./prompts";
 import {
   getLlmWorkflowTools,
@@ -57,8 +57,8 @@ export async function streamLlmInteraction({
     systemPrompt: patchAwareSystemPrompt,
     tools: getLlmWorkflowTools({ allowedToolNames }),
   });
-  const model = resolveLlmModel();
-  const eventStream = stream(model, context, { signal });
+  const { apiKey, model } = resolveConfiguredLlmModel("primary");
+  const eventStream = stream(model, context, { apiKey, signal });
   let streamedText = "";
 
   for await (const event of eventStream) {

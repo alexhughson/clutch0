@@ -32,6 +32,7 @@ export type LlmSlashCommand = {
     | "agent-ask"
     | "agent-edit"
     | "agent-skill"
+    | "config"
     | "shell-command"
     | "show-context";
   readonly title: string;

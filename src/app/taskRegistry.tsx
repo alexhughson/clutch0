@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { LlmResponseScreen } from "../components/LlmResponseScreen";
 import { assertNever } from "../lib/invariant";
+import { ConfigScreen } from "../workflows/config/ConfigScreen";
 import { ContextItemViewerScreen } from "../workflows/contextItems/ContextItemViewerScreen";
 import { CreateFileScreen } from "../workflows/createFile/CreateFileScreen";
 import { FindFilesScreen } from "../workflows/findFiles/FindFilesScreen";
@@ -10,6 +11,8 @@ import type { AppTask } from "./appTypes";
 
 export function renderTask(task: AppTask): ReactNode {
   switch (task.kind) {
+    case "config":
+      return <ConfigScreen task={task} />;
     case "response":
       return <LlmResponseScreen request={task.request} />;
     case "find-files":
