@@ -1,5 +1,8 @@
 import type { ContextItemReplacementTarget } from "../../app/appTypes";
-import { streamLlmInteraction } from "../../lib/llm/streamResponse";
+import {
+  LlmCompletionError,
+  streamLlmInteraction,
+} from "../../lib/llm/streamResponse";
 import { useAppStore } from "../../store/appStore";
 import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
 
@@ -58,6 +61,8 @@ export function startLlmRequest(
       useAppStore.getState().actions.response.fail({
         errorMessage: error instanceof Error ? error.message : String(error),
         requestId,
+        responseText:
+          error instanceof LlmCompletionError ? error.debugOutput : undefined,
       });
     },
   );

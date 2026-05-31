@@ -30,8 +30,10 @@ export function createResponseActions({
   return {
     appendDelta: ({ delta, requestId }) =>
       set((state) => appendResponseDelta(state, requestId, delta)),
-    fail: ({ errorMessage, requestId }) =>
-      set((state) => failResponse(state, requestId, errorMessage)),
+    fail: ({ errorMessage, requestId, responseText }) =>
+      set((state) =>
+        failResponse(state, requestId, errorMessage, responseText),
+      ),
     failPatchApply: ({ errorMessage, requestId }) =>
       set((state) =>
         updatePatchApplyState(state, requestId, {
@@ -91,18 +93,23 @@ function failResponse(
   state: AppState,
   requestId: number,
   errorMessage: string,
+  responseText?: string,
 ): Partial<AppState> | AppState {
   const activeUpdate = isActiveInProgressLlmRequest(state, requestId)
     ? setActiveLlmRequest(state, {
         ...state.activeTask.request,
         errorMessage,
+        responseText: responseText ?? state.activeTask.request.responseText,
         status: "error",
       })
     : {};
   const nextState = { ...state, ...activeUpdate };
 
   return updateLiveLlmResponseItem(nextState, requestId, (item) =>
-    item.withError(errorMessage),
+    (responseText === undefined
+      ? item
+      : item.withOutput(responseText)
+    ).withError(errorMessage),
   );
 }
 

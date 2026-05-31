@@ -1,10 +1,10 @@
+import type { Api, Model } from "@earendil-works/pi-ai";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import {
   getClutchConfigPaths,
-  getDefaultClutchModelId,
   isClutchConfigured,
   loadClutchAuth,
   resolveConfiguredLlmModel,
@@ -17,28 +17,54 @@ async function createTempConfigPaths() {
   return getClutchConfigPaths(await mkdtemp(join(tmpdir(), "clutch-config-")));
 }
 
+function modelFixture({
+  id,
+  provider = "openai",
+}: {
+  id: string;
+  provider?: string;
+}): Model<Api> {
+  return {
+    api: provider === "openai" ? "openai-responses" : "openai-completions",
+    baseUrl:
+      provider === "openai"
+        ? "https://api.openai.com/v1"
+        : "https://openrouter.ai/api/v1",
+    contextWindow: 128_000,
+    cost: { cacheRead: 0, cacheWrite: 0, input: 1, output: 2 },
+    id,
+    input: ["text"],
+    maxTokens: 16_384,
+    name: id,
+    provider,
+    reasoning: false,
+  };
+}
+
 test("saves model settings separately from API credentials", async () => {
   const paths = await createTempConfigPaths();
-  const primaryModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "primary",
-  });
-  const summarizationModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "summarization",
-  });
+  const primary = {
+    metadata: modelFixture({ id: "gpt-live-primary" }),
+    model: "gpt-live-primary",
+    provider: "openai" as const,
+  };
+  const summarization = {
+    metadata: modelFixture({ id: "gpt-live-summary" }),
+    model: "gpt-live-summary",
+    provider: "openai" as const,
+  };
 
   saveClutchConfiguration({
     apiKey: "secret-token",
     paths,
-    primaryModel,
-    provider: "openai",
-    summarizationModel,
+    primary,
+    summarization,
   });
 
   const settingsText = await readFile(paths.settingsPath, "utf-8");
   const auth = loadClutchAuth(paths);
-  expect(settingsText).toContain(primaryModel);
+  expect(settingsText).toContain(primary.model);
+  expect(settingsText).toContain('"metadata"');
   expect(settingsText).not.toContain("secret-token");
   expect(auth.openai?.key).toBe("secret-token");
   expect(isClutchConfigured(paths)).toBe(true);
@@ -46,28 +72,29 @@ test("saves model settings separately from API credentials", async () => {
 
 test("resolves primary and summarization models independently", async () => {
   const paths = await createTempConfigPaths();
-  const primaryModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "primary",
-  });
-  const summarizationModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "summarization",
-  });
+  const primary = {
+    metadata: modelFixture({ id: "gpt-live-primary" }),
+    model: "gpt-live-primary",
+    provider: "openai" as const,
+  };
+  const summarization = {
+    metadata: modelFixture({ id: "gpt-live-summary" }),
+    model: "gpt-live-summary",
+    provider: "openai" as const,
+  };
 
   saveClutchConfiguration({
     apiKey: "secret-token",
     paths,
-    primaryModel,
-    provider: "openai",
-    summarizationModel,
+    primary,
+    summarization,
   });
 
   expect(resolveConfiguredLlmModel("primary", paths).model.id).toBe(
-    primaryModel,
+    primary.model,
   );
   expect(resolveConfiguredLlmModel("summarization", paths).model.id).toBe(
-    summarizationModel,
+    summarization.model,
   );
   expect(resolveConfiguredLlmModel("primary", paths).apiKey).toBe(
     "secret-token",
@@ -84,22 +111,24 @@ test("supports different providers for primary and summarization models", async 
       provider: "openrouter",
     }),
   ]);
-  const primaryModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "primary",
-  });
-  const summarizationModel = getDefaultClutchModelId({
-    provider: "openrouter",
-    role: "summarization",
-  });
+  const primary = {
+    metadata: modelFixture({ id: "gpt-live-primary", provider: "openai" }),
+    model: "gpt-live-primary",
+    provider: "openai" as const,
+  };
+  const summarization = {
+    metadata: modelFixture({
+      id: "anthropic/live-summary",
+      provider: "openrouter",
+    }),
+    model: "anthropic/live-summary",
+    provider: "openrouter" as const,
+  };
 
   saveClutchModelConfiguration({
     paths,
-    primary: { model: primaryModel, provider: "openai" },
-    summarization: {
-      model: summarizationModel,
-      provider: "openrouter",
-    },
+    primary,
+    summarization,
   });
 
   expect(resolveConfiguredLlmModel("primary", paths).apiKey).toBe(
@@ -111,25 +140,57 @@ test("supports different providers for primary and summarization models", async 
   expect(isClutchConfigured(paths)).toBe(true);
 });
 
+test("requires dynamic model metadata for configured models", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchApiKey({ apiKey: "secret-token", paths, provider: "openai" });
+
+  expect(() =>
+    saveClutchModelConfiguration({
+      paths,
+      primary: { model: "legacy-primary", provider: "openai" },
+      summarization: { model: "legacy-summary", provider: "openai" },
+    }),
+  ).toThrow("missing dynamic model metadata");
+});
+
 test("requires credentials for the configured provider", async () => {
   const paths = await createTempConfigPaths();
-  const primaryModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "primary",
-  });
-  const summarizationModel = getDefaultClutchModelId({
-    provider: "openai",
-    role: "summarization",
-  });
 
   expect(() =>
     saveClutchConfiguration({
       paths,
-      primaryModel,
-      provider: "openai",
-      summarizationModel,
+      primary: {
+        metadata: modelFixture({ id: "gpt-live-primary" }),
+        model: "gpt-live-primary",
+        provider: "openai",
+      },
+      summarization: {
+        metadata: modelFixture({ id: "gpt-live-summary" }),
+        model: "gpt-live-summary",
+        provider: "openai",
+      },
     }),
   ).toThrow('Missing Clutch API key for provider "openai".');
+});
+
+test("legacy metadata-less settings are not considered configured", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchApiKey({ apiKey: "secret-token", paths, provider: "openai" });
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      models: {
+        primary: { model: "legacy-primary", provider: "openai" },
+        summarization: { model: "legacy-summary", provider: "openai" },
+      },
+    }),
+    "utf-8",
+  );
+
+  expect(isClutchConfigured(paths)).toBe(false);
+  expect(() => resolveConfiguredLlmModel("primary", paths)).toThrow(
+    "missing dynamic model metadata",
+  );
 });
 
 test("malformed settings fail loudly", async () => {

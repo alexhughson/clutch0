@@ -1,4 +1,7 @@
-import { streamLlmInteraction } from "../../lib/llm/streamResponse";
+import {
+  LlmCompletionError,
+  streamLlmInteraction,
+} from "../../lib/llm/streamResponse";
 import { runShellCommand } from "../../lib/shell/shellCommand";
 import { useAppStore } from "../../store/appStore";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "../llmTools/shellCommandWorkflowTool";
@@ -39,7 +42,12 @@ export function startShellCommandRequest(
     },
     (error: unknown) => {
       useAppStore.getState().actions.shellCommand.fail({
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage:
+          error instanceof LlmCompletionError
+            ? error.debugOutput
+            : error instanceof Error
+              ? error.message
+              : String(error),
         requestId,
       });
     },

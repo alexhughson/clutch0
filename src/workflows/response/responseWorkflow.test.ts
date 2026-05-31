@@ -122,6 +122,43 @@ test("saving a running response creates live context and finish updates it", () 
   expect(item?.id).toBe("saved:1");
 });
 
+test("failing a request can replace the response output with debug text", () => {
+  const harness = createHarness({
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      request: {
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        question: "Explain the app",
+        responseText: "partial",
+        status: "streaming",
+      },
+    },
+    nextContextItemId: 1,
+    nextLlmRequestId: 2,
+    workspace: createInitialComposeScreen(),
+  });
+
+  harness.response.fail({
+    errorMessage:
+      "LLM completion failed. See response output for full details.",
+    requestId: 1,
+    responseText: "# LLM completion failed\n\npartial\n\nfull provider error",
+  });
+
+  expect(harness.state.activeTask?.kind).toBe("response");
+  if (harness.state.activeTask?.kind !== "response") {
+    return;
+  }
+
+  expect(harness.state.activeTask.request.status).toBe("error");
+  expect(harness.state.activeTask.request.responseText).toContain(
+    "full provider error",
+  );
+});
+
 test("saving a running edit replaces the live item with a saved diff", () => {
   const harness = createHarness({
     actions: {} as AppActions,

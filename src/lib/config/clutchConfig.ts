@@ -7,16 +7,12 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import {
-  getModels,
-  type Api,
-  type KnownProvider,
-  type Model,
-} from "@earendil-works/pi-ai";
+import type { Api, Model } from "@earendil-works/pi-ai";
 
 export const CLUTCH_CONFIG_DIR_ENV = "CLUTCH_CONFIG_DIR";
 
 export const SUPPORTED_CLUTCH_LLM_PROVIDERS = [
+  { id: "cerebras", label: "Cerebras" },
   { id: "openai", label: "OpenAI" },
   { id: "openrouter", label: "OpenRouter" },
   { id: "opencode", label: "OpenCode Zen" },
@@ -29,6 +25,7 @@ export type SupportedClutchLlmProvider =
 export type ClutchModelRole = "primary" | "summarization";
 
 export type ClutchModelSelection = {
+  metadata?: Model<Api>;
   model: string;
   provider: SupportedClutchLlmProvider;
 };
@@ -59,28 +56,6 @@ export type ResolvedConfiguredLlmModel = {
 
 const DEFAULT_PROVIDER: SupportedClutchLlmProvider = "openai";
 
-const PREFERRED_MODELS: Record<
-  SupportedClutchLlmProvider,
-  Partial<Record<ClutchModelRole, string>>
-> = {
-  openai: {
-    primary: "gpt-5",
-    summarization: "gpt-4.1-mini",
-  },
-  openrouter: {
-    primary: "anthropic/claude-sonnet-4.5",
-    summarization: "openai/gpt-4.1-mini",
-  },
-  opencode: {
-    primary: "claude-sonnet-4-5",
-    summarization: "gemini-3-flash",
-  },
-  "opencode-go": {
-    primary: "kimi-k2.6",
-    summarization: "deepseek-v4-flash",
-  },
-};
-
 export function getClutchConfigPaths(
   configDir = process.env[CLUTCH_CONFIG_DIR_ENV] ?? join(homedir(), ".clutch"),
 ): ClutchConfigPaths {
@@ -103,35 +78,6 @@ export function isSupportedClutchProvider(
   return SUPPORTED_CLUTCH_LLM_PROVIDERS.some(
     (candidate) => candidate.id === provider,
   );
-}
-
-export function getClutchModelOptions(
-  provider: SupportedClutchLlmProvider,
-): Model<Api>[] {
-  return getModels(provider as KnownProvider) as Model<Api>[];
-}
-
-export function getDefaultClutchModelId({
-  provider,
-  role,
-}: {
-  provider: SupportedClutchLlmProvider;
-  role: ClutchModelRole;
-}): string {
-  const models = getClutchModelOptions(provider);
-  const preferredModel = PREFERRED_MODELS[provider][role];
-  if (
-    preferredModel !== undefined &&
-    models.some((model) => model.id === preferredModel)
-  ) {
-    return preferredModel;
-  }
-
-  const firstModel = models[0];
-  if (firstModel === undefined) {
-    throw new Error(`No models are registered for provider: ${provider}`);
-  }
-  return firstModel.id;
 }
 
 export function loadClutchSettings(
@@ -161,6 +107,8 @@ export function isClutchConfigured(paths = getClutchConfigPaths()): boolean {
   return (
     hasUsableModelSelection(settings.models?.primary) &&
     hasUsableModelSelection(settings.models?.summarization) &&
+    hasUsableModelMetadata(settings.models.primary) &&
+    hasUsableModelMetadata(settings.models.summarization) &&
     hasUsableApiKey(auth[settings.models.primary.provider]) &&
     hasUsableApiKey(auth[settings.models.summarization.provider])
   );
@@ -180,12 +128,9 @@ export function resolveConfiguredLlmModel(
     );
   }
 
-  const model = getClutchModelOptions(selection.provider).find(
-    (candidate) => candidate.id === selection.model,
-  );
-  if (model === undefined) {
+  if (!hasUsableModelMetadata(selection)) {
     throw new Error(
-      `Unknown Clutch ${role} model "${selection.model}" for provider "${selection.provider}". Run /config to choose a supported model.`,
+      `Clutch ${role} model "${selection.model}" for provider "${selection.provider}" is missing dynamic model metadata. Run /config to re-select it.`,
     );
   }
 
@@ -198,30 +143,28 @@ export function resolveConfiguredLlmModel(
 
   return {
     apiKey: credential.key,
-    model,
+    model: selection.metadata,
   };
 }
 
 export function saveClutchConfiguration({
   apiKey,
   paths = getClutchConfigPaths(),
-  primaryModel,
-  provider,
-  summarizationModel,
+  primary,
+  summarization,
 }: {
   apiKey?: string;
   paths?: ClutchConfigPaths;
-  primaryModel: string;
-  provider: SupportedClutchLlmProvider;
-  summarizationModel: string;
+  primary: ClutchModelSelection;
+  summarization: ClutchModelSelection;
 }) {
   if (apiKey !== undefined) {
-    saveClutchApiKey({ apiKey, paths, provider });
+    saveClutchApiKey({ apiKey, paths, provider: primary.provider });
   }
   saveClutchModelConfiguration({
     paths,
-    primary: { model: primaryModel, provider },
-    summarization: { model: summarizationModel, provider },
+    primary,
+    summarization,
   });
 }
 
@@ -260,16 +203,8 @@ export function saveClutchModelConfiguration({
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 }) {
-  assertKnownModel({
-    modelId: primary.model,
-    provider: primary.provider,
-    role: "primary",
-  });
-  assertKnownModel({
-    modelId: summarization.model,
-    provider: summarization.provider,
-    role: "summarization",
-  });
+  assertUsableModelSelection(primary, "primary");
+  assertUsableModelSelection(summarization, "summarization");
 
   const auth = loadClutchAuth(paths);
   assertConfiguredProviderCredential(auth, primary.provider);
@@ -302,40 +237,29 @@ export function createDefaultClutchConfigDraft(
     configuredProviders: SUPPORTED_CLUTCH_LLM_PROVIDERS.map(
       (candidate) => candidate.id,
     ).filter((candidate) => hasUsableApiKey(auth[candidate])),
-    primary: {
-      model: getExistingOrDefaultModel({
-        model: settings.models?.primary,
-        provider: primaryProvider,
-        role: "primary",
-      }),
+    primary: getExistingOrEmptyModelSelection({
+      model: settings.models?.primary,
       provider: primaryProvider,
-    },
-    summarization: {
-      model: getExistingOrDefaultModel({
-        model: settings.models?.summarization,
-        provider: summarizationProvider,
-        role: "summarization",
-      }),
+    }),
+    summarization: getExistingOrEmptyModelSelection({
+      model: settings.models?.summarization,
       provider: summarizationProvider,
-    },
+    }),
   };
 }
 
-function getExistingOrDefaultModel({
+function getExistingOrEmptyModelSelection({
   model,
   provider,
-  role,
 }: {
   model?: ClutchModelSelection;
   provider: SupportedClutchLlmProvider;
-  role: ClutchModelRole;
-}): string {
+}): ClutchModelSelection {
   if (model?.provider === provider) {
-    assertKnownModel({ modelId: model.model, provider, role });
-    return model.model;
+    return model;
   }
 
-  return getDefaultClutchModelId({ provider, role });
+  return { model: "", provider };
 }
 
 function parseClutchSettings(raw: Record<string, unknown>): ClutchSettings {
@@ -377,6 +301,7 @@ function parseModelSelection(
 
   const provider = (raw as Record<string, unknown>).provider;
   const model = (raw as Record<string, unknown>).model;
+  const metadata = (raw as Record<string, unknown>).metadata;
   if (typeof provider !== "string" || typeof model !== "string") {
     throw new Error(
       `Clutch ${role} model config must include provider and model strings.`,
@@ -386,8 +311,15 @@ function parseModelSelection(
     throw new Error(`Unsupported Clutch LLM provider: ${provider}`);
   }
 
-  assertKnownModel({ modelId: model, provider, role });
-  return { model, provider };
+  if (metadata === undefined) {
+    return { model, provider };
+  }
+
+  return {
+    metadata: parseModelMetadata({ metadata, modelId: model, provider, role }),
+    model,
+    provider,
+  };
 }
 
 function parseClutchAuth(raw: Record<string, unknown>): ClutchAuth {
@@ -438,18 +370,82 @@ function writeJsonFile(path: string, value: unknown) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf-8");
 }
 
-function assertKnownModel({
+function parseModelMetadata({
+  metadata,
   modelId,
   provider,
   role,
 }: {
+  metadata: unknown;
   modelId: string;
   provider: SupportedClutchLlmProvider;
   role: ClutchModelRole;
-}) {
-  if (!getClutchModelOptions(provider).some((model) => model.id === modelId)) {
+}): Model<Api> {
+  if (
+    metadata === null ||
+    typeof metadata !== "object" ||
+    Array.isArray(metadata)
+  ) {
+    throw new Error(`Clutch ${role} model metadata must be an object.`);
+  }
+
+  const candidate = metadata as Record<string, unknown>;
+  if (candidate.id !== modelId) {
+    throw new Error(`Clutch ${role} model metadata id must match model.`);
+  }
+  if (candidate.provider !== provider) {
     throw new Error(
-      `Unknown Clutch ${role} model "${modelId}" for provider "${provider}".`,
+      `Clutch ${role} model metadata provider must match provider.`,
+    );
+  }
+  if (typeof candidate.name !== "string" || candidate.name.length === 0) {
+    throw new Error(`Clutch ${role} model metadata name must be a string.`);
+  }
+  if (typeof candidate.api !== "string" || candidate.api.length === 0) {
+    throw new Error(`Clutch ${role} model metadata api must be a string.`);
+  }
+  if (typeof candidate.baseUrl !== "string" || candidate.baseUrl.length === 0) {
+    throw new Error(`Clutch ${role} model metadata baseUrl must be a string.`);
+  }
+  if (typeof candidate.reasoning !== "boolean") {
+    throw new Error(
+      `Clutch ${role} model metadata reasoning must be a boolean.`,
+    );
+  }
+  if (!isStringArray(candidate.input)) {
+    throw new Error(
+      `Clutch ${role} model metadata input must be a string array.`,
+    );
+  }
+  if (!isPositiveNumber(candidate.contextWindow)) {
+    throw new Error(
+      `Clutch ${role} model metadata contextWindow must be a positive number.`,
+    );
+  }
+  if (!isPositiveNumber(candidate.maxTokens)) {
+    throw new Error(
+      `Clutch ${role} model metadata maxTokens must be a positive number.`,
+    );
+  }
+  if (!isCostObject(candidate.cost)) {
+    throw new Error(
+      `Clutch ${role} model metadata cost must include numeric token costs.`,
+    );
+  }
+
+  return candidate as unknown as Model<Api>;
+}
+
+function assertUsableModelSelection(
+  selection: ClutchModelSelection,
+  role: ClutchModelRole,
+) {
+  if (!hasUsableModelSelection(selection)) {
+    throw new Error(`Clutch ${role} model is not configured.`);
+  }
+  if (!hasUsableModelMetadata(selection)) {
+    throw new Error(
+      `Clutch ${role} model "${selection.model}" for provider "${selection.provider}" is missing dynamic model metadata.`,
     );
   }
 }
@@ -470,6 +466,36 @@ function hasUsableModelSelection(
     selection !== undefined &&
     isSupportedClutchProvider(selection.provider) &&
     selection.model.length > 0
+  );
+}
+
+function hasUsableModelMetadata(
+  selection: ClutchModelSelection,
+): selection is ClutchModelSelection & { metadata: Model<Api> } {
+  return selection.metadata !== undefined;
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
+function isPositiveNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+function isCostObject(value: unknown): boolean {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const cost = value as Record<string, unknown>;
+  return (
+    typeof cost.input === "number" &&
+    typeof cost.output === "number" &&
+    typeof cost.cacheRead === "number" &&
+    typeof cost.cacheWrite === "number"
   );
 }
 

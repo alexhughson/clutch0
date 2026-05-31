@@ -4,11 +4,10 @@ import {
   type KeyEvent,
 } from "@opentui/core";
 import { useKeyboard, usePaste } from "@opentui/react";
-import { useState } from "react";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import { useEffect, useState } from "react";
 import type { ConfigTaskState } from "../../app/appTypes";
 import {
-  getClutchModelOptions,
-  getDefaultClutchModelId,
   getSupportedClutchProviderLabel,
   saveClutchApiKey,
   saveClutchModelConfiguration,
@@ -16,6 +15,7 @@ import {
   type ClutchModelSelection,
   type SupportedClutchLlmProvider,
 } from "../../lib/config/clutchConfig";
+import { fetchClutchProviderModels } from "../../lib/config/providerModels";
 import { useAppStore } from "../../store/appStore";
 
 type ConfigScreenProps = {
@@ -30,6 +30,20 @@ type ConfigStage =
   | "token";
 type ModelEntry = "primary" | "summarization";
 type ModelSettingsRow = ModelEntry | "done";
+type ModelLoadState =
+  | {
+      models: Model<Api>[];
+      provider: SupportedClutchLlmProvider;
+      status: "loaded";
+    }
+  | {
+      errorMessage: string;
+      models: [];
+      provider: SupportedClutchLlmProvider;
+      status: "error";
+    }
+  | { models: []; provider: SupportedClutchLlmProvider; status: "loading" }
+  | { models: []; provider: null; status: "idle" };
 
 type AppActions = ReturnType<typeof useAppStore.getState>["actions"];
 
@@ -59,6 +73,45 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const [configuredProviders, setConfiguredProviders] = useState(
     task.configuredProviders,
   );
+  const [modelLoad, setModelLoad] = useState<ModelLoadState>({
+    models: [],
+    provider: null,
+    status: "idle",
+  });
+
+  const activeSelection =
+    activeModelEntry === "primary" ? primary : summarization;
+
+  useEffect(() => {
+    if (stage !== "model-model") {
+      return;
+    }
+
+    const controller = new AbortController();
+    const provider = activeSelection.provider;
+    setModelLoad({ models: [], provider, status: "loading" });
+    fetchClutchProviderModels({ provider, signal: controller.signal })
+      .then((models) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setModelLoad({ models, provider, status: "loaded" });
+        setModelIndex(indexOfModel(activeSelection, models));
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setModelLoad({
+          errorMessage: error instanceof Error ? error.message : String(error),
+          models: [],
+          provider,
+          status: "error",
+        });
+      });
+
+    return () => controller.abort();
+  }, [activeSelection.model, activeSelection.provider, stage]);
 
   usePaste((event) => {
     if (stage !== "token") {
@@ -127,6 +180,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         activeModelEntry,
         event,
         modelProviderIndex,
+        primary,
         setMessage,
         setModelFilter,
         setModelIndex,
@@ -134,6 +188,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         setPrimary,
         setStage,
         setSummarization,
+        summarization,
       });
       return;
     }
@@ -143,6 +198,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       event,
       modelFilter,
       modelIndex,
+      modelLoad,
       primary,
       setMessage,
       setModelFilter,
@@ -209,6 +265,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
             filter={modelFilter}
             message={message}
             modelIndex={modelIndex}
+            modelLoad={modelLoad}
             primary={primary}
             summarization={summarization}
           />
@@ -328,6 +385,7 @@ function ModelChoiceStep({
   filter,
   message,
   modelIndex,
+  modelLoad,
   primary,
   summarization,
 }: {
@@ -335,19 +393,28 @@ function ModelChoiceStep({
   filter: string;
   message: string | null;
   modelIndex: number;
+  modelLoad: ModelLoadState;
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 }) {
   const selection = activeModelEntry === "primary" ? primary : summarization;
-  const matches = matchingModels({ filter, selection });
+  const matches = matchingModels({ filter, models: modelLoad.models });
   const visibleModels = getVisibleModels({ modelIndex, models: matches });
 
   return (
     <>
       <text>{`Choose model for ${entryLabel(activeModelEntry)}.`}</text>
       <text style={{ fg: "gray" }}>
-        {`Provider: ${getSupportedClutchProviderLabel(selection.provider)}${filter.length === 0 ? "" : ` · filter: ${filter}`}`}
+        {modelChoiceStatusLabel({
+          filter,
+          modelLoad,
+          provider: selection.provider,
+        })}
       </text>
+      {modelLoad.status === "loading" ? <text>Loading models…</text> : null}
+      {modelLoad.status === "error" ? (
+        <text style={{ fg: "red" }}>{modelLoad.errorMessage}</text>
+      ) : null}
       {visibleModels.map(({ index, model }) => (
         <text
           key={model.id}
@@ -356,7 +423,9 @@ function ModelChoiceStep({
           {`${index === modelIndex ? ">" : " "} ${model.id} — ${model.name}`}
         </text>
       ))}
-      {matches.length === 0 ? <text>No matching models.</text> : null}
+      {modelLoad.status === "loaded" && matches.length === 0 ? (
+        <text>No matching models.</text>
+      ) : null}
       {message === null ? null : <text style={{ fg: "red" }}>{message}</text>}
     </>
   );
@@ -561,6 +630,7 @@ function handleModelProviderKey({
   activeModelEntry,
   event,
   modelProviderIndex,
+  primary,
   setMessage,
   setModelFilter,
   setModelIndex,
@@ -568,10 +638,12 @@ function handleModelProviderKey({
   setPrimary,
   setStage,
   setSummarization,
+  summarization,
 }: {
   activeModelEntry: ModelEntry;
   event: KeyEvent;
   modelProviderIndex: number;
+  primary: ClutchModelSelection;
   setMessage: (message: string | null) => void;
   setModelFilter: (filter: string) => void;
   setModelIndex: (index: number) => void;
@@ -579,6 +651,7 @@ function handleModelProviderKey({
   setPrimary: (selection: ClutchModelSelection) => void;
   setStage: (stage: ConfigStage) => void;
   setSummarization: (selection: ClutchModelSelection) => void;
+  summarization: ClutchModelSelection;
 }) {
   if (event.name === "escape") {
     setStage("model-settings");
@@ -609,15 +682,19 @@ function handleModelProviderKey({
     throw new Error(`Invalid model provider row index: ${modelProviderIndex}`);
   }
 
-  const model = getDefaultClutchModelId({ provider, role: activeModelEntry });
-  const selection = { model, provider };
+  const currentSelection =
+    activeModelEntry === "primary" ? primary : summarization;
+  const selection =
+    currentSelection.provider === provider
+      ? currentSelection
+      : { model: "", provider };
   setActiveSelection({
     activeModelEntry,
     selection,
     setPrimary,
     setSummarization,
   });
-  setModelIndex(indexOfModel(selection));
+  setModelIndex(0);
   setModelFilter("");
   setStage("model-model");
   setMessage(null);
@@ -629,6 +706,7 @@ function handleModelChoiceKey({
   event,
   modelFilter,
   modelIndex,
+  modelLoad,
   primary,
   setMessage,
   setModelFilter,
@@ -642,6 +720,7 @@ function handleModelChoiceKey({
   event: KeyEvent;
   modelFilter: string;
   modelIndex: number;
+  modelLoad: ModelLoadState;
   primary: ClutchModelSelection;
   setMessage: (message: string | null) => void;
   setModelFilter: (filter: string) => void;
@@ -652,7 +731,10 @@ function handleModelChoiceKey({
   summarization: ClutchModelSelection;
 }) {
   const selection = activeModelEntry === "primary" ? primary : summarization;
-  const matches = matchingModels({ filter: modelFilter, selection });
+  const matches = matchingModels({
+    filter: modelFilter,
+    models: modelLoad.models,
+  });
 
   if (event.name === "escape") {
     setStage("model-provider");
@@ -673,6 +755,12 @@ function handleModelChoiceKey({
   }
 
   if (event.name === "return") {
+    if (modelLoad.status !== "loaded") {
+      setMessage("Models are not loaded yet.");
+      prevent(event);
+      return;
+    }
+
     const model = matches[modelIndex];
     if (model === undefined) {
       setMessage("Choose a model before continuing.");
@@ -682,7 +770,7 @@ function handleModelChoiceKey({
 
     setActiveSelection({
       activeModelEntry,
-      selection: { ...selection, model: model.id },
+      selection: { ...selection, metadata: model, model: model.id },
       setPrimary,
       setSummarization,
     });
@@ -697,7 +785,7 @@ function handleModelChoiceKey({
 
   if (event.ctrl && event.name === "u") {
     setModelFilter("");
-    setModelIndex(indexOfModel(selection));
+    setModelIndex(indexOfModel(selection, modelLoad.models));
     setMessage(null);
     prevent(event);
     return;
@@ -735,7 +823,7 @@ function modelSettingsRowLabel({
   }
 
   const selection = row === "primary" ? primary : summarization;
-  return `${entryLabel(row)}: ${getSupportedClutchProviderLabel(selection.provider)} / ${selection.model}`;
+  return `${entryLabel(row)}: ${getSupportedClutchProviderLabel(selection.provider)} / ${selection.model.length === 0 ? "(choose model)" : selection.model}`;
 }
 
 function providerRows(
@@ -754,6 +842,21 @@ function providerRows(
       label: "Configure models",
     },
   ];
+}
+
+function modelChoiceStatusLabel({
+  filter,
+  modelLoad,
+  provider,
+}: {
+  filter: string;
+  modelLoad: ModelLoadState;
+  provider: SupportedClutchLlmProvider;
+}): string {
+  const base = `Provider: ${getSupportedClutchProviderLabel(provider)}`;
+  const loadedCount =
+    modelLoad.status === "loaded" ? ` · ${modelLoad.models.length} models` : "";
+  return `${base}${loadedCount}${filter.length === 0 ? "" : ` · filter: ${filter}`}`;
 }
 
 function setActiveSelection({
@@ -777,13 +880,12 @@ function setActiveSelection({
 
 function matchingModels({
   filter,
-  selection,
+  models,
 }: {
   filter: string;
-  selection: ClutchModelSelection;
+  models: readonly Model<Api>[];
 }) {
   const normalizedFilter = filter.trim().toLowerCase();
-  const models = getClutchModelOptions(selection.provider);
   if (normalizedFilter.length === 0) {
     return models;
   }
@@ -811,12 +913,13 @@ function getVisibleModels<T>({
     }));
 }
 
-function indexOfModel(selection: ClutchModelSelection): number {
+function indexOfModel(
+  selection: ClutchModelSelection,
+  models: readonly Model<Api>[],
+): number {
   return Math.max(
     0,
-    getClutchModelOptions(selection.provider).findIndex(
-      (model) => model.id === selection.model,
-    ),
+    models.findIndex((model) => model.id === selection.model),
   );
 }
 

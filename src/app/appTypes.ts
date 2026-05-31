@@ -259,7 +259,11 @@ export type AppActions = {
   };
   response: {
     appendDelta: (options: { delta: string; requestId: number }) => void;
-    fail: (options: { errorMessage: string; requestId: number }) => void;
+    fail: (options: {
+      errorMessage: string;
+      requestId: number;
+      responseText?: string;
+    }) => void;
     failPatchApply: (options: {
       errorMessage: string;
       requestId: number;

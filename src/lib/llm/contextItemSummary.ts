@@ -9,6 +9,7 @@ import type {
 } from "../../types";
 import { resolveConfiguredLlmModel } from "../config/clutchConfig";
 import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
+import { maxOutputTokensForModel } from "./requestOptions";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;
 const MAX_ONE_LINE_CHARACTERS = 100;
@@ -38,7 +39,7 @@ export async function generateContextItemSummary(
       ],
       systemPrompt: contextItemSummarySystemPrompt,
     },
-    { apiKey },
+    { apiKey, maxTokens: maxOutputTokensForModel(model) },
   );
 
   const parsed = parseSummaryResponse(getAssistantText(message));

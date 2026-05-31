@@ -13,8 +13,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.75.5",
-    "@earendil-works/pi-coding-agent": "^0.75.4",
+    "@earendil-works/pi-ai": "^0.78.0",
+    "@earendil-works/pi-coding-agent": "^0.78.0",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",
     "diff": "^9.0.0",

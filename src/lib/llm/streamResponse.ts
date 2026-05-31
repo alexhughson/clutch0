@@ -8,6 +8,7 @@ import type { ContextItem } from "../../types";
 import { buildLlmContext } from "./context";
 import { resolveConfiguredLlmModel } from "../config/clutchConfig";
 import { patchAwareSystemPrompt, renderPrompt } from "./prompts";
+import { maxOutputTokensForModel } from "./requestOptions";
 import {
   getLlmWorkflowTools,
   routeLlmWorkflowToolCalls,
@@ -31,6 +32,13 @@ export type StreamLlmInteractionResult =
       responseText: string;
     }
   | ({ responseText: string } & LlmWorkflowToolResult);
+
+export class LlmCompletionError extends Error {
+  constructor(readonly debugOutput: string) {
+    super("LLM completion failed. See response output for full details.");
+    this.name = "LlmCompletionError";
+  }
+}
 
 export async function streamLlmResponse(
   options: StreamLlmResponseOptions,
@@ -58,25 +66,45 @@ export async function streamLlmInteraction({
     tools: getLlmWorkflowTools({ allowedToolNames }),
   });
   const { apiKey, model } = resolveConfiguredLlmModel("primary");
-  const eventStream = stream(model, context, { apiKey, signal });
+  const eventStream = stream(model, context, {
+    apiKey,
+    maxTokens: maxOutputTokensForModel(model),
+    signal,
+  });
   let streamedText = "";
 
-  for await (const event of eventStream) {
-    if (event.type === "text_delta") {
-      streamedText += event.delta;
-      onDelta?.(event.delta);
-      continue;
+  let finalMessage: AssistantMessage;
+  try {
+    for await (const event of eventStream) {
+      if (event.type === "text_delta") {
+        streamedText += event.delta;
+        onDelta?.(event.delta);
+        continue;
+      }
+
+      if (event.type === "error") {
+        throw new LlmCompletionError(
+          formatCompletionFailureOutput({
+            assistantMessage: event.error,
+            error:
+              event.error.errorMessage ??
+              "The LLM request failed without an error message.",
+            streamedText,
+          }),
+        );
+      }
     }
 
-    if (event.type === "error") {
-      throw new Error(
-        event.error.errorMessage ??
-          "The LLM request failed without an error message.",
-      );
+    finalMessage = await eventStream.result();
+  } catch (error) {
+    if (error instanceof LlmCompletionError) {
+      throw error;
     }
+
+    throw new LlmCompletionError(
+      formatCompletionFailureOutput({ error, streamedText }),
+    );
   }
-
-  const finalMessage = await eventStream.result();
   const finalText = getAssistantText(finalMessage);
   const responseText = finalText.length > 0 ? finalText : streamedText;
   const workflowResult = await routeLlmWorkflowToolCalls({
@@ -113,6 +141,57 @@ function formatQuestionForCommand({
     commandDirective,
     question,
   });
+}
+
+function formatCompletionFailureOutput({
+  assistantMessage,
+  error,
+  streamedText,
+}: {
+  assistantMessage?: AssistantMessage;
+  error: unknown;
+  streamedText: string;
+}): string {
+  return [
+    "# LLM completion failed",
+    "",
+    "## Error",
+    "```text",
+    formatUnknownError(error),
+    "```",
+    "",
+    "## Partial streamed text",
+    streamedText.trim().length === 0 ? "(none)" : streamedText,
+    "",
+    "## Provider error response",
+    assistantMessage === undefined
+      ? "(none)"
+      : `\`\`\`json\n${safeJsonStringify(assistantMessage)}\n\`\`\``,
+  ].join("\n");
+}
+
+function formatUnknownError(error: unknown): string {
+  if (error instanceof Error) {
+    const parts = [
+      `${error.name}: ${error.message}`,
+      error.stack === undefined ? undefined : `\nStack:\n${error.stack}`,
+      error.cause === undefined
+        ? undefined
+        : `\nCause:\n${formatUnknownError(error.cause)}`,
+    ];
+
+    return parts.filter((part) => part !== undefined).join("\n");
+  }
+
+  return typeof error === "string" ? error : safeJsonStringify(error);
+}
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    return `Could not serialize value: ${error instanceof Error ? error.message : String(error)}`;
+  }
 }
 
 function getAssistantText(message: AssistantMessage): string {
