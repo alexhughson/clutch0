@@ -1,8 +1,29 @@
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { expect, test } from "bun:test";
 import { loadFileList } from "./fileListLoader";
+
+const execFileAsync = promisify(execFile);
+
+test("loads git files while respecting gitignore rules", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-file-list-git-"));
+
+  try {
+    await execFileAsync("git", ["init", "-q"], { cwd: root });
+    await mkdir(join(root, "ignored-dir"), { recursive: true });
+    await writeFile(join(root, ".gitignore"), "ignored.txt\nignored-dir/\n");
+    await writeFile(join(root, "visible.ts"), "");
+    await writeFile(join(root, "ignored.txt"), "");
+    await writeFile(join(root, "ignored-dir", "hidden.ts"), "");
+
+    expect(await loadFileList({ root })).toEqual([".gitignore", "visible.ts"]);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});
 
 test("loads files with pluggable exclusions", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-file-list-"));

@@ -1,6 +1,7 @@
 import { stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { invariant } from "../invariant";
+import { loadFileList } from "../fileListLoader";
 import type { FilePath } from "../../types";
 
 export async function validateExistingContextFilePaths({
@@ -13,8 +14,11 @@ export async function validateExistingContextFilePaths({
   invariant(paths.length > 0, "add_context_files.paths must not be empty.");
 
   const absoluteRoot = resolve(root);
-  const seen = new Set<string>();
-  const validPaths: FilePath[] = [];
+  const candidates: Array<{
+    index: number;
+    path: string;
+    normalizedPath: FilePath;
+  }> = [];
 
   for (const [index, rawPath] of paths.entries()) {
     const path = rawPath.trim();
@@ -38,6 +42,7 @@ export async function validateExistingContextFilePaths({
         (!relativePath.startsWith("..") && !isAbsolute(relativePath)),
       `add_context_files.paths[${index}] is outside the working directory.`,
     );
+    const normalizedPath = toPosixPath(relativePath);
 
     const fileStat = await statExistingFile(path, absolutePath, index);
     invariant(
@@ -45,9 +50,22 @@ export async function validateExistingContextFilePaths({
       `add_context_files.paths[${index}] must point to a regular file.`,
     );
 
-    if (!seen.has(path)) {
-      seen.add(path);
-      validPaths.push(path);
+    candidates.push({ index, normalizedPath, path });
+  }
+
+  const addableFilePaths = new Set(await loadFileList({ root: absoluteRoot }));
+  const seen = new Set<string>();
+  const validPaths: FilePath[] = [];
+
+  for (const candidate of candidates) {
+    invariant(
+      addableFilePaths.has(candidate.normalizedPath),
+      `add_context_files.paths[${candidate.index}] is ignored by .gitignore or Clutch file exclusions: ${candidate.path}`,
+    );
+
+    if (!seen.has(candidate.normalizedPath)) {
+      seen.add(candidate.normalizedPath);
+      validPaths.push(candidate.normalizedPath);
     }
   }
 
@@ -72,6 +90,10 @@ async function statExistingFile(
       `Could not check add_context_files.paths[${index}]: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
+}
+
+function toPosixPath(path: string): string {
+  return path.split(sep).join("/");
 }
 
 function isNotFoundError(error: unknown): boolean {

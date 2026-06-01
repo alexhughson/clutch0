@@ -1,20 +1,23 @@
 # Clutch0
 
-Clutch0 is a tool for using AI to write code.
+Clutch is a tool for using AI to write code.
+
+Clutch0 is a largely vibe coded prototype.  It is probably buggy, but I am pushing it up to get some feedback on the UX.  When it seems to work, my plan is to use it to build a very similar piece of software from scratch.
+
+Clutch tries to make AI coding feel more like driving a standard transmission. You issue the command for each next action rather than an agent loop, anachronistically involving you in tasks that could be automated so that you stay connected to what is happening.
+
+Inspired by the Composer feature that Cursor launched briefly before adding their agent, you build a context window from files, command outputs, mcp calls, and have the LLM perform operations one at a time.
 
 ## Install from a cloned repo
 
-Clutch0 is Bun-first and currently installs from this repository.
 
 ```sh
 git clone <repo-url> clutch0
 cd clutch0
 bun install
-bun install -g .
+bun link
 clutch0
 ```
-
-The global command is `clutch0`. Bun must be installed and available on your `PATH`.
 
 For local development without installing globally:
 
@@ -22,20 +25,24 @@ For local development without installing globally:
 bun run start
 ```
 
-Clutch tries to make AI coding feel more like driving a standard transmission. You issue the command for each next action rather than an agent loop, anachronistically involving you in tasks that could be automated so that you stay connected to what is happening.
+## Quickstart
 
-Clutch puts you in the driver's seat, agent loops are just one of many tools. You issue natural language commands to edit files, run programs and tools, add files to context. You can save most things to the context window, so that later LLM calls will react to them.
+Connect an LLM - The UX feels better with a fast LLM like GPT-5.4 mini or something hosted by Cerebras.  The goal is that it works great with Deepseek v4 Flash.
 
-For example:
+Type @ and a file name in the input box to add it to context.  Or issue the /add command and mention some files to add (the add command can only see paths not contents)
 
-- Add several files to context, and then ask to "Create a new module in this pattern, but for {new domain}"
-- Ask an agent loop to gather info on every place a library is used, ask the LLM what you should do next, as you edit have the "what should we do next" generation update. So you always have a next step, you you save yourself the research, but you do the edits exactly as you would want them./pl
-- Ask for an edit, save the diff to context rather than applying it, ask questions about that diff, save the answer to context, generate a new edit that takes this all in, and apply it.
+Highlight one of those files and issue an /edit command to make an edit
 
 ## Some potential taglines
 
 - AI coding where you are the agent
 - A mech suit for the mind, to augment the drone swarm of agent loops
+
+## Potential usage patterns
+
+- Add several files to context, and then ask to "Create a new module in this pattern, but for {new domain}"
+- Ask an agent loop to gather info on every place a library is used, ask a separate LLM call what the next step is, as you edit have the "what should we do next" generation update. So you always have a next step, you you save yourself the research, but you do the edits exactly as you would want them./pl
+- Ask for an edit, save the diff to context rather than applying it, ask questions about that diff, save the answer to context, generate a new edit that takes this all in, and apply it.
 
 ## Why?
 
@@ -95,3 +102,11 @@ Create a new file
 - ### /find-files
 
 Launch a pi session to find which files
+
+- ### /agent-ask
+
+Launch a read-only pi agent to answer a question.  The final message from the agent will be the only thing included in context.  The agent loop is rejoinable so you can ask follow up questions
+
+- ### /agent-edit
+
+This is probably super buggy, but it launches pi in a git worktree, and tries to make the accumulated diff be the context item, which you can then apply.
