@@ -8,6 +8,9 @@ Clutch tries to make AI coding feel more like driving a standard transmission. Y
 
 Inspired by the Composer feature that Cursor launched briefly before adding their agent, you build a context window from files, command outputs, mcp calls, and have the LLM perform operations one at a time.
 
+<img width="1303" height="610" alt="image" src="https://github.com/user-attachments/assets/cb51357e-4c4b-435c-bc1b-b2523d85cef7" />
+
+
 ## Install from a cloned repo
 
 
