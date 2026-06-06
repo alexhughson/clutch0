@@ -8,6 +8,7 @@ import type {
 import { applyAgentOutputUpdate } from "../agentOutput/agentOutputReducer";
 import type { PatchProposal } from "../patch/types";
 import type { ShellCommandResult } from "../shell/shellCommand";
+import type { McpToolOutput } from "../mcp/mcpTypes";
 import type {
   AgentAskMode,
   AgentSandboxContext,
@@ -279,6 +280,155 @@ export class ShellCommandOutputContextItem implements ContextItem {
     return {
       consumedFileCharacters: 0,
       text: `<shell_command_output${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), command: this.result.command, exit_code: this.result.exitCode ?? "signal", signal: this.result.signal })}>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</shell_command_output>`,
+    };
+  }
+}
+
+export class McpToolOutputContextItem implements ContextItem {
+  readonly type = "mcp-tool-output";
+
+  constructor(
+    readonly id: string,
+    readonly output: McpToolOutput,
+    readonly sourceRequestId: number,
+    readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: summarize(formatMcpToolOutputForDisplay(this.output)),
+      title: `MCP ${this.output.serverName}: ${this.output.toolName}`,
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): McpToolOutputContextItem {
+    return new McpToolOutputContextItem(
+      this.id,
+      this.output,
+      this.sourceRequestId,
+      this.createdAt,
+      summaryState,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    const sourceText = `Server: ${this.output.serverName}\nTool: ${this.output.toolName}\nError: ${this.output.isError ? "yes" : "no"}\n\nArguments:\n${safeJsonStringify(this.output.arguments)}\n\nOutput:\n${truncateContent(formatMcpToolOutputForDisplay(this.output), MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `MCP ${this.output.serverName}: ${this.output.toolName}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
+  }
+
+  async getDetailView() {
+    return {
+      content: formatMcpToolOutputForDisplay(this.output),
+      kind: "markdown" as const,
+      title: `MCP ${this.output.serverName}: ${this.output.toolName}`,
+    };
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<mcp_tool_output${formatAttributes({ focused, server: this.output.serverName, tool: this.output.toolName, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), is_error: this.output.isError })}>\n<arguments>\n${truncateContent(safeJsonStringify(this.output.arguments), MAX_SAVED_CONTEXT_CHARACTERS)}\n</arguments>\n<result>\n${truncateContent(formatMcpToolOutputForLlm(this.output), MAX_SAVED_CONTEXT_CHARACTERS)}\n</result>\n</mcp_tool_output>`,
+    };
+  }
+}
+
+export class UserTextContextItem implements ContextItem {
+  readonly type = "user-text";
+
+  constructor(
+    readonly id: string,
+    readonly text: string,
+    readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: summarize(this.text),
+      title: `User text: ${summarize(this.text)}`,
+    });
+  }
+
+  withSummaryState(summaryState: ContextItemSummaryState): UserTextContextItem {
+    return new UserTextContextItem(
+      this.id,
+      this.text,
+      this.createdAt,
+      summaryState,
+    );
+  }
+
+  withText(text: string): UserTextContextItem {
+    return new UserTextContextItem(
+      this.id,
+      text,
+      this.createdAt,
+      MISSING_SUMMARY_STATE,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    return null;
+  }
+
+  getEditableDetailView(): Extract<
+    ContextItemDetailView,
+    { kind: "editable-text" }
+  > {
+    return {
+      content: this.text,
+      itemId: this.id,
+      kind: "editable-text" as const,
+      title: "User text",
+    };
+  }
+
+  async getDetailView() {
+    return this.getEditableDetailView();
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<user_text${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString() })}>\n${truncateContent(this.text, MAX_SAVED_CONTEXT_CHARACTERS)}\n</user_text>`,
     };
   }
 }
@@ -814,6 +964,32 @@ export function createShellCommandOutputContextItem({
   );
 }
 
+export function createMcpToolOutputContextItem({
+  createdAt,
+  id,
+  output,
+  sourceRequestId,
+}: {
+  createdAt: number;
+  id: string;
+  output: McpToolOutput;
+  sourceRequestId: number;
+}): McpToolOutputContextItem {
+  return new McpToolOutputContextItem(id, output, sourceRequestId, createdAt);
+}
+
+export function createUserTextContextItem({
+  createdAt,
+  id,
+  text,
+}: {
+  createdAt: number;
+  id: string;
+  text: string;
+}): UserTextContextItem {
+  return new UserTextContextItem(id, text, createdAt);
+}
+
 export function createSavedDiffContextItem({
   createdAt,
   diffText,
@@ -1068,6 +1244,63 @@ function formatAgentOutputBlocks(blocks: readonly AgentOutputBlock[]): string {
       return `${block.streamKind}: ${block.text}`;
     })
     .join("\n");
+}
+
+function formatMcpToolOutputForDisplay(output: McpToolOutput): string {
+  return [
+    "# MCP tool output",
+    "",
+    `Server: \`${output.serverName}\``,
+    `Tool: \`${output.toolName}\``,
+    `Status: ${output.isError ? "tool returned an error" : "ok"}`,
+    "",
+    "## Arguments",
+    "```json",
+    truncateContent(
+      safeJsonStringify(output.arguments),
+      MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
+    ),
+    "```",
+    "",
+    "## Content",
+    output.contentText.trim().length === 0
+      ? "(none)"
+      : truncateContent(output.contentText, MAX_CONTEXT_ITEM_DETAIL_CHARACTERS),
+    "",
+    "## Structured content",
+    output.structuredContent === undefined
+      ? "(none)"
+      : `\`\`\`json\n${truncateContent(safeJsonStringify(output.structuredContent), MAX_CONTEXT_ITEM_DETAIL_CHARACTERS)}\n\`\`\``,
+    "",
+    "## Raw result",
+    "```json",
+    truncateContent(
+      safeJsonStringify(output.rawResult),
+      MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
+    ),
+    "```",
+  ].join("\n");
+}
+
+function formatMcpToolOutputForLlm(output: McpToolOutput): string {
+  return [
+    output.isError ? "MCP tool returned an error." : "MCP tool succeeded.",
+    "",
+    output.contentText.trim().length === 0
+      ? "(no text content)"
+      : output.contentText,
+    output.structuredContent === undefined
+      ? ""
+      : `\nStructured content:\n${safeJsonStringify(output.structuredContent)}`,
+  ].join("\n");
+}
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (error) {
+    return `Could not serialize value: ${error instanceof Error ? error.message : String(error)}`;
+  }
 }
 
 function formatShellCommandOutput(result: ShellCommandResult): string {

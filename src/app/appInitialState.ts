@@ -1,4 +1,5 @@
 import type { AppState, WorkspaceState } from "./appTypes";
+import { createAutomaticContextItems } from "../lib/context/automaticContextItems";
 
 export function createInitialAppState(): Omit<AppState, "actions"> {
   return {
@@ -11,6 +12,7 @@ export function createInitialAppState(): Omit<AppState, "actions"> {
 
 export function createInitialWorkspace(): WorkspaceState {
   return {
+    automaticContextItems: createAutomaticContextItems(),
     composer: {
       cursorPosition: 0,
       message: "",

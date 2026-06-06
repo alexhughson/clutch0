@@ -1,78 +1,127 @@
-import { useTerminalDimensions } from "@opentui/react";
 import { getContextItemDisplayEntries } from "../lib/context/contextItemDisplay";
 import { getContextItemById } from "../lib/context/contextItems";
 import type { ContextItem, ContextItemSummaryView } from "../types";
 
 type ContextItemsListProps = {
-  contextItems: ContextItem[];
+  columns?: 1 | 2;
+  contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
 };
 
-const WIDE_CONTEXT_LAYOUT_COLUMNS = 100;
-
 export function ContextItemsList({
+  columns = 1,
   contextItems,
   focusedContextItemId,
 }: ContextItemsListProps) {
-  const { width } = useTerminalDimensions();
   if (contextItems.length === 0) {
-    return null;
+    return (
+      <box style={{ flexDirection: "column", width: "100%" }}>
+        <text style={{ fg: "gray" }}>Context</text>
+        <text style={{ fg: "gray" }}>No context items.</text>
+      </box>
+    );
   }
 
-  const focusedItem = getContextItemById(contextItems, focusedContextItemId);
-  const useSidePane = width >= WIDE_CONTEXT_LAYOUT_COLUMNS;
   const displayEntries = getContextItemDisplayEntries(contextItems);
+  const splitIndex = Math.ceil(displayEntries.length / 2);
+  const entryColumns =
+    columns === 1
+      ? [displayEntries]
+      : [displayEntries.slice(0, splitIndex), displayEntries.slice(splitIndex)];
 
   return (
     <box
-      style={{ flexDirection: "column", gap: 1, paddingLeft: 1, width: "100%" }}
+      style={{
+        flexDirection: "column",
+        flexGrow: 1,
+        flexShrink: 1,
+        minHeight: 1,
+        width: "100%",
+      }}
     >
       <text style={{ fg: "gray" }}>Context</text>
-      <box
-        style={{
-          flexDirection: useSidePane ? "row" : "column",
-          gap: 2,
-          width: "100%",
-        }}
-      >
-        <box
-          style={{
-            flexDirection: "column",
-            width: useSidePane ? "58%" : "100%",
-          }}
-        >
-          {displayEntries.map((entry) => {
-            if (entry.kind === "folder") {
-              return (
-                <ContextFolderHeader
-                  key={entry.key}
-                  depth={entry.depth}
-                  label={entry.label}
-                />
-              );
-            }
-
-            const isFocused = entry.item.id === focusedContextItemId;
-            const summary = entry.item.getSummaryView();
-
-            return (
-              <ContextItemRow
-                key={entry.item.id}
-                depth={entry.depth}
-                focused={isFocused}
-                label={entry.label ?? summary.label}
-                summary={summary}
-              />
-            );
-          })}
-        </box>
-        {focusedItem === null ? null : (
-          <FocusedContextItemSummary
-            item={focusedItem}
-            sidePane={useSidePane}
+      {columns === 1 ? (
+        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
+          <ContextEntryColumn
+            entries={entryColumns[0] ?? []}
+            focusedContextItemId={focusedContextItemId}
           />
-        )}
-      </box>
+        </scrollbox>
+      ) : (
+        <box
+          style={{ flexDirection: "row", flexGrow: 1, gap: 2, width: "100%" }}
+        >
+          {entryColumns.map((entries, index) => (
+            <scrollbox
+              key={index}
+              style={{ flexGrow: 1, height: "100%", width: "50%" }}
+            >
+              <ContextEntryColumn
+                entries={entries}
+                focusedContextItemId={focusedContextItemId}
+              />
+            </scrollbox>
+          ))}
+        </box>
+      )}
+    </box>
+  );
+}
+
+export function FocusedContextItemSummary({
+  contextItems,
+  focusedContextItemId,
+}: {
+  contextItems: readonly ContextItem[];
+  focusedContextItemId: string | null;
+}) {
+  const focusedItem = getContextItemById(contextItems, focusedContextItemId);
+
+  return (
+    <box style={{ flexDirection: "column", flexGrow: 1, width: "100%" }}>
+      <text style={{ fg: "gray" }}>Summary</text>
+      {focusedItem === null ? (
+        <text style={{ fg: "gray" }}>No focused context item.</text>
+      ) : (
+        <FocusedContextItemSummaryContent item={focusedItem} />
+      )}
+    </box>
+  );
+}
+
+function ContextEntryColumn({
+  entries,
+  focusedContextItemId,
+}: {
+  entries: ReturnType<typeof getContextItemDisplayEntries>;
+  focusedContextItemId: string | null;
+}) {
+  return (
+    <box style={{ flexDirection: "column", width: "100%" }}>
+      {entries.map((entry) => {
+        if (entry.kind === "folder") {
+          return (
+            <ContextFolderHeader
+              key={entry.key}
+              depth={entry.depth}
+              label={entry.label}
+            />
+          );
+        }
+
+        const isFocused = entry.item.id === focusedContextItemId;
+        const summary = entry.item.getSummaryView();
+
+        return (
+          <ContextItemRow
+            key={entry.item.id}
+            depth={entry.depth}
+            focused={isFocused}
+            label={entry.label ?? summary.label}
+            summary={summary}
+          />
+        );
+      })}
     </box>
   );
 }
@@ -124,29 +173,14 @@ function ContextItemRow({
   );
 }
 
-function FocusedContextItemSummary({
-  item,
-  sidePane,
-}: {
-  item: ContextItem;
-  sidePane: boolean;
-}) {
+function FocusedContextItemSummaryContent({ item }: { item: ContextItem }) {
   const summary = item.getSummaryView();
-  if (summary.detail === undefined) {
-    return null;
-  }
+  const detail = summary.detail ?? getShortSummary(summary) ?? summary.label;
 
   return (
-    <box
-      style={{
-        flexDirection: "column",
-        marginTop: sidePane ? 0 : 1,
-        width: sidePane ? "40%" : "100%",
-      }}
-    >
-      <text style={{ fg: "gray" }}>Summary</text>
-      <text>{summary.detail}</text>
-    </box>
+    <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
+      <text>{detail}</text>
+    </scrollbox>
   );
 }
 

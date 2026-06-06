@@ -18,25 +18,13 @@ export class ContextDeck {
   }
 
   focus(direction: "next" | "previous"): ContextDeck {
-    const displayOrder = getContextItemDisplayOrder(this.contextItems);
-    if (displayOrder.length === 0) {
-      return new ContextDeck(this.contextItems, null);
-    }
-
-    const currentIndex = displayOrder.findIndex(
-      (item) => item.id === this.focusedContextItemId,
-    );
-    const offset = direction === "next" ? 1 : -1;
-    const nextIndex =
-      currentIndex === -1
-        ? direction === "next"
-          ? 0
-          : displayOrder.length - 1
-        : (currentIndex + offset + displayOrder.length) % displayOrder.length;
-
     return new ContextDeck(
       this.contextItems,
-      displayOrder[nextIndex]?.id ?? null,
+      getNextContextItemFocusId({
+        contextItems: this.contextItems,
+        direction,
+        focusedContextItemId: this.focusedContextItemId,
+      }),
     );
   }
 
@@ -87,6 +75,34 @@ export class ContextDeck {
       composeScreen.focusedContextItemId,
     );
   }
+}
+
+export function getNextContextItemFocusId({
+  contextItems,
+  direction,
+  focusedContextItemId,
+}: {
+  contextItems: readonly ContextItem[];
+  direction: "next" | "previous";
+  focusedContextItemId: string | null;
+}): string | null {
+  const displayOrder = getContextItemDisplayOrder(contextItems);
+  if (displayOrder.length === 0) {
+    return null;
+  }
+
+  const currentIndex = displayOrder.findIndex(
+    (item) => item.id === focusedContextItemId,
+  );
+  const offset = direction === "next" ? 1 : -1;
+  const nextIndex =
+    currentIndex === -1
+      ? direction === "next"
+        ? 0
+        : displayOrder.length - 1
+      : (currentIndex + offset + displayOrder.length) % displayOrder.length;
+
+  return displayOrder[nextIndex]?.id ?? null;
 }
 
 function getFocusAfterRemoval({

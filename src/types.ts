@@ -91,6 +91,12 @@ export type ContextItemDetailView =
       title: string;
     }
   | {
+      content: string;
+      itemId: string;
+      kind: "editable-text";
+      title: string;
+    }
+  | {
       blocks: readonly AgentOutputBlock[];
       errorMessage?: string;
       itemId: string;

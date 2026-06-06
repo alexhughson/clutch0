@@ -22,9 +22,7 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
 
   return (
     <box
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         flexGrow: 1,
         gap: 1,
@@ -33,13 +31,10 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
         width: "100%",
       }}
     >
-      <box
-        title="Question"
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        <text>{request.question}</text>
-      </box>
+      <text
+        style={{ fg: "gray" }}
+      >{`Question · ${formatStatus(request.status)}`}</text>
+      <text>{request.question}</text>
       {request.patch === undefined ? <TextResponse request={request} /> : null}
       {request.patch === undefined ? null : <PatchReview request={request} />}
     </box>
@@ -49,35 +44,34 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
 function TextResponse({ request }: { request: LlmRequestState }) {
   return (
     <box
-      title={`Response (${formatStatus(request.status)})`}
-      bottomTitle={getTextResponseHotkeys(request)}
-      bottomTitleAlignment="right"
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         flexGrow: 1,
-        padding: 1,
+        gap: 1,
+        minHeight: 1,
+        width: "100%",
       }}
     >
-      {request.responseText.length > 0 ? (
-        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
+      <text style={{ fg: "gray" }}>Response</text>
+      <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
+        {request.responseText.length > 0 ? (
           <HighlightedMarkdown
             content={request.responseText}
             streaming={request.status === "loading"}
           />
-        </scrollbox>
-      ) : (
-        <text>
-          {request.status === "loading" ? "Waiting for model..." : ""}
-        </text>
-      )}
+        ) : (
+          <text>
+            {request.status === "loading" ? "Waiting for model..." : ""}
+          </text>
+        )}
+      </scrollbox>
       {request.status === "error" ? (
         <text style={{ fg: "red" }}>{request.errorMessage}</text>
       ) : null}
       {request.savedContextItemId === undefined ? null : (
         <text style={{ fg: "green" }}>Saved to context.</text>
       )}
+      <ResponseHotkeys hotkeys={getTextResponseHotkeys(request)} />
     </box>
   );
 }
@@ -90,17 +84,17 @@ function PatchReview({ request }: { request: LlmRequestState }) {
 
   return (
     <box
-      title={`Patch (${formatPatchStatus(patch.applyStatus)})`}
-      bottomTitle={getPatchReviewHotkeys(request)}
-      bottomTitleAlignment="right"
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         flexGrow: 1,
-        padding: 1,
+        gap: 1,
+        minHeight: 1,
+        width: "100%",
       }}
     >
+      <text
+        style={{ fg: "gray" }}
+      >{`Patch · ${formatPatchStatus(patch.applyStatus)}`}</text>
       <text>{patch.proposal.summary}</text>
       {patch.status === "valid" ? (
         <scrollbox
@@ -131,8 +125,17 @@ function PatchReview({ request }: { request: LlmRequestState }) {
       {request.savedContextItemId === undefined ? null : (
         <text style={{ fg: "green" }}>Saved to context.</text>
       )}
+      <ResponseHotkeys hotkeys={getPatchReviewHotkeys(request)} />
     </box>
   );
+}
+
+function ResponseHotkeys({ hotkeys }: { hotkeys: string | undefined }) {
+  if (hotkeys === undefined) {
+    return null;
+  }
+
+  return <text style={{ fg: "gray" }}>{hotkeys}</text>;
 }
 
 function handleResponseKey({

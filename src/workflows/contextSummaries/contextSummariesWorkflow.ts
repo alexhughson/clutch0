@@ -1,6 +1,7 @@
 import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { getContextItemById } from "../../lib/context/contextItems";
+import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import {
   generateContextItemSummary,
   type ContextItemSummaryGenerator,
@@ -48,16 +49,21 @@ async function ensureWorkspaceSummaries({
   get: GetAppState;
   set: SetAppState;
 }) {
-  const items = [...get().workspace.contextItems];
+  const items = [
+    ...get().workspace.automaticContextItems,
+    ...get().workspace.contextItems,
+  ];
   for (const item of items) {
     const input = await item.getSummarizationInput({ root: process.cwd() });
     if (input === null) {
       continue;
     }
 
-    const currentItem = getContextItemById(
-      get().workspace.contextItems,
+    const currentState = get();
+    const currentItem = getVisibleContextItemById(
+      currentState.workspace.contextItems,
       item.id,
+      currentState.workspace.automaticContextItems,
     );
     if (currentItem === null || !shouldStartSummaryWorker(currentItem, input)) {
       continue;
@@ -154,22 +160,23 @@ function finishSummaryWorker(
   summary: GeneratedContextItemSummary,
 ) {
   set((state) => {
-    const item = getContextItemById(state.workspace.contextItems, itemId);
+    const item = getVisibleContextItemById(
+      state.workspace.contextItems,
+      itemId,
+      state.workspace.automaticContextItems,
+    );
     if (!hasMatchingPendingSummary(item, workerId, summary.sourceHash)) {
       return state;
     }
 
-    return {
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(
-          item.withSummaryState({
-            sourceHash: summary.sourceHash,
-            status: "ready",
-            summary,
-          }),
-        )
-        .applyTo(state.workspace),
-    };
+    return replaceContextItemInWorkspace(
+      state,
+      item.withSummaryState({
+        sourceHash: summary.sourceHash,
+        status: "ready",
+        summary,
+      }),
+    );
   });
 }
 
@@ -180,23 +187,24 @@ function failSummaryWorker(
   errorMessage: string,
 ) {
   set((state) => {
-    const item = getContextItemById(state.workspace.contextItems, input.itemId);
+    const item = getVisibleContextItemById(
+      state.workspace.contextItems,
+      input.itemId,
+      state.workspace.automaticContextItems,
+    );
     if (!hasMatchingPendingSummary(item, workerId, input.sourceHash)) {
       return state;
     }
 
-    return {
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(
-          item.withSummaryState({
-            errorMessage,
-            sourceHash: input.sourceHash,
-            status: "error",
-            workerId,
-          }),
-        )
-        .applyTo(state.workspace),
-    };
+    return replaceContextItemInWorkspace(
+      state,
+      item.withSummaryState({
+        errorMessage,
+        sourceHash: input.sourceHash,
+        status: "error",
+        workerId,
+      }),
+    );
   });
 }
 
@@ -206,17 +214,46 @@ function replaceContextItemSummaryState(
   summaryState: ContextItemSummaryState,
 ) {
   set((state) => {
-    const item = getContextItemById(state.workspace.contextItems, itemId);
+    const item = getVisibleContextItemById(
+      state.workspace.contextItems,
+      itemId,
+      state.workspace.automaticContextItems,
+    );
     if (item === null) {
       return state;
     }
 
-    return {
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(item.withSummaryState(summaryState))
-        .applyTo(state.workspace),
-    };
+    return replaceContextItemInWorkspace(
+      state,
+      item.withSummaryState(summaryState),
+    );
   });
+}
+
+function replaceContextItemInWorkspace(
+  state: AppState,
+  item: ContextItem,
+): Partial<AppState> | AppState {
+  if (getContextItemById(state.workspace.automaticContextItems, item.id)) {
+    return {
+      workspace: {
+        ...state.workspace,
+        automaticContextItems: state.workspace.automaticContextItems.map(
+          (contextItem) => (contextItem.id === item.id ? item : contextItem),
+        ),
+      },
+    };
+  }
+
+  if (getContextItemById(state.workspace.contextItems, item.id) === null) {
+    return state;
+  }
+
+  return {
+    workspace: ContextDeck.fromComposeScreen(state.workspace)
+      .replace(item)
+      .applyTo(state.workspace),
+  };
 }
 
 function hasMatchingPendingSummary(

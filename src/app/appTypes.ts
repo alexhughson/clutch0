@@ -9,6 +9,7 @@ import type {
   SupportedClutchLlmProvider,
 } from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
+import type { McpToolOutput } from "../lib/mcp/mcpTypes";
 import type {
   AgentAskMode,
   AgentSandboxContext,
@@ -71,6 +72,7 @@ export type ComposerState = {
 };
 
 export type WorkspaceState = {
+  automaticContextItems: ContextItem[];
   composer: ComposerState;
   contextItems: ContextItem[];
   focusedContextItemId: string | null;
@@ -252,10 +254,21 @@ export type AppActions = {
     selectPrevious: () => void;
     showSearch: (options: { goal: string; hints: string[] }) => void;
   };
+  mcp: {
+    finishToolCall: (options: {
+      output: McpToolOutput;
+      requestId: number;
+      responseText: string;
+    }) => void;
+  };
   navigation: {
     clearResponseAndMessage: () => void;
     rejectResponse: () => void;
     showComposer: () => void;
+  };
+  say: {
+    addToContext: (options: { text: string }) => void;
+    updateText: (options: { itemId: string; text: string }) => void;
   };
   response: {
     appendDelta: (options: { delta: string; requestId: number }) => void;

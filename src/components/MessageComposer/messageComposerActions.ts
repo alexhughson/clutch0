@@ -1,6 +1,6 @@
 import type { KeyEvent } from "@opentui/core";
 import { getContextItemActionForKeyEvent } from "../../lib/context/contextItemActions";
-import { getContextItemById } from "../../lib/context/contextItems";
+import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import {
   NoFileSelector,
@@ -376,6 +376,9 @@ function submitQuestion(event: KeyEvent) {
     return;
   }
 
+  event.preventDefault();
+  event.stopPropagation();
+
   const question = currentState.workspace.composer.message.trim();
 
   if (question.length === 0) {
@@ -388,13 +391,11 @@ function submitQuestion(event: KeyEvent) {
     requestQuestion.length === 0 &&
     slashCommandInvocation?.command.taskKind !== "show-context" &&
     slashCommandInvocation?.command.taskKind !== "agent-skill" &&
-    slashCommandInvocation?.command.taskKind !== "config"
+    slashCommandInvocation?.command.taskKind !== "config" &&
+    slashCommandInvocation?.command.taskKind !== "say"
   ) {
     return;
   }
-
-  event.preventDefault();
-  event.stopPropagation();
 
   if (slashCommandInvocation?.command.taskKind === "show-context") {
     startShowContextRequest(requestQuestion);
@@ -403,6 +404,11 @@ function submitQuestion(event: KeyEvent) {
 
   if (slashCommandInvocation?.command.taskKind === "config") {
     currentState.actions.config.openSettings();
+    return;
+  }
+
+  if (slashCommandInvocation?.command.taskKind === "say") {
+    currentState.actions.say.addToContext({ text: requestQuestion });
     return;
   }
 
@@ -440,9 +446,10 @@ function runFocusedContextItemActionForKey(event: KeyEvent) {
     return;
   }
 
-  const focusedItem = getContextItemById(
+  const focusedItem = getVisibleContextItemById(
     currentState.workspace.contextItems,
     currentState.workspace.focusedContextItemId,
+    currentState.workspace.automaticContextItems,
   );
   if (focusedItem === null) {
     return;

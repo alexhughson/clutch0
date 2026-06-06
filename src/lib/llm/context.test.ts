@@ -6,6 +6,7 @@ import {
   createFileContextItem,
   createSavedDiffContextItem,
   createSavedLlmResponseContextItem,
+  createUserTextContextItem,
   PiAgentContextItem,
 } from "../context/contextItems";
 import { buildLlmContext, MAX_FILE_CONTEXT_CHARACTERS } from "./context";
@@ -105,6 +106,31 @@ test("builds LLM context from saved responses and diffs", async () => {
   expect(getUserContent(context)).toContain("The answer is 42.");
   expect(getUserContent(context)).toContain("<saved_diff");
   expect(getUserContent(context)).toContain("Update answer");
+});
+
+test("builds LLM context from user text context items", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  const item = createUserTextContextItem({
+    createdAt: 1_700_000_000_000,
+    id: "say:1",
+    text: "Remember to preserve the narrow layout.",
+  });
+
+  const { context } = await buildLlmContext({
+    contextItems: [item],
+    focusedContextItemId: item.id,
+    question: "Use note",
+    root,
+  });
+
+  expect(getUserContent(context)).toContain(
+    "Focused context item:\nUser text:",
+  );
+  expect(getUserContent(context)).toContain("<user_text");
+  expect(getUserContent(context)).toContain('focused="true"');
+  expect(getUserContent(context)).toContain(
+    "Remember to preserve the narrow layout.",
+  );
 });
 
 test("agent session context includes only the latest assistant message", async () => {

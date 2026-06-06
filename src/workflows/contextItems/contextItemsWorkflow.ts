@@ -1,6 +1,6 @@
 import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
-import { getContextItemById } from "../../lib/context/contextItems";
+import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 
 type SetAppState = (
   partial:
@@ -41,7 +41,11 @@ function openContextItem(
   state: AppState,
   itemId: string,
 ): Partial<AppState> | AppState {
-  const item = getContextItemById(state.workspace.contextItems, itemId);
+  const item = getVisibleContextItemById(
+    state.workspace.contextItems,
+    itemId,
+    state.workspace.automaticContextItems,
+  );
   if (item === null) {
     return state;
   }
@@ -59,7 +63,11 @@ function startSavedDiffApply(
   state: AppState,
   itemId: string,
 ): Partial<AppState> | AppState {
-  const item = getContextItemById(state.workspace.contextItems, itemId);
+  const item = getVisibleContextItemById(
+    state.workspace.contextItems,
+    itemId,
+    state.workspace.automaticContextItems,
+  );
   if (item === null) {
     return state;
   }

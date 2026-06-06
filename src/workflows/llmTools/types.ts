@@ -3,6 +3,7 @@ import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import type { CreateFileValidationResult } from "../../lib/createFile/createFile";
 import type { PatchValidationResult } from "../../lib/patch/types";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
+import type { McpToolOutput } from "../../lib/mcp/mcpTypes";
 
 export type LlmWorkflowToolResult =
   | {
@@ -25,6 +26,10 @@ export type LlmWorkflowToolResult =
   | {
       kind: "create-file";
       validation: CreateFileValidationResult;
+    }
+  | {
+      kind: "mcp-tool-output";
+      output: McpToolOutput;
     };
 
 export type LlmSlashCommand = {
@@ -37,6 +42,7 @@ export type LlmSlashCommand = {
     | "agent-edit"
     | "agent-skill"
     | "config"
+    | "say"
     | "shell-command"
     | "show-context";
   readonly title: string;

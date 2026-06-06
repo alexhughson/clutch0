@@ -23,7 +23,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 }));
 
 useAppStore.subscribe((state, previousState) => {
-  if (state.workspace.contextItems !== previousState.workspace.contextItems) {
+  if (
+    state.workspace.contextItems !== previousState.workspace.contextItems ||
+    state.workspace.automaticContextItems !==
+      previousState.workspace.automaticContextItems
+  ) {
     state.actions.contextSummaries.ensureWorkspaceSummaries();
   }
 });

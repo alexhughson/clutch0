@@ -2,14 +2,13 @@
 
 Clutch is a tool for using AI to write code.
 
-Clutch0 is a largely vibe coded prototype.  It is probably buggy, but I am pushing it up to get some feedback on the UX.  When it seems to work, my plan is to use it to build a very similar piece of software from scratch.
+Clutch0 is a largely vibe coded prototype. It is probably buggy, but I am pushing it up to get some feedback on the UX. When it seems to work, my plan is to use it to build a very similar piece of software from scratch.
 
 Clutch tries to make AI coding feel more like driving a standard transmission. You issue the command for each next action rather than an agent loop, anachronistically involving you in tasks that could be automated so that you stay connected to what is happening.
 
 Inspired by the Composer feature that Cursor launched briefly before adding their agent, you build a context window from files, command outputs, mcp calls, and have the LLM perform operations one at a time.
 
 ## Install from a cloned repo
-
 
 ```sh
 git clone <repo-url> clutch0
@@ -27,9 +26,9 @@ bun run start
 
 ## Quickstart
 
-Connect an LLM - The UX feels better with a fast LLM like GPT-5.4 mini or something hosted by Cerebras.  The goal is that it works great with Deepseek v4 Flash.
+Connect an LLM - The UX feels better with a fast LLM like GPT-5.4 mini or something hosted by Cerebras. The goal is that it works great with Deepseek v4 Flash.
 
-Type @ and a file name in the input box to add it to context.  Or issue the /add command and mention some files to add (the add command can only see paths not contents)
+Type @ and a file name in the input box to add it to context. Or issue the /add command and mention some files to add (the add command can only see paths not contents)
 
 Highlight one of those files and issue an /edit command to make an edit
 
@@ -87,6 +86,30 @@ Adds a file to the files in context
 
 Ask the LLM a question. The answer can be saved into context, and re-run.
 
+- ### /say
+
+Add your text directly to the context list without calling the LLM. The new context item opens immediately and can be edited in place.
+
+- ### /mcp:server and /mcp:server:tool
+
+Call configured MCP tools. Clutch reads MCP config from `~/.config/mcp/mcp.json`, `~/.clutch/mcp.json`, `.mcp.json`, and `.clutch/mcp.json`. Only tools enabled by `directTools` are exposed to the core classifier and slash commands. MCP tool outputs are saved as context items.
+
+Example:
+
+```json
+{
+  "settings": { "toolPrefix": "short", "directTools": false },
+  "mcpServers": {
+    "github-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" },
+      "directTools": ["search_repositories"]
+    }
+  }
+}
+```
+
 - ### /agent-ask
 
 Ask a question of an embedded agent session. This creates a persistent context item that contains the whole agent history, allowing you to send followup messages. Only the final message from the agent is included in the general context
@@ -105,7 +128,7 @@ Launch a pi session to find which files
 
 - ### /agent-ask
 
-Launch a read-only pi agent to answer a question.  The final message from the agent will be the only thing included in context.  The agent loop is rejoinable so you can ask follow up questions
+Launch a read-only pi agent to answer a question. The final message from the agent will be the only thing included in context. The agent loop is rejoinable so you can ask follow up questions
 
 - ### /agent-edit
 
