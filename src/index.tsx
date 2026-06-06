@@ -22,7 +22,7 @@ if (!isClutchConfigured()) {
   useAppStore.getState().actions.config.openSetup();
 }
 const renderer = await createCliRenderer({
-  exitOnCtrlC: true,
+  exitOnCtrlC: false,
 });
 
 createRoot(renderer).render(<App filePaths={filePaths} />);

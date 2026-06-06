@@ -453,7 +453,7 @@ function handleProvidersKey({
   task: ConfigTaskState;
 }) {
   if (event.name === "escape" && task.mode === "settings") {
-    actions.navigation.showComposer();
+    actions.navigation.dismissPane();
     prevent(event);
     return;
   }

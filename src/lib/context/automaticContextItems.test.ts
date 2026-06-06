@@ -13,7 +13,7 @@ const execFileAsync = promisify(execFile);
 
 test("shows automatic unstaged changes in the visible context list", () => {
   expect(getVisibleContextItems([]).map((item) => item.getListLabel())).toEqual(
-    ["AGENTS.md", "Unstaged changes", "File list"],
+    ["@AGENTS.md", "Unstaged changes", "File list"],
   );
 });
 

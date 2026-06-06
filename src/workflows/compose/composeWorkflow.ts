@@ -10,7 +10,10 @@ import {
   getFileContextItemId,
   hasContextItem,
 } from "../../lib/context/contextItems";
-import { getVisibleContextItems } from "../../lib/context/automaticContextItems";
+import {
+  getAutomaticFileContextItems,
+  getVisibleContextItems,
+} from "../../lib/context/automaticContextItems";
 import type { FilePath } from "../../types";
 
 type SetAppState = (
@@ -69,17 +72,24 @@ function focusContextItem(
   state: AppState,
   direction: "next" | "previous",
 ): Partial<AppState> | AppState {
+  const focusedContextItemId = getNextContextItemFocusId({
+    contextItems: getVisibleContextItems(
+      state.workspace.contextItems,
+      state.workspace.automaticContextItems,
+    ),
+    direction,
+    focusedContextItemId: state.workspace.focusedContextItemId,
+  });
+
   return {
+    activeTask:
+      focusedContextItemId !== null &&
+      state.activeTask?.kind === "context-item-viewer"
+        ? { ...state.activeTask, itemId: focusedContextItemId }
+        : state.activeTask,
     workspace: {
       ...state.workspace,
-      focusedContextItemId: getNextContextItemFocusId({
-        contextItems: getVisibleContextItems(
-          state.workspace.contextItems,
-          state.workspace.automaticContextItems,
-        ),
-        direction,
-        focusedContextItemId: state.workspace.focusedContextItemId,
-      }),
+      focusedContextItemId,
     },
   };
 }
@@ -127,9 +137,13 @@ function startLlmRequest({
 }): number | null {
   const state = get();
   const requestId = state.nextLlmRequestId;
-  const contextItems = state.workspace.contextItems.filter(
-    (item) => item.id !== replacement?.contextItemId,
-  );
+  const contextItems = [
+    ...getAutomaticFileContextItems({
+      automaticContextItems: state.workspace.automaticContextItems,
+      contextItems: state.workspace.contextItems,
+    }),
+    ...state.workspace.contextItems,
+  ].filter((item) => item.id !== replacement?.contextItemId);
   const focusedContextItemId = contextItems.some(
     (item) => item.id === state.workspace.focusedContextItemId,
   )

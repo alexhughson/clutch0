@@ -262,9 +262,9 @@ export type AppActions = {
     }) => void;
   };
   navigation: {
-    clearResponseAndMessage: () => void;
-    rejectResponse: () => void;
-    showComposer: () => void;
+    acceptAndClose: () => void;
+    dismissPane: () => void;
+    rejectToEdit: () => void;
   };
   say: {
     addToContext: (options: { text: string }) => void;

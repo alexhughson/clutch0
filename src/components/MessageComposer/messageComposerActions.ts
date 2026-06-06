@@ -7,31 +7,28 @@ import {
   NoSlashCommandSelector,
   type SlashCommandSelectorMatch,
 } from "../../lib/inputLineParser";
-import {
-  disposeAgentAskSession,
-  saveAgentSandboxDiffToContext,
-} from "../../workflows/agentAsk/agentAskSessionRegistry";
+import { assertNever } from "../../lib/invariant";
 import {
   startAgentAskRequest,
   startAgentEditRequest,
 } from "../../workflows/agentAsk/startAgentAskRequest";
-import { applySavedDiffContextItem } from "../../workflows/contextItems/contextItemEffects";
+import { runContextItemAction } from "../../workflows/contextItems/contextItemActionRunner";
 import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
-import {
-  startShellCommandRequest,
-  startShellCommandRerun,
-} from "../../workflows/shellCommand/startShellCommandRequest";
+import { startShellCommandRequest } from "../../workflows/shellCommand/startShellCommandRequest";
 import { startShowContextRequest } from "../../workflows/showContext/startShowContextRequest";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
-  ContextItemAction,
   FilePath,
   FileSelectionDirection,
   FileSelectorMatch,
   HighlightedFilePath,
 } from "../../types";
 import { getMessageComposerKeyAction } from "./messageComposerKeymap";
+import {
+  getSubmissionIntent,
+  type SubmissionIntent,
+} from "./messageSubmission";
 import {
   getCommandSuggestionStateFromComposeScreen,
   getCursorPositionAfterInput,
@@ -40,10 +37,7 @@ import {
   type CommandSuggestionState,
   type FileSuggestionState,
 } from "./messageComposerModel";
-import {
-  getLlmSlashCommand,
-  parseLlmSlashCommandInvocation,
-} from "../../workflows/llmTools/toolRegistry";
+import { getLlmSlashCommand } from "../../workflows/llmTools/toolRegistry";
 
 export function updateMessage({ nextMessage }: { nextMessage: string }) {
   const currentState = useAppStore.getState();
@@ -379,65 +373,54 @@ function submitQuestion(event: KeyEvent) {
   event.preventDefault();
   event.stopPropagation();
 
-  const question = currentState.workspace.composer.message.trim();
+  const intent = getSubmissionIntent(currentState.workspace.composer.message);
+  if (intent !== null) {
+    runSubmissionIntent(intent);
+  }
+}
 
-  if (question.length === 0) {
+function runSubmissionIntent(intent: SubmissionIntent) {
+  if (intent.kind === "show-context") {
+    startShowContextRequest(intent.question);
     return;
   }
 
-  const slashCommandInvocation = parseLlmSlashCommandInvocation(question);
-  const requestQuestion = slashCommandInvocation?.input ?? question;
-  if (
-    requestQuestion.length === 0 &&
-    slashCommandInvocation?.command.taskKind !== "show-context" &&
-    slashCommandInvocation?.command.taskKind !== "agent-skill" &&
-    slashCommandInvocation?.command.taskKind !== "config" &&
-    slashCommandInvocation?.command.taskKind !== "say"
-  ) {
+  if (intent.kind === "config") {
+    useAppStore.getState().actions.config.openSettings();
     return;
   }
 
-  if (slashCommandInvocation?.command.taskKind === "show-context") {
-    startShowContextRequest(requestQuestion);
+  if (intent.kind === "say") {
+    useAppStore.getState().actions.say.addToContext({ text: intent.text });
     return;
   }
 
-  if (slashCommandInvocation?.command.taskKind === "config") {
-    currentState.actions.config.openSettings();
+  if (intent.kind === "agent-ask") {
+    startAgentAskRequest(intent.prompt);
     return;
   }
 
-  if (slashCommandInvocation?.command.taskKind === "say") {
-    currentState.actions.say.addToContext({ text: requestQuestion });
+  if (intent.kind === "agent-edit") {
+    startAgentEditRequest(intent.prompt);
     return;
   }
 
-  if (slashCommandInvocation?.command.taskKind === "agent-ask") {
-    startAgentAskRequest(requestQuestion);
-    return;
-  }
-
-  if (slashCommandInvocation?.command.taskKind === "agent-edit") {
-    startAgentEditRequest(requestQuestion);
-    return;
-  }
-
-  if (slashCommandInvocation?.command.taskKind === "agent-skill") {
-    startAgentAskRequest(question);
-    return;
-  }
-
-  if (slashCommandInvocation?.command.taskKind === "shell-command") {
-    startShellCommandRequest(requestQuestion, {
-      commandDirective: slashCommandInvocation.command.promptDirective,
+  if (intent.kind === "shell-command") {
+    startShellCommandRequest(intent.prompt, {
+      commandDirective: intent.commandDirective,
     });
     return;
   }
 
-  startLlmRequest(requestQuestion, {
-    allowedToolNames: slashCommandInvocation?.command.allowedToolNames,
-    commandDirective: slashCommandInvocation?.command.promptDirective,
-  });
+  if (intent.kind === "llm-request") {
+    startLlmRequest(intent.question, {
+      allowedToolNames: intent.allowedToolNames,
+      commandDirective: intent.commandDirective,
+    });
+    return;
+  }
+
+  assertNever(intent, "Unhandled submission intent");
 }
 
 function runFocusedContextItemActionForKey(event: KeyEvent) {
@@ -465,35 +448,5 @@ function runFocusedContextItemActionForKey(event: KeyEvent) {
 
   event.preventDefault();
   event.stopPropagation();
-  runContextItemAction(action);
-}
-
-function runContextItemAction(action: ContextItemAction) {
-  void action.run({
-    removeContextItem: (itemId) => {
-      disposeAgentAskSession(itemId);
-      useAppStore.getState().actions.compose.removeContextItem({ itemId });
-    },
-    applyAgentSandboxDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    applySavedDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    openContextItem: (itemId) => {
-      useAppStore.getState().actions.contextItems.openContextItem({ itemId });
-    },
-    rerunPrompt: ({ expectedResult, prompt, replaceContextItemId }) =>
-      startLlmRequest(prompt, {
-        replacement: {
-          contextItemId: replaceContextItemId,
-          expectedResult,
-        },
-      }),
-    rerunShellCommand: ({ command, replaceContextItemId }) =>
-      startShellCommandRerun({ command, replaceContextItemId }),
-    saveAgentSandboxDiff: (itemId) => {
-      void saveAgentSandboxDiffToContext(itemId);
-    },
-  });
+  runContextItemAction({ action, closeAfterRemove: false });
 }

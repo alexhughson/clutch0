@@ -1,9 +1,7 @@
-import type { AppTask } from "./appTypes";
-
 export type WorkspaceLayoutMode = "compact" | "medium" | "wide";
 
 export type WorkspaceLayout = {
-  detailTakesOver: boolean;
+  paneTakesOver: boolean;
   mode: WorkspaceLayoutMode;
 };
 
@@ -13,18 +11,18 @@ const MEDIUM_MIN_WIDTH = 82;
 const MEDIUM_MIN_HEIGHT = 24;
 
 export function getWorkspaceLayout({
-  hasDetailTask,
+  hasPaneTask,
   height,
   width,
 }: {
-  hasDetailTask: boolean;
+  hasPaneTask: boolean;
   height: number;
   width: number;
 }): WorkspaceLayout {
   const mode = getWorkspaceLayoutMode({ height, width });
 
   return {
-    detailTakesOver: hasDetailTask && mode === "compact",
+    paneTakesOver: hasPaneTask && mode === "compact",
     mode,
   };
 }
@@ -45,10 +43,4 @@ export function getWorkspaceLayoutMode({
   }
 
   return "compact";
-}
-
-export function isWorkspaceDetailTask(
-  task: AppTask | null,
-): task is Extract<AppTask, { kind: "context-item-viewer" | "response" }> {
-  return task?.kind === "context-item-viewer" || task?.kind === "response";
 }

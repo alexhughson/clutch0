@@ -54,7 +54,7 @@ test("marks focused context item for the LLM", async () => {
   );
 });
 
-test("adds automatic context without making it selected context", async () => {
+test("adds directory automatic context without making it selected context", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
   await writeFile(join(root, "AGENTS.md"), "Follow the project rules.\n");
   await writeFile(join(root, "example.ts"), "export {};\n");
@@ -66,14 +66,27 @@ test("adds automatic context without making it selected context", async () => {
   });
 
   expect(getUserContent(context)).toContain("No selected context items.");
-  expect(getUserContent(context)).toContain(
+  expect(getUserContent(context)).not.toContain(
     '<automatic_context name="AGENTS.md">',
   );
-  expect(getUserContent(context)).toContain("Follow the project rules.");
   expect(getUserContent(context)).toContain(
     '<automatic_context name="directory_tree">',
   );
   expect(getUserContent(context)).toContain("example.ts");
+});
+
+test("includes AGENTS.md through normal selected file context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  await writeFile(join(root, "AGENTS.md"), "Follow the project rules.\n");
+
+  const { context } = await buildLlmContext({
+    contextItems: [createFileContextItem("AGENTS.md")],
+    question: "What rules apply?",
+    root,
+  });
+
+  expect(getUserContent(context)).toContain('<file path="AGENTS.md">');
+  expect(getUserContent(context)).toContain("Follow the project rules.");
 });
 
 test("builds LLM context from saved responses and diffs", async () => {

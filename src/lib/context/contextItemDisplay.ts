@@ -96,11 +96,10 @@ function renderNodeChildren(
   keyPrefix: string,
 ): ContextItemDisplayEntry[] {
   const entries: ContextItemDisplayEntry[] = [];
-  const childNames = [...node.files.keys(), ...node.directories.keys()].sort(
-    comparePath,
-  );
+  const fileNames = [...node.files.keys()].sort(comparePath);
+  const directoryNames = [...node.directories.keys()].sort(comparePath);
 
-  for (const childName of childNames) {
+  for (const childName of fileNames) {
     const fileItem = node.files.get(childName);
     if (fileItem !== undefined) {
       entries.push({
@@ -109,9 +108,10 @@ function renderNodeChildren(
         kind: "item",
         label: `@${childName}`,
       });
-      continue;
     }
+  }
 
+  for (const childName of directoryNames) {
     const directory = node.directories.get(childName);
     if (directory !== undefined) {
       entries.push(...renderDirectory(childName, directory, depth, keyPrefix));

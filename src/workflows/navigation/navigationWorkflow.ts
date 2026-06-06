@@ -13,15 +13,13 @@ export function createNavigationActions({
   set: SetAppState;
 }): AppActions["navigation"] {
   return {
-    clearResponseAndMessage: () => set(clearResponseAndMessage),
-    rejectResponse: () => set(clearResponseAndMessage),
-    showComposer: () => set({ activeTask: null }),
+    acceptAndClose: () => set(acceptAndClose),
+    dismissPane: () => set(closePanePreservingComposer),
+    rejectToEdit: () => set(closePanePreservingComposer),
   };
 }
 
-function clearResponseAndMessage(
-  state: AppState,
-): Partial<AppState> | AppState {
+function acceptAndClose(state: AppState): Partial<AppState> | AppState {
   return {
     activeTask: null,
     workspace: {
@@ -32,4 +30,8 @@ function clearResponseAndMessage(
       },
     },
   };
+}
+
+function closePanePreservingComposer(): Partial<AppState> {
+  return { activeTask: null };
 }

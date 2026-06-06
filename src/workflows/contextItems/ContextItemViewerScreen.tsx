@@ -13,16 +13,14 @@ import {
   PiAgentContextItem,
   UserTextContextItem,
 } from "../../lib/context/contextItems";
+import { isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
 import {
-  disposeAgentAskSession,
   saveAgentSandboxDiffToContext,
   sendAgentAskMessage,
 } from "../agentAsk/agentAskSessionRegistry";
-import { startLlmRequest } from "../llmRequest/startLlmRequest";
-import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
-import { applySavedDiffContextItem } from "./contextItemEffects";
+import { runContextItemAction } from "./contextItemActionRunner";
 
 export function ContextItemViewerScreen({
   screen,
@@ -83,7 +81,7 @@ export function ContextItemViewerScreen({
     if (event.name === "escape") {
       event.preventDefault();
       event.stopPropagation();
-      actions.navigation.showComposer();
+      actions.navigation.dismissPane();
       return;
     }
 
@@ -113,7 +111,7 @@ export function ContextItemViewerScreen({
 
     event.preventDefault();
     event.stopPropagation();
-    runContextItemAction(action);
+    runContextItemAction({ action, closeAfterRemove: true });
   });
 
   return (
@@ -252,7 +250,7 @@ function EditableTextDetailView({
 
           event.preventDefault();
           event.stopPropagation();
-          actions.navigation.showComposer();
+          actions.navigation.dismissPane();
         }}
         placeholder="Add context text"
         style={{ height: "100%", width: "100%", wrapMode: "word" }}
@@ -287,11 +285,8 @@ function AgentDetailView({
         </box>
       )}
       <AgentOutputLog blocks={detail.blocks} />
-      <box
-        title="Follow-up"
-        borderStyle="rounded"
-        style={{ border: true, height: 3 }}
-      >
+      <box style={{ flexDirection: "column", gap: 1, height: 3 }}>
+        <text style={{ fg: "gray" }}>Follow-up</text>
         <input
           value={message}
           placeholder="Send a follow-up to this agent session"
@@ -357,12 +352,6 @@ function isOpenFocusedContextItemKey(event: KeyEvent): boolean {
   );
 }
 
-function isEnterKey(keyName: string): boolean {
-  return (
-    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
-  );
-}
-
 function getViewerActionForKey(
   keyName: string,
   actions: readonly ContextItemAction[],
@@ -392,35 +381,4 @@ function getBottomTitle(actions: readonly ContextItemAction[]): string {
   ]
     .filter((item): item is string => item !== null)
     .join(" · ");
-}
-
-function runContextItemAction(action: ContextItemAction) {
-  void action.run({
-    applyAgentSandboxDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    applySavedDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    openContextItem: (itemId) => {
-      useAppStore.getState().actions.contextItems.openContextItem({ itemId });
-    },
-    removeContextItem: (itemId) => {
-      disposeAgentAskSession(itemId);
-      useAppStore.getState().actions.compose.removeContextItem({ itemId });
-      useAppStore.getState().actions.navigation.showComposer();
-    },
-    rerunPrompt: ({ expectedResult, prompt, replaceContextItemId }) =>
-      startLlmRequest(prompt, {
-        replacement: {
-          contextItemId: replaceContextItemId,
-          expectedResult,
-        },
-      }),
-    rerunShellCommand: ({ command, replaceContextItemId }) =>
-      startShellCommandRerun({ command, replaceContextItemId }),
-    saveAgentSandboxDiff: (itemId) => {
-      void saveAgentSandboxDiffToContext(itemId);
-    },
-  });
 }

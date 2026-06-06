@@ -4,6 +4,7 @@ import {
   HighlightedDiff,
   HighlightedMarkdown,
 } from "./SyntaxHighlightedContent";
+import { isEnterKey } from "../lib/keymap";
 import { applyPatchProposal } from "../lib/patch/patchEngine";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
 
@@ -188,14 +189,14 @@ function handleTextResponseKey({
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
     return;
   }
 
   if (isEnterKey(event.name)) {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.clearResponseAndMessage();
+    actions.navigation.acceptAndClose();
   }
 }
 
@@ -217,7 +218,10 @@ function handlePatchReviewKey({
     return;
   }
 
-  if (patch.status === "valid" && event.name === "a") {
+  if (
+    patch.status === "valid" &&
+    (event.name === "a" || isEnterKey(event.name))
+  ) {
     event.preventDefault();
     event.stopPropagation();
     void applyPatch(request, actions.response);
@@ -238,14 +242,14 @@ function handlePatchReviewKey({
   if (event.name === "e") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
     return;
   }
 
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.rejectResponse();
+    actions.navigation.rejectToEdit();
   }
 }
 
@@ -257,12 +261,12 @@ function getTextResponseHotkeys(request: LlmRequestState): string | undefined {
   }
 
   if (request.status === "error") {
-    return "Enter clear · Esc return";
+    return "Enter clear · Esc edit prompt";
   }
 
   return request.savedContextItemId === undefined
-    ? "s save to context · Enter clear · Esc return"
-    : "Enter clear · Esc return";
+    ? "s save to context · Enter clear · Esc edit prompt"
+    : "Enter clear · Esc edit prompt";
 }
 
 function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
@@ -277,14 +281,16 @@ function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
   }
 
   if (patch.status !== "valid") {
-    return "e edit message · Esc reject";
+    return "e/Esc edit message";
   }
 
   return [
-    patch.applyStatus === "apply-error" ? "a retry apply" : "a apply",
+    patch.applyStatus === "apply-error"
+      ? "Enter/a retry apply"
+      : "Enter/a apply",
     request.savedContextItemId === undefined ? "s save diff to context" : null,
     "e edit message",
-    "Esc reject",
+    "Esc edit message",
   ]
     .filter((item): item is string => item !== null)
     .join(" · ");
@@ -343,10 +349,4 @@ async function applyPatch(
       requestId: request.id,
     });
   }
-}
-
-function isEnterKey(keyName: string): boolean {
-  return (
-    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
-  );
 }

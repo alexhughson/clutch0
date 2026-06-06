@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import type { Context, Tool } from "@earendil-works/pi-ai";
 import {
   MAX_TOTAL_FILE_CONTEXT_CHARACTERS,
@@ -11,7 +9,6 @@ import type { ContextItem, LlmFileContext } from "../../types";
 import { defaultSystemPrompt, renderPrompt } from "./prompts";
 
 export { MAX_FILE_CONTEXT_CHARACTERS } from "../context/contextItems";
-export const MAX_AGENTS_CONTEXT_CHARACTERS = 40_000;
 export const MAX_DIFF_CONTEXT_CHARACTERS = 120_000;
 export const MAX_DIRECTORY_TREE_ENTRIES = 1_000;
 
@@ -142,39 +139,14 @@ async function buildAutomaticContext({
 }: {
   root: string;
 }): Promise<AutomaticContextBlock[]> {
-  const [agents, diff, directoryTree] = await Promise.all([
-    readOptionalAgentsContext({ root }),
+  const [diff, directoryTree] = await Promise.all([
     readOptionalCurrentDiffContext({ root }),
     readDirectoryTreeContext({ root }),
   ]);
 
-  return [agents, diff, directoryTree].filter(
+  return [diff, directoryTree].filter(
     (block): block is AutomaticContextBlock => block !== null,
   );
-}
-
-async function readOptionalAgentsContext({
-  root,
-}: {
-  root: string;
-}): Promise<AutomaticContextBlock | null> {
-  try {
-    const content = await readFile(resolve(root, "AGENTS.md"), "utf8");
-    if (content.trim().length === 0) {
-      return null;
-    }
-
-    return {
-      name: "AGENTS.md",
-      content: truncateContent(content, MAX_AGENTS_CONTEXT_CHARACTERS),
-    };
-  } catch (error) {
-    if (isFileNotFoundError(error)) {
-      return null;
-    }
-
-    throw error;
-  }
 }
 
 async function readOptionalCurrentDiffContext({
@@ -238,14 +210,6 @@ function formatAutomaticContext(
         `<automatic_context name=${JSON.stringify(block.name)}>\n${block.content}\n</automatic_context>`,
     )
     .join("\n\n");
-}
-
-function isFileNotFoundError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === "ENOENT"
-  );
 }
 
 function truncateContent(content: string, maxCharacters: number): string {

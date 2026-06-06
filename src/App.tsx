@@ -1,12 +1,13 @@
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { AppTask, WorkspaceState } from "./app/appTypes";
+import { getCtrlCShortcutDecision, isCtrlCKey } from "./app/ctrlCShortcut";
 import { renderTask } from "./app/taskRegistry";
+import { getWorkspaceLayout, type WorkspaceLayoutMode } from "./app/layout";
 import {
-  getWorkspaceLayout,
-  isWorkspaceDetailTask,
-  type WorkspaceLayoutMode,
-} from "./app/layout";
+  canUseContextListKeyboardWithPane,
+  isWorkspacePaneTask,
+} from "./app/taskPresentation";
 import {
   ContextItemsList,
   FocusedContextItemSummary,
@@ -20,10 +21,6 @@ import {
   getVisibleContextItemById,
   getVisibleContextItems,
 } from "./lib/context/automaticContextItems";
-import {
-  PiAgentContextItem,
-  UserTextContextItem,
-} from "./lib/context/contextItems";
 import {
   getFileSelectorMatchAtCursor,
   getSlashCommandSelectorMatchAtCursor,
@@ -43,9 +40,10 @@ export function App({ filePaths }: AppProps) {
   const activeTask = useAppStore((state) => state.activeTask);
   const workspace = useAppStore((state) => state.workspace);
   const { height, width } = useTerminalDimensions();
-  const detailTask = isWorkspaceDetailTask(activeTask) ? activeTask : null;
+  const paneTask = isWorkspacePaneTask(activeTask) ? activeTask : null;
+  const lastBaseCtrlCAt = useRef<number | null>(null);
   const layout = getWorkspaceLayout({
-    hasDetailTask: detailTask !== null,
+    hasPaneTask: paneTask !== null,
     height,
     width,
   });
@@ -55,10 +53,34 @@ export function App({ filePaths }: AppProps) {
   }, [actions]);
 
   useKeyboard((event) => {
-    if (
-      detailTask === null ||
-      isFocusedDetailTakingKeyboard({ detailTask, workspace })
-    ) {
+    if (!isCtrlCKey(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    const decision = getCtrlCShortcutDecision({
+      activeTask,
+      lastBaseCtrlCAt: lastBaseCtrlCAt.current,
+      now,
+    });
+
+    if (decision === "close-task") {
+      lastBaseCtrlCAt.current = null;
+      actions.navigation.dismissPane();
+      return;
+    }
+
+    if (decision === "exit") {
+      process.exit(0);
+    }
+
+    lastBaseCtrlCAt.current = decision === "arm-exit" ? now : null;
+  });
+
+  useKeyboard((event) => {
+    if (paneTask === null || !canUseContextListKeyboardWithPane(paneTask)) {
       return;
     }
 
@@ -77,10 +99,7 @@ export function App({ filePaths }: AppProps) {
   });
 
   useKeyboard((event) => {
-    if (
-      detailTask === null ||
-      isFocusedDetailTakingKeyboard({ detailTask, workspace })
-    ) {
+    if (paneTask === null || !canUseContextListKeyboardWithPane(paneTask)) {
       return;
     }
 
@@ -106,7 +125,7 @@ export function App({ filePaths }: AppProps) {
     actions.contextItems.openContextItem({ itemId: focusedItem.id });
   });
 
-  if (activeTask !== null && detailTask === null) {
+  if (activeTask !== null && paneTask === null) {
     return (
       <AppRoot height={height} width={width}>
         {renderTask(activeTask)}
@@ -114,10 +133,10 @@ export function App({ filePaths }: AppProps) {
     );
   }
 
-  if (detailTask !== null && layout.detailTakesOver) {
+  if (paneTask !== null && layout.paneTakesOver) {
     return (
       <AppRoot height={height} width={width}>
-        {renderTask(detailTask)}
+        {renderTask(paneTask)}
       </AppRoot>
     );
   }
@@ -125,7 +144,7 @@ export function App({ filePaths }: AppProps) {
   return (
     <AppRoot height={height} width={width}>
       <WorkspaceLayout
-        detailTask={detailTask}
+        paneTask={paneTask}
         filePaths={filePaths}
         mode={layout.mode}
         terminalHeight={height}
@@ -158,16 +177,13 @@ function AppRoot({
 }
 
 function WorkspaceLayout({
-  detailTask,
+  paneTask,
   filePaths,
   mode,
   terminalHeight,
   workspace,
 }: {
-  detailTask: Extract<
-    AppTask,
-    { kind: "context-item-viewer" | "response" }
-  > | null;
+  paneTask: AppTask | null;
   filePaths: readonly FilePath[];
   mode: WorkspaceLayoutMode;
   terminalHeight: number;
@@ -178,7 +194,7 @@ function WorkspaceLayout({
     workspace.automaticContextItems,
   );
   const composerHasSuggestions =
-    detailTask === null && hasComposerSuggestions(workspace);
+    paneTask === null && hasComposerSuggestions(workspace);
 
   if (mode === "wide") {
     return (
@@ -192,41 +208,51 @@ function WorkspaceLayout({
           width: "100%",
         }}
       >
-        <box style={{ flexDirection: "column", gap: 1, width: "36%" }}>
+        <box
+          style={{
+            flexDirection: "column",
+            gap: 1,
+            height: "100%",
+            minHeight: 0,
+            width: "36%",
+          }}
+        >
           <text>Clutch0</text>
           <ContextHotkeys
             contextItems={contextItems}
             focusedContextItemId={workspace.focusedContextItemId}
-            showItemActions={detailTask === null}
+            showItemActions={paneTask === null}
           />
-          <ContextItemsList
-            contextItems={contextItems}
-            focusedContextItemId={workspace.focusedContextItemId}
-          />
-        </box>
-        <box
-          style={{
-            flexDirection: "column",
-            flexGrow: 1,
-            gap: 1,
-            height: "100%",
-            width: "64%",
-          }}
-        >
-          <box style={{ flexDirection: "column", height: detailTask ? 7 : 10 }}>
+          <box style={{ flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
+            <ContextItemsList
+              contextItems={contextItems}
+              focusedContextItemId={workspace.focusedContextItemId}
+            />
+          </box>
+          <box style={{ flexDirection: "column", flexShrink: 0, height: 7 }}>
             <FocusedContextItemSummary
               contextItems={contextItems}
               focusedContextItemId={workspace.focusedContextItemId}
             />
           </box>
-          {detailTask === null ? (
+        </box>
+        <box
+          style={{
+            flexDirection: "column",
+            flexGrow: 1,
+            height: "100%",
+            minHeight: 0,
+            width: "64%",
+          }}
+        >
+          {paneTask === null ? (
             <MessageComposer
               composeScreen={workspace}
               filePaths={filePaths}
               suggestionHeight={8}
             />
           ) : (
-            <DetailPane task={detailTask} />
+            <CommandPane task={paneTask} />
           )}
         </box>
       </box>
@@ -234,13 +260,13 @@ function WorkspaceLayout({
   }
 
   if (mode === "medium") {
-    const summaryHeight = composerHasSuggestions ? 4 : 5;
+    const summaryHeight = composerHasSuggestions ? 6 : 7;
     const inputHeight = composerHasSuggestions ? 3 : 4;
     const suggestionHeight = composerHasSuggestions ? 5 : undefined;
     const contextHeight = Math.max(
       3,
       Math.min(
-        detailTask === null ? 10 : 8,
+        paneTask === null ? 10 : 8,
         terminalHeight -
           12 -
           summaryHeight -
@@ -264,7 +290,7 @@ function WorkspaceLayout({
         <ContextHotkeys
           contextItems={contextItems}
           focusedContextItemId={workspace.focusedContextItemId}
-          showItemActions={detailTask === null}
+          showItemActions={paneTask === null}
         />
         <box style={{ flexDirection: "column", height: contextHeight }}>
           <ContextItemsList
@@ -279,7 +305,7 @@ function WorkspaceLayout({
             focusedContextItemId={workspace.focusedContextItemId}
           />
         </box>
-        {detailTask === null ? (
+        {paneTask === null ? (
           <MessageComposer
             composeScreen={workspace}
             filePaths={filePaths}
@@ -287,7 +313,7 @@ function WorkspaceLayout({
             suggestionHeight={suggestionHeight}
           />
         ) : (
-          <DetailPane task={detailTask} />
+          <CommandPane task={paneTask} />
         )}
       </box>
     );
@@ -295,7 +321,7 @@ function WorkspaceLayout({
 
   const compactSuggestionHeight = composerHasSuggestions ? 4 : undefined;
   const compactInputHeight = 2;
-  const compactSummaryHeight = 3;
+  const compactSummaryHeight = 5;
   const compactContextHeight = Math.max(
     2,
     terminalHeight -
@@ -320,7 +346,7 @@ function WorkspaceLayout({
       <ContextHotkeys
         contextItems={contextItems}
         focusedContextItemId={workspace.focusedContextItemId}
-        showItemActions={detailTask === null}
+        showItemActions={paneTask === null}
       />
       <box style={{ flexDirection: "column", height: compactContextHeight }}>
         <ContextItemsList
@@ -365,28 +391,6 @@ function ContextHotkeys({
   return <text style={{ fg: "gray" }}>{hotkeys}</text>;
 }
 
-function isFocusedDetailTakingKeyboard({
-  detailTask,
-  workspace,
-}: {
-  detailTask: Extract<AppTask, { kind: "context-item-viewer" | "response" }>;
-  workspace: WorkspaceState;
-}): boolean {
-  if (detailTask.kind !== "context-item-viewer") {
-    return false;
-  }
-
-  const item = getVisibleContextItemById(
-    workspace.contextItems,
-    detailTask.itemId,
-    workspace.automaticContextItems,
-  );
-
-  return (
-    item instanceof PiAgentContextItem || item instanceof UserTextContextItem
-  );
-}
-
 function hasComposerSuggestions(workspace: WorkspaceState): boolean {
   const { cursorPosition, message } = workspace.composer;
   if (
@@ -401,11 +405,7 @@ function hasComposerSuggestions(workspace: WorkspaceState): boolean {
   );
 }
 
-function DetailPane({
-  task,
-}: {
-  task: Extract<AppTask, { kind: "context-item-viewer" | "response" }>;
-}) {
+function CommandPane({ task }: { task: AppTask }) {
   return (
     <box style={{ flexDirection: "column", flexGrow: 1, height: "100%" }}>
       {renderTask(task)}

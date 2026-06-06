@@ -163,6 +163,7 @@ test("context summaries update automatic context items", async () => {
       workspace: {
         ...createInitialAppState().workspace,
         automaticContextItems: createAutomaticContextItems(),
+        contextItems: [],
       },
     },
   });
@@ -171,7 +172,7 @@ test("context summaries update automatic context items", async () => {
   await flushPromises();
   await flushPromises();
 
-  expect(calls.map((input) => input.itemId)).toContain(AGENTS_CONTEXT_ITEM_ID);
+  expect(calls.map((input) => input.label)).toContain("AGENTS.md");
   const agentsItem = harness.state.workspace.automaticContextItems.find(
     (item) => item.id === AGENTS_CONTEXT_ITEM_ID,
   );

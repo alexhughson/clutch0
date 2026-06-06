@@ -1,8 +1,11 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import { loadFileList } from "../fileListLoader";
 import { isNotGitRepositoryError, readGitDiff } from "../git/gitDiff";
+import {
+  createFileContextItem,
+  FileContextItem,
+  getFileContextItemId,
+} from "./contextItems";
 import type {
   ContextItem,
   ContextItemAction,
@@ -13,7 +16,7 @@ import type {
 
 const MISSING_SUMMARY_STATE: ContextItemSummaryState = { status: "missing" };
 
-export const AGENTS_CONTEXT_ITEM_ID = "builtin:agents";
+export const AGENTS_CONTEXT_ITEM_ID = getFileContextItemId("AGENTS.md");
 export const FILE_LIST_CONTEXT_ITEM_ID = "builtin:file-list";
 export const UNSTAGED_CHANGES_CONTEXT_ITEM_ID = "builtin:unstaged-changes";
 
@@ -23,7 +26,7 @@ let automaticContextItems: readonly ContextItem[] | null = null;
 
 export function createAutomaticContextItems(): ContextItem[] {
   return [
-    new AgentsContextItem(),
+    createFileContextItem("AGENTS.md"),
     new UnstagedChangesContextItem(),
     new FileListContextItem(),
   ];
@@ -38,7 +41,25 @@ export function getVisibleContextItems(
   contextItems: readonly ContextItem[],
   automaticContextItems: readonly ContextItem[] = getAutomaticContextItems(),
 ): readonly ContextItem[] {
-  return [...automaticContextItems, ...contextItems];
+  const selectedItemIds = new Set(contextItems.map((item) => item.id));
+  return [
+    ...automaticContextItems.filter((item) => !selectedItemIds.has(item.id)),
+    ...contextItems,
+  ];
+}
+
+export function getAutomaticFileContextItems({
+  automaticContextItems,
+  contextItems,
+}: {
+  automaticContextItems: readonly ContextItem[];
+  contextItems: readonly ContextItem[];
+}): FileContextItem[] {
+  const selectedItemIds = new Set(contextItems.map((item) => item.id));
+  return automaticContextItems.filter(
+    (item): item is FileContextItem =>
+      item instanceof FileContextItem && !selectedItemIds.has(item.id),
+  );
 }
 
 export function getVisibleContextItemById(
@@ -51,93 +72,6 @@ export function getVisibleContextItemById(
       (item) => item.id === itemId,
     ) ?? null
   );
-}
-
-class AgentsContextItem implements ContextItem {
-  readonly id = AGENTS_CONTEXT_ITEM_ID;
-  readonly type = "automatic-agents";
-
-  constructor(
-    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
-  ) {}
-
-  getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id)];
-  }
-
-  async getDetailView({
-    root,
-  }: {
-    root: string;
-  }): Promise<ContextItemDetailView> {
-    try {
-      return {
-        content: await readFile(resolve(root, "AGENTS.md"), "utf8"),
-        kind: "markdown",
-        title: "AGENTS.md",
-      };
-    } catch (error) {
-      if (isFileNotFoundError(error)) {
-        return {
-          content: "No AGENTS.md file exists in this workspace.",
-          kind: "text",
-          title: "AGENTS.md",
-        };
-      }
-
-      throw error;
-    }
-  }
-
-  getListLabel(): string {
-    return "AGENTS.md";
-  }
-
-  async getSummarizationInput({ root }: { root: string }) {
-    try {
-      const content = await readFile(resolve(root, "AGENTS.md"), "utf8");
-      if (content.trim().length === 0) {
-        return null;
-      }
-
-      const sourceText = `AGENTS.md\n\n${content}`;
-      return {
-        content: sourceText,
-        itemId: this.id,
-        label: "AGENTS.md",
-        sourceHash: hashContent(sourceText),
-        type: this.type,
-      };
-    } catch (error) {
-      if (isFileNotFoundError(error)) {
-        return null;
-      }
-
-      throw error;
-    }
-  }
-
-  getSummaryState(): ContextItemSummaryState {
-    return this.summaryState;
-  }
-
-  getSummaryView() {
-    return getAutomaticSummaryView(this.summaryState, {
-      detail: "Automatically included instructions for LLM requests.",
-      title: "AGENTS.md",
-    });
-  }
-
-  async formatForLlm(): Promise<FormattedContextItem> {
-    return {
-      consumedFileCharacters: 0,
-      text: "",
-    };
-  }
-
-  withSummaryState(summaryState: ContextItemSummaryState): ContextItem {
-    return new AgentsContextItem(summaryState);
-  }
 }
 
 class UnstagedChangesContextItem implements ContextItem {
