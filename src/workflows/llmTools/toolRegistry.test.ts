@@ -8,12 +8,15 @@ import { ADD_CONTEXT_FILES_TOOL_NAME } from "../addFiles/addFilesWorkflowTool";
 import { FIND_RELEVANT_FILES_TOOL_NAME } from "../findFiles/findFilesTool";
 import { CREATE_FILE_TOOL_NAME } from "../createFile/createFileWorkflowTool";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "./shellCommandWorkflowTool";
+import type { McpToolRuntime } from "../../lib/mcp/mcpTypes";
+import { createMcpWorkflowResources } from "../mcp/mcpWorkflowTool";
 import {
   getLlmSlashCommands,
   getLlmWorkflowTools,
   parseLlmSlashCommandInvocation,
   routeLlmWorkflowToolCalls,
   setAgentAskSkillSlashCommands,
+  setMcpWorkflowResources,
 } from "./toolRegistry";
 
 test("routes add context files tool calls to the add files workflow", async () => {
@@ -210,6 +213,7 @@ test("derives slash commands from workflow tools plus ask", () => {
     "agent-edit",
     "config",
     "show-context",
+    "say",
     "add",
     "create",
     "find",
@@ -225,6 +229,9 @@ test("derives slash commands from workflow tools plus ask", () => {
   expect(
     commands.find((command) => command.name === "show-context")
       ?.allowedToolNames,
+  ).toEqual([]);
+  expect(
+    commands.find((command) => command.name === "say")?.allowedToolNames,
   ).toEqual([]);
   expect(
     commands.find((command) => command.name === "add")?.allowedToolNames,
@@ -265,7 +272,111 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
     },
     input: "",
   });
+  expect(
+    parseLlmSlashCommandInvocation("/say keep this in mind"),
+  ).toMatchObject({
+    command: {
+      name: "say",
+      taskKind: "say",
+    },
+    input: "keep this in mind",
+  });
   expect(parseLlmSlashCommandInvocation("/wat auth routing")).toBeNull();
+});
+
+test("routes direct MCP tool calls and exposes MCP slash commands", async () => {
+  const calls: unknown[] = [];
+  const runtime: McpToolRuntime = {
+    async callTool(options) {
+      calls.push(options);
+      return {
+        arguments: options.arguments,
+        contentText: "repo results",
+        isError: false,
+        rawResult: { content: [{ text: "repo results", type: "text" }] },
+        serverName: options.serverName,
+        toolName: options.toolName,
+      };
+    },
+    async listTools() {
+      throw new Error("listTools should not be used in this test.");
+    },
+  };
+  const resources = createMcpWorkflowResources({
+    runtime,
+    tools: [
+      {
+        description: "Search GitHub repositories.",
+        inputSchema: {
+          properties: { query: { type: "string" } },
+          required: ["query"],
+          type: "object",
+        },
+        name: "search_repositories",
+        serverName: "github",
+        slashCommandName: "mcp:github",
+        slashToolName: "mcp:github:search_repositories",
+        toolName: "mcp_github_search_repositories",
+      },
+    ],
+  });
+  setMcpWorkflowResources(resources);
+
+  try {
+    expect(getLlmWorkflowTools().map((tool) => tool.name)).toContain(
+      "mcp_github_search_repositories",
+    );
+    expect(
+      parseLlmSlashCommandInvocation("/mcp:github find react"),
+    ).toMatchObject({
+      command: {
+        allowedToolNames: ["mcp_github_search_repositories"],
+        name: "mcp:github",
+      },
+      input: "find react",
+    });
+    expect(
+      parseLlmSlashCommandInvocation(
+        "/mcp:github:search_repositories find react",
+      ),
+    ).toMatchObject({
+      command: {
+        allowedToolNames: ["mcp_github_search_repositories"],
+        name: "mcp:github:search_repositories",
+      },
+      input: "find react",
+    });
+
+    const result = await routeLlmWorkflowToolCalls({
+      allowedToolNames: ["mcp_github_search_repositories"],
+      toolCalls: [
+        {
+          arguments: { query: "react" },
+          id: "tool-1",
+          name: "mcp_github_search_repositories",
+          type: "toolCall",
+        } satisfies ToolCall,
+      ],
+    });
+
+    expect(result).toMatchObject({
+      kind: "mcp-tool-output",
+      output: {
+        contentText: "repo results",
+        serverName: "github",
+        toolName: "search_repositories",
+      },
+    });
+    expect(calls).toEqual([
+      {
+        arguments: { query: "react" },
+        serverName: "github",
+        toolName: "search_repositories",
+      },
+    ]);
+  } finally {
+    setMcpWorkflowResources({ slashCommands: [], toolControllers: [] });
+  }
 });
 
 test("parses agent skill slash commands", () => {

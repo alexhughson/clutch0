@@ -1,6 +1,6 @@
-import type { KeyEvent } from "@opentui/core";
+import type { KeyEvent, TextareaRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextItemViewerTaskState } from "../../app/appTypes";
 import { AgentOutputLog } from "../../components/AgentOutputLog";
 import {
@@ -8,20 +8,19 @@ import {
   HighlightedDiff,
   HighlightedMarkdown,
 } from "../../components/SyntaxHighlightedContent";
+import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import {
-  getContextItemById,
   PiAgentContextItem,
+  UserTextContextItem,
 } from "../../lib/context/contextItems";
+import { isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
 import {
-  disposeAgentAskSession,
   saveAgentSandboxDiffToContext,
   sendAgentAskMessage,
 } from "../agentAsk/agentAskSessionRegistry";
-import { startLlmRequest } from "../llmRequest/startLlmRequest";
-import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
-import { applySavedDiffContextItem } from "./contextItemEffects";
+import { runContextItemAction } from "./contextItemActionRunner";
 
 export function ContextItemViewerScreen({
   screen,
@@ -30,14 +29,23 @@ export function ContextItemViewerScreen({
 }) {
   const actions = useAppStore((state) => state.actions);
   const item = useAppStore((state) =>
-    getContextItemById(state.workspace.contextItems, screen.itemId),
+    getVisibleContextItemById(
+      state.workspace.contextItems,
+      screen.itemId,
+      state.workspace.automaticContextItems,
+    ),
   );
   const [detail, setDetail] = useState<ContextItemDetailView | null>(null);
   const liveAgentDetail =
     item instanceof PiAgentContextItem ? item.getLiveDetailView() : null;
-  const visibleDetail = liveAgentDetail ?? detail;
+  const editableTextDetail =
+    item instanceof UserTextContextItem ? item.getEditableDetailView() : null;
+  const visibleDetail = liveAgentDetail ?? editableTextDetail ?? detail;
   const canAct = screen.applyStatus !== "applying";
-  const canRunItemActions = canAct && visibleDetail?.kind !== "agent-output";
+  const canRunItemActions =
+    canAct &&
+    visibleDetail?.kind !== "agent-output" &&
+    visibleDetail?.kind !== "editable-text";
   const itemActions = useMemo(
     () => item?.getActions().filter((action) => action.id !== "open") ?? [],
     [item],
@@ -46,7 +54,11 @@ export function ContextItemViewerScreen({
   useEffect(() => {
     let cancelled = false;
     setDetail(null);
-    if (item === null || item instanceof PiAgentContextItem) {
+    if (
+      item === null ||
+      item instanceof PiAgentContextItem ||
+      item instanceof UserTextContextItem
+    ) {
       return;
     }
 
@@ -69,7 +81,22 @@ export function ContextItemViewerScreen({
     if (event.name === "escape") {
       event.preventDefault();
       event.stopPropagation();
-      actions.navigation.showComposer();
+      actions.navigation.dismissPane();
+      return;
+    }
+
+    if (isOpenFocusedContextItemKey(event)) {
+      const state = useAppStore.getState();
+      const focusedItem = getVisibleContextItemById(
+        state.workspace.contextItems,
+        state.workspace.focusedContextItemId,
+        state.workspace.automaticContextItems,
+      );
+      if (focusedItem !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        actions.contextItems.openContextItem({ itemId: focusedItem.id });
+      }
       return;
     }
 
@@ -84,7 +111,7 @@ export function ContextItemViewerScreen({
 
     event.preventDefault();
     event.stopPropagation();
-    runContextItemAction(action);
+    runContextItemAction({ action, closeAfterRemove: true });
   });
 
   return (
@@ -147,6 +174,10 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
     );
   }
 
+  if (detail.kind === "editable-text") {
+    return <EditableTextDetailView detail={detail} />;
+  }
+
   if (detail.kind === "diff") {
     return (
       <>
@@ -165,6 +196,69 @@ function DetailView({ detail }: { detail: ContextItemDetailView }) {
   );
 }
 
+function EditableTextDetailView({
+  detail,
+}: {
+  detail: Extract<ContextItemDetailView, { kind: "editable-text" }>;
+}) {
+  const actions = useAppStore((state) => state.actions);
+  const textareaRef = useRef<TextareaRenderable | null>(null);
+  const initializedItemId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea === null) {
+      return;
+    }
+
+    if (textarea.plainText !== detail.content) {
+      textarea.replaceText(detail.content);
+    }
+
+    if (initializedItemId.current !== detail.itemId) {
+      textarea.cursorOffset = detail.content.length;
+      initializedItemId.current = detail.itemId;
+    }
+  }, [detail.content, detail.itemId]);
+
+  return (
+    <box
+      style={{
+        backgroundColor: "#1f2937",
+        flexGrow: 1,
+        height: "100%",
+        paddingX: 1,
+        width: "100%",
+      }}
+    >
+      <textarea
+        ref={textareaRef}
+        focused
+        initialValue={detail.content}
+        onContentChange={() => {
+          const text = textareaRef.current?.plainText;
+          if (text === undefined) {
+            return;
+          }
+
+          actions.say.updateText({ itemId: detail.itemId, text });
+        }}
+        onKeyDown={(event: KeyEvent) => {
+          if (event.name !== "escape") {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          actions.navigation.dismissPane();
+        }}
+        placeholder="Add context text"
+        style={{ height: "100%", width: "100%", wrapMode: "word" }}
+      />
+    </box>
+  );
+}
+
 function AgentDetailView({
   detail,
 }: {
@@ -173,7 +267,9 @@ function AgentDetailView({
   const [message, setMessage] = useState("");
 
   return (
-    <box style={{ flexDirection: "column", gap: 1 }}>
+    <box
+      style={{ flexDirection: "column", flexGrow: 1, gap: 1, height: "100%" }}
+    >
       <text>{`Prompt: ${detail.prompt}`}</text>
       <text style={{ fg: detail.status === "error" ? "red" : "gray" }}>
         {detail.status === "running"
@@ -188,12 +284,9 @@ function AgentDetailView({
           <text>{`Sandbox diff: ${formatSandboxDiffStatus(detail.sandbox)}`}</text>
         </box>
       )}
-      <AgentOutputLog blocks={detail.blocks} height={32} />
-      <box
-        title="Follow-up"
-        borderStyle="rounded"
-        style={{ border: true, height: 3 }}
-      >
+      <AgentOutputLog blocks={detail.blocks} />
+      <box style={{ flexDirection: "column", gap: 1, height: 3 }}>
+        <text style={{ fg: "gray" }}>Follow-up</text>
         <input
           value={message}
           placeholder="Send a follow-up to this agent session"
@@ -247,9 +340,15 @@ function formatSandboxDiffStatus(
   return sandbox.diffStatus;
 }
 
-function isEnterKey(keyName: string): boolean {
+function isOpenFocusedContextItemKey(event: KeyEvent): boolean {
   return (
-    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
+    event.name === "o" &&
+    event.ctrl &&
+    !event.shift &&
+    !event.meta &&
+    !event.option &&
+    !event.super &&
+    !event.hyper
   );
 }
 
@@ -282,35 +381,4 @@ function getBottomTitle(actions: readonly ContextItemAction[]): string {
   ]
     .filter((item): item is string => item !== null)
     .join(" · ");
-}
-
-function runContextItemAction(action: ContextItemAction) {
-  void action.run({
-    applyAgentSandboxDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    applySavedDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    openContextItem: (itemId) => {
-      useAppStore.getState().actions.contextItems.openContextItem({ itemId });
-    },
-    removeContextItem: (itemId) => {
-      disposeAgentAskSession(itemId);
-      useAppStore.getState().actions.compose.removeContextItem({ itemId });
-      useAppStore.getState().actions.navigation.showComposer();
-    },
-    rerunPrompt: ({ expectedResult, prompt, replaceContextItemId }) =>
-      startLlmRequest(prompt, {
-        replacement: {
-          contextItemId: replaceContextItemId,
-          expectedResult,
-        },
-      }),
-    rerunShellCommand: ({ command, replaceContextItemId }) =>
-      startShellCommandRerun({ command, replaceContextItemId }),
-    saveAgentSandboxDiff: (itemId) => {
-      void saveAgentSandboxDiffToContext(itemId);
-    },
-  });
 }

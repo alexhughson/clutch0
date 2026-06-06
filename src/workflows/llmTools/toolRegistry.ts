@@ -27,6 +27,8 @@ const workflowToolControllers = createWorkflowToolControllers([
 ]);
 
 let agentAskSkillSlashCommands: readonly LlmSlashCommand[] = [];
+let mcpSlashCommands: readonly LlmSlashCommand[] = [];
+let mcpWorkflowToolControllers: readonly LlmWorkflowToolController[] = [];
 
 const agentAskSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
@@ -74,6 +76,15 @@ const showContextSlashCommand: LlmSlashCommand = {
   title: "Show rendered context",
 };
 
+const saySlashCommand: LlmSlashCommand = {
+  allowedToolNames: [],
+  description: "Add editable user text directly to context.",
+  name: "say",
+  promptDirective: "",
+  taskKind: "say",
+  title: "Add editable context text",
+};
+
 export function getLlmWorkflowTools({
   allowedToolNames,
 }: {
@@ -87,8 +98,27 @@ export function getLlmWorkflowTools({
 export function setAgentAskSkillSlashCommands(
   commands: readonly LlmSlashCommand[],
 ) {
-  assertNoSlashCommandNameCollisions(commands);
+  assertNoSlashCommandNameCollisions(commands, [
+    ...getBaseLlmSlashCommands(),
+    ...mcpSlashCommands,
+  ]);
   agentAskSkillSlashCommands = [...commands];
+}
+
+export function setMcpWorkflowResources({
+  slashCommands,
+  toolControllers,
+}: {
+  slashCommands: readonly LlmSlashCommand[];
+  toolControllers: readonly LlmWorkflowToolController[];
+}) {
+  assertNoSlashCommandNameCollisions(slashCommands, [
+    ...getBaseLlmSlashCommands(),
+    ...agentAskSkillSlashCommands,
+  ]);
+  assertNoWorkflowToolNameCollisions(toolControllers);
+  mcpSlashCommands = [...slashCommands];
+  mcpWorkflowToolControllers = [...toolControllers];
 }
 
 export function getLlmSlashCommands(): LlmSlashCommand[] {
@@ -97,8 +127,10 @@ export function getLlmSlashCommands(): LlmSlashCommand[] {
     agentAskSlashCommand,
     agentEditSlashCommand,
     ...agentAskSkillSlashCommands,
+    ...mcpSlashCommands,
     configSlashCommand,
     showContextSlashCommand,
+    saySlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
       controller.slashCommand === undefined
         ? []
@@ -178,9 +210,10 @@ export function handleLlmWorkflowResult({
   requestId: number;
   result: LlmWorkflowToolResult & { responseText: string };
 }) {
-  const controller = workflowToolControllers.find(
-    (candidate) => candidate.resultKind === result.kind,
-  );
+  const controller = [
+    ...workflowToolControllers,
+    ...mcpWorkflowToolControllers,
+  ].find((candidate) => candidate.resultKind === result.kind);
   invariant(
     controller !== undefined,
     `No workflow tool controller handles result kind: ${result.kind}`,
@@ -195,16 +228,15 @@ function getLlmWorkflowToolControllers({
   allowedToolNames?: readonly string[];
 } = {}): readonly LlmWorkflowToolController[] {
   if (allowedToolNames === undefined) {
-    return workflowToolControllers.filter(
+    return [...workflowToolControllers, ...mcpWorkflowToolControllers].filter(
       (controller) => controller.enabledByDefault !== false,
     );
   }
 
   const controllersByName = new Map(
-    workflowToolControllers.map((controller) => [
-      controller.tool.name,
-      controller,
-    ]),
+    [...workflowToolControllers, ...mcpWorkflowToolControllers].map(
+      (controller) => [controller.tool.name, controller],
+    ),
   );
 
   return allowedToolNames.map((toolName) => {
@@ -219,9 +251,10 @@ function getLlmWorkflowToolControllers({
 
 function assertNoSlashCommandNameCollisions(
   commands: readonly LlmSlashCommand[],
+  existingCommands: readonly LlmSlashCommand[],
 ) {
   const existingNames = new Set(
-    getBaseLlmSlashCommands().map((command) => command.name),
+    existingCommands.map((command) => command.name),
   );
 
   for (const command of commands) {
@@ -233,12 +266,35 @@ function assertNoSlashCommandNameCollisions(
   }
 }
 
+function assertNoWorkflowToolNameCollisions(
+  controllers: readonly LlmWorkflowToolController[],
+) {
+  const existingNames = new Set(
+    workflowToolControllers.map((controller) => controller.tool.name),
+  );
+  const newNames = new Set<string>();
+
+  for (const controller of controllers) {
+    invariant(
+      !existingNames.has(controller.tool.name),
+      `Duplicate workflow tool name: ${controller.tool.name}`,
+    );
+    invariant(
+      !newNames.has(controller.tool.name),
+      `Duplicate workflow tool name: ${controller.tool.name}`,
+    );
+    newNames.add(controller.tool.name);
+  }
+}
+
 function getBaseLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
     agentAskSlashCommand,
     agentEditSlashCommand,
+    configSlashCommand,
     showContextSlashCommand,
+    saySlashCommand,
     ...workflowToolControllers.flatMap((controller) =>
       controller.slashCommand === undefined
         ? []

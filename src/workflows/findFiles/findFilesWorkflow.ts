@@ -121,7 +121,10 @@ function addSelectedCandidate(state: AppState): Partial<AppState> | AppState {
   }
 
   return {
-    workspace: addCandidatesToWorkspace(state.workspace, [candidate]),
+    activeTask: null,
+    workspace: clearComposer(
+      addCandidatesToWorkspace(state.workspace, [candidate]),
+    ),
   };
 }
 
@@ -134,9 +137,9 @@ function addAllCandidates(state: AppState): Partial<AppState> | AppState {
   }
 
   return {
-    workspace: addCandidatesToWorkspace(
-      state.workspace,
-      state.activeTask.candidates,
+    activeTask: null,
+    workspace: clearComposer(
+      addCandidatesToWorkspace(state.workspace, state.activeTask.candidates),
     ),
   };
 }
@@ -151,4 +154,14 @@ function addCandidatesToWorkspace(
   }
 
   return deck.applyTo(workspace);
+}
+
+function clearComposer(workspace: WorkspaceState): WorkspaceState {
+  return {
+    ...workspace,
+    composer: {
+      cursorPosition: 0,
+      message: "",
+    },
+  };
 }

@@ -6,6 +6,7 @@ import {
   createFileContextItem,
   createSavedDiffContextItem,
   createSavedLlmResponseContextItem,
+  createUserTextContextItem,
   PiAgentContextItem,
 } from "../context/contextItems";
 import { buildLlmContext, MAX_FILE_CONTEXT_CHARACTERS } from "./context";
@@ -53,7 +54,7 @@ test("marks focused context item for the LLM", async () => {
   );
 });
 
-test("adds automatic context without making it selected context", async () => {
+test("adds directory automatic context without making it selected context", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
   await writeFile(join(root, "AGENTS.md"), "Follow the project rules.\n");
   await writeFile(join(root, "example.ts"), "export {};\n");
@@ -65,14 +66,27 @@ test("adds automatic context without making it selected context", async () => {
   });
 
   expect(getUserContent(context)).toContain("No selected context items.");
-  expect(getUserContent(context)).toContain(
+  expect(getUserContent(context)).not.toContain(
     '<automatic_context name="AGENTS.md">',
   );
-  expect(getUserContent(context)).toContain("Follow the project rules.");
   expect(getUserContent(context)).toContain(
     '<automatic_context name="directory_tree">',
   );
   expect(getUserContent(context)).toContain("example.ts");
+});
+
+test("includes AGENTS.md through normal selected file context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  await writeFile(join(root, "AGENTS.md"), "Follow the project rules.\n");
+
+  const { context } = await buildLlmContext({
+    contextItems: [createFileContextItem("AGENTS.md")],
+    question: "What rules apply?",
+    root,
+  });
+
+  expect(getUserContent(context)).toContain('<file path="AGENTS.md">');
+  expect(getUserContent(context)).toContain("Follow the project rules.");
 });
 
 test("builds LLM context from saved responses and diffs", async () => {
@@ -105,6 +119,31 @@ test("builds LLM context from saved responses and diffs", async () => {
   expect(getUserContent(context)).toContain("The answer is 42.");
   expect(getUserContent(context)).toContain("<saved_diff");
   expect(getUserContent(context)).toContain("Update answer");
+});
+
+test("builds LLM context from user text context items", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  const item = createUserTextContextItem({
+    createdAt: 1_700_000_000_000,
+    id: "say:1",
+    text: "Remember to preserve the narrow layout.",
+  });
+
+  const { context } = await buildLlmContext({
+    contextItems: [item],
+    focusedContextItemId: item.id,
+    question: "Use note",
+    root,
+  });
+
+  expect(getUserContent(context)).toContain(
+    "Focused context item:\nUser text:",
+  );
+  expect(getUserContent(context)).toContain("<user_text");
+  expect(getUserContent(context)).toContain('focused="true"');
+  expect(getUserContent(context)).toContain(
+    "Remember to preserve the narrow layout.",
+  );
 });
 
 test("agent session context includes only the latest assistant message", async () => {

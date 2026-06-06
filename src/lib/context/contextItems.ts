@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
 import type {
@@ -8,6 +7,7 @@ import type {
 import { applyAgentOutputUpdate } from "../agentOutput/agentOutputReducer";
 import type { PatchProposal } from "../patch/types";
 import type { ShellCommandResult } from "../shell/shellCommand";
+import type { McpToolOutput } from "../mcp/mcpTypes";
 import type {
   AgentAskMode,
   AgentSandboxContext,
@@ -20,12 +20,32 @@ import type {
   FormatContextItemForLlmOptions,
   LlmFileContext,
 } from "../../types";
+import {
+  formatAgentOutputBlocks,
+  formatAttributes,
+  formatFile,
+  formatMcpToolOutputForDisplay,
+  formatMcpToolOutputForLlm,
+  formatShellCommandOutput,
+  getGeneratedSummaryView,
+  getLatestAgentAssistantMessage,
+  hashContent,
+  MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
+  MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS,
+  MAX_FILE_CONTEXT_CHARACTERS,
+  MAX_SAVED_CONTEXT_CHARACTERS,
+  safeJsonStringify,
+  summarize,
+  truncateContent,
+} from "./contextItemFormatting";
 
-export const MAX_FILE_CONTEXT_CHARACTERS = 60_000;
-export const MAX_TOTAL_FILE_CONTEXT_CHARACTERS = 200_000;
-export const MAX_SAVED_CONTEXT_CHARACTERS = 60_000;
-export const MAX_CONTEXT_ITEM_DETAIL_CHARACTERS = 20_000;
-export const MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS = 30_000;
+export {
+  MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
+  MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS,
+  MAX_FILE_CONTEXT_CHARACTERS,
+  MAX_SAVED_CONTEXT_CHARACTERS,
+  MAX_TOTAL_FILE_CONTEXT_CHARACTERS,
+} from "./contextItemFormatting";
 
 const MISSING_SUMMARY_STATE: ContextItemSummaryState = { status: "missing" };
 
@@ -279,6 +299,155 @@ export class ShellCommandOutputContextItem implements ContextItem {
     return {
       consumedFileCharacters: 0,
       text: `<shell_command_output${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), command: this.result.command, exit_code: this.result.exitCode ?? "signal", signal: this.result.signal })}>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</shell_command_output>`,
+    };
+  }
+}
+
+export class McpToolOutputContextItem implements ContextItem {
+  readonly type = "mcp-tool-output";
+
+  constructor(
+    readonly id: string,
+    readonly output: McpToolOutput,
+    readonly sourceRequestId: number,
+    readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: summarize(formatMcpToolOutputForDisplay(this.output)),
+      title: `MCP ${this.output.serverName}: ${this.output.toolName}`,
+    });
+  }
+
+  withSummaryState(
+    summaryState: ContextItemSummaryState,
+  ): McpToolOutputContextItem {
+    return new McpToolOutputContextItem(
+      this.id,
+      this.output,
+      this.sourceRequestId,
+      this.createdAt,
+      summaryState,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    const sourceText = `Server: ${this.output.serverName}\nTool: ${this.output.toolName}\nError: ${this.output.isError ? "yes" : "no"}\n\nArguments:\n${safeJsonStringify(this.output.arguments)}\n\nOutput:\n${truncateContent(formatMcpToolOutputForDisplay(this.output), MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
+
+    return {
+      content: sourceText,
+      itemId: this.id,
+      label: `MCP ${this.output.serverName}: ${this.output.toolName}`,
+      sourceHash: hashContent(sourceText),
+      type: this.type,
+    };
+  }
+
+  async getDetailView() {
+    return {
+      content: formatMcpToolOutputForDisplay(this.output),
+      kind: "markdown" as const,
+      title: `MCP ${this.output.serverName}: ${this.output.toolName}`,
+    };
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<mcp_tool_output${formatAttributes({ focused, server: this.output.serverName, tool: this.output.toolName, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), is_error: this.output.isError })}>\n<arguments>\n${truncateContent(safeJsonStringify(this.output.arguments), MAX_SAVED_CONTEXT_CHARACTERS)}\n</arguments>\n<result>\n${truncateContent(formatMcpToolOutputForLlm(this.output), MAX_SAVED_CONTEXT_CHARACTERS)}\n</result>\n</mcp_tool_output>`,
+    };
+  }
+}
+
+export class UserTextContextItem implements ContextItem {
+  readonly type = "user-text";
+
+  constructor(
+    readonly id: string,
+    readonly text: string,
+    readonly createdAt: number,
+    private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
+  ) {}
+
+  getListLabel(): string {
+    return this.getSummaryView().title;
+  }
+
+  getSummaryState(): ContextItemSummaryState {
+    return this.summaryState;
+  }
+
+  getSummaryView() {
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: summarize(this.text),
+      title: `User text: ${summarize(this.text)}`,
+    });
+  }
+
+  withSummaryState(summaryState: ContextItemSummaryState): UserTextContextItem {
+    return new UserTextContextItem(
+      this.id,
+      this.text,
+      this.createdAt,
+      summaryState,
+    );
+  }
+
+  withText(text: string): UserTextContextItem {
+    return new UserTextContextItem(
+      this.id,
+      text,
+      this.createdAt,
+      MISSING_SUMMARY_STATE,
+    );
+  }
+
+  getActions(): readonly ContextItemAction[] {
+    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+  }
+
+  async getSummarizationInput() {
+    return null;
+  }
+
+  getEditableDetailView(): Extract<
+    ContextItemDetailView,
+    { kind: "editable-text" }
+  > {
+    return {
+      content: this.text,
+      itemId: this.id,
+      kind: "editable-text" as const,
+      title: "User text",
+    };
+  }
+
+  async getDetailView() {
+    return this.getEditableDetailView();
+  }
+
+  async formatForLlm({
+    focused,
+  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    return {
+      consumedFileCharacters: 0,
+      text: `<user_text${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString() })}>\n${truncateContent(this.text, MAX_SAVED_CONTEXT_CHARACTERS)}\n</user_text>`,
     };
   }
 }
@@ -814,6 +983,32 @@ export function createShellCommandOutputContextItem({
   );
 }
 
+export function createMcpToolOutputContextItem({
+  createdAt,
+  id,
+  output,
+  sourceRequestId,
+}: {
+  createdAt: number;
+  id: string;
+  output: McpToolOutput;
+  sourceRequestId: number;
+}): McpToolOutputContextItem {
+  return new McpToolOutputContextItem(id, output, sourceRequestId, createdAt);
+}
+
+export function createUserTextContextItem({
+  createdAt,
+  id,
+  text,
+}: {
+  createdAt: number;
+  id: string;
+  text: string;
+}): UserTextContextItem {
+  return new UserTextContextItem(id, text, createdAt);
+}
+
 export function createSavedDiffContextItem({
   createdAt,
   diffText,
@@ -1040,145 +1235,10 @@ async function readFileContext({
   }
 }
 
-function getLatestAgentAssistantMessage(
-  blocks: readonly AgentOutputBlock[],
-): string | null {
-  for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    const block = blocks[index];
-    if (block?.kind === "stream" && block.streamKind === "assistant") {
-      return block.text;
-    }
-  }
-
-  return null;
-}
-
-function formatAgentOutputBlocks(blocks: readonly AgentOutputBlock[]): string {
-  return blocks
-    .map((block) => {
-      if (block.kind === "status") {
-        return block.message;
-      }
-
-      if (block.kind === "tool") {
-        const suffix = block.summary.length === 0 ? "" : `: ${block.summary}`;
-        return `tool ${block.toolName} ${block.phase}${suffix}`;
-      }
-
-      return `${block.streamKind}: ${block.text}`;
-    })
-    .join("\n");
-}
-
-function formatShellCommandOutput(result: ShellCommandResult): string {
-  const metadata = [
-    `$ ${result.command}`,
-    `exit code: ${result.exitCode ?? "signal"}`,
-    result.signal === undefined ? null : `signal: ${result.signal}`,
-    `duration: ${result.durationMs}ms`,
-    result.timedOut ? "timed out" : null,
-    result.truncated ? "output truncated" : null,
-  ].filter((line): line is string => line !== null);
-
-  return `${metadata.join("\n")}\n\nstdout:\n${result.stdout}\n\nstderr:\n${result.stderr}`;
-}
-
-function formatFile(
-  file: LlmFileContext,
-  { focused }: { focused: boolean },
-): string {
-  const attributes = formatAttributes({
-    path: file.filePath,
-    focused,
-    status: file.status === "skipped" ? "skipped" : undefined,
-  });
-
-  if (file.status === "skipped") {
-    return `<file${attributes}>\n${file.errorMessage ?? "Skipped."}\n</file>`;
-  }
-
-  const truncatedNote = file.truncated
-    ? "\n[File truncated because the selected file context limit was reached.]"
-    : "";
-
-  return `<file${attributes}>\n${file.content}${truncatedNote}\n</file>`;
-}
-
-function formatAttributes(
-  attributes: Record<string, boolean | number | string | undefined>,
-): string {
-  const formatted = Object.entries(attributes)
-    .filter(([, value]) => value !== undefined && value !== false)
-    .map(([key, value]) =>
-      value === true ? `${key}="true"` : `${key}=${JSON.stringify(value)}`,
-    );
-
-  return formatted.length === 0 ? "" : ` ${formatted.join(" ")}`;
-}
-
-function truncateContent(content: string, maxCharacters: number): string {
-  if (content.length <= maxCharacters) {
-    return content;
-  }
-
-  return `${content.slice(0, maxCharacters)}\n[Context truncated.]`;
-}
-
 function isInsideRoot(root: string, path: string): boolean {
   const relativePath = relative(root, path);
   return (
     relativePath === "" ||
     (!relativePath.startsWith("..") && !isAbsolute(relativePath))
   );
-}
-
-function getGeneratedSummaryView(
-  summaryState: ContextItemSummaryState,
-  fallback: { detail: string; title: string },
-) {
-  if (summaryState.status === "ready") {
-    return {
-      detail: summaryState.summary.details,
-      label: fallback.title,
-      status: summaryState.status,
-      title: summaryState.summary.oneLine,
-    };
-  }
-
-  if (summaryState.status === "pending") {
-    return {
-      detail: "Summarizing…",
-      label: fallback.title,
-      status: summaryState.status,
-      title: fallback.title,
-    };
-  }
-
-  if (summaryState.status === "error") {
-    return {
-      detail: `Summary unavailable: ${summaryState.errorMessage}`,
-      label: fallback.title,
-      status: summaryState.status,
-      title: fallback.title,
-    };
-  }
-
-  return {
-    ...fallback,
-    label: fallback.title,
-    status: summaryState.status,
-  };
-}
-
-function hashContent(content: string): string {
-  return createHash("sha256").update(content).digest("hex");
-}
-
-function summarize(value: string): string {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 60) {
-    return normalized.length > 0 ? normalized : "Untitled";
-  }
-
-  return `${normalized.slice(0, 57)}…`;
 }

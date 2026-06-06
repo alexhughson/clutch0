@@ -3,6 +3,7 @@ import { useKeyboard } from "@opentui/react";
 import type { CreateFileTaskState } from "../../app/appTypes";
 import { HighlightedCode } from "../../components/SyntaxHighlightedContent";
 import { applyCreateFileProposal } from "../../lib/createFile/createFile";
+import { isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 
 type CreateFileScreenProps = {
@@ -22,6 +23,9 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
 
   return (
     <box
+      title={`Create file (${formatStatus(task)})`}
+      bottomTitle={getCreateFileHotkeys(task)}
+      bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{
         border: true,
@@ -33,26 +37,9 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
         width: "100%",
       }}
     >
-      <box
-        title="Create request"
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        <text>{task.prompt}</text>
-      </box>
-      <box
-        title={`Create file (${formatStatus(task)})`}
-        bottomTitle={getCreateFileHotkeys(task)}
-        bottomTitleAlignment="right"
-        borderStyle="rounded"
-        style={{
-          border: true,
-          flexDirection: "column",
-          flexGrow: 1,
-          gap: 1,
-          padding: 1,
-        }}
-      >
+      <text style={{ fg: "gray" }}>Request</text>
+      <text>{task.prompt}</text>
+      <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
         <text>{proposal.summary}</text>
         <text>{`Path: ${proposal.path}`}</text>
         {task.validation.status === "invalid" ? (
@@ -95,7 +82,10 @@ function handleCreateFileKey({
     return;
   }
 
-  if (task.validation.status === "valid" && event.name === "a") {
+  if (
+    task.validation.status === "valid" &&
+    (event.name === "a" || isEnterKey(event.name))
+  ) {
     event.preventDefault();
     event.stopPropagation();
     void applyCreateFile(task, actions.createFile);
@@ -105,7 +95,7 @@ function handleCreateFileKey({
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
   }
 }
 
@@ -147,7 +137,7 @@ function getCreateFileHotkeys(task: CreateFileTaskState): string | undefined {
     return "Esc return";
   }
 
-  return "a create file · Esc reject";
+  return "Enter/a create file · Esc edit prompt";
 }
 
 function formatStatus(task: CreateFileTaskState): string {

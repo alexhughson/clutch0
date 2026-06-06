@@ -125,7 +125,7 @@ function finishResponse(
       return state;
     }
 
-    const item = createSavedLlmResponseContextItem({
+    const item = createSavedTextResponseItem({
       createdAt: liveItem.createdAt,
       id: liveItem.id,
       output: responseText,
@@ -147,7 +147,7 @@ function finishResponse(
   };
 
   if (liveItem !== null && responseKind === "text") {
-    const item = createSavedLlmResponseContextItem({
+    const item = createSavedTextResponseItem({
       createdAt: liveItem.createdAt,
       id: liveItem.id,
       output: responseText,
@@ -180,7 +180,7 @@ function finishResponse(
     return setActiveLlmRequest(state, request);
   }
 
-  const item = createSavedLlmResponseContextItem({
+  const item = createSavedTextResponseItem({
     createdAt: Date.now(),
     id: request.replacement.contextItemId,
     output: responseText,
@@ -220,14 +220,12 @@ function setPatchOnActiveRequest(
       );
     }
 
-    const item = createSavedDiffContextItem({
+    const item = createSavedDiffItem({
       createdAt: liveItem.createdAt,
-      diffText: patch.diffText,
       id: liveItem.id,
       prompt: liveItem.prompt,
-      proposal: patch.proposal,
+      patch,
       sourceRequestId: requestId,
-      summary: patch.proposal.summary,
     });
 
     return {
@@ -243,14 +241,12 @@ function setPatchOnActiveRequest(
   };
 
   if (liveItem !== null && patch.status === "valid") {
-    const item = createSavedDiffContextItem({
+    const item = createSavedDiffItem({
       createdAt: liveItem.createdAt,
-      diffText: patch.diffText,
       id: liveItem.id,
       prompt: requestWithPatch.question,
-      proposal: patch.proposal,
+      patch,
       sourceRequestId: requestWithPatch.id,
-      summary: patch.proposal.summary,
     });
 
     return {
@@ -282,14 +278,12 @@ function setPatchOnActiveRequest(
     return setActiveLlmRequest(state, requestWithPatch);
   }
 
-  const item = createSavedDiffContextItem({
+  const item = createSavedDiffItem({
     createdAt: Date.now(),
-    diffText: patch.diffText,
     id: requestWithPatch.replacement.contextItemId,
     prompt: requestWithPatch.question,
-    proposal: patch.proposal,
+    patch,
     sourceRequestId: requestWithPatch.id,
-    summary: patch.proposal.summary,
   });
 
   return {
@@ -365,14 +359,12 @@ function saveDiffToContext(
   }
 
   const itemId = `saved:${state.nextContextItemId}`;
-  const item = createSavedDiffContextItem({
+  const item = createSavedDiffItem({
     createdAt: Date.now(),
-    diffText: request.patch.diffText,
     id: itemId,
     prompt: request.question,
-    proposal: request.patch.proposal,
+    patch: request.patch,
     sourceRequestId: request.id,
-    summary: request.patch.proposal.summary,
   });
 
   return {
@@ -428,7 +420,7 @@ function saveTextToContext(
   }
 
   const itemId = `saved:${state.nextContextItemId}`;
-  const item = createSavedLlmResponseContextItem({
+  const item = createSavedTextResponseItem({
     createdAt: Date.now(),
     id: itemId,
     output: request.responseText,
@@ -449,6 +441,52 @@ function saveTextToContext(
       .add(item)
       .applyTo(state.workspace),
   };
+}
+
+function createSavedTextResponseItem({
+  createdAt,
+  id,
+  output,
+  prompt,
+  sourceRequestId,
+}: {
+  createdAt: number;
+  id: string;
+  output: string;
+  prompt: string;
+  sourceRequestId: number;
+}) {
+  return createSavedLlmResponseContextItem({
+    createdAt,
+    id,
+    output,
+    prompt,
+    sourceRequestId,
+  });
+}
+
+function createSavedDiffItem({
+  createdAt,
+  id,
+  patch,
+  prompt,
+  sourceRequestId,
+}: {
+  createdAt: number;
+  id: string;
+  patch: Extract<PatchReviewState, { status: "valid" }>;
+  prompt: string;
+  sourceRequestId: number;
+}) {
+  return createSavedDiffContextItem({
+    createdAt,
+    diffText: patch.diffText,
+    id,
+    prompt,
+    proposal: patch.proposal,
+    sourceRequestId,
+    summary: patch.proposal.summary,
+  });
 }
 
 function formatPatchValidationErrors(patch: PatchReviewState): string {

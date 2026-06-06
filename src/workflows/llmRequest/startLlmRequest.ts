@@ -1,4 +1,5 @@
 import type { ContextItemReplacementTarget } from "../../app/appTypes";
+import { getAutomaticFileContextItems } from "../../lib/context/automaticContextItems";
 import {
   LlmCompletionError,
   streamLlmInteraction,
@@ -15,9 +16,13 @@ export function startLlmRequest(
   } = {},
 ) {
   const currentState = useAppStore.getState();
-  const contextItems = currentState.workspace.contextItems.filter(
-    (item) => item.id !== options.replacement?.contextItemId,
-  );
+  const contextItems = [
+    ...getAutomaticFileContextItems({
+      automaticContextItems: currentState.workspace.automaticContextItems,
+      contextItems: currentState.workspace.contextItems,
+    }),
+    ...currentState.workspace.contextItems,
+  ].filter((item) => item.id !== options.replacement?.contextItemId);
   const focusedContextItemId = contextItems.some(
     (item) => item.id === currentState.workspace.focusedContextItemId,
   )

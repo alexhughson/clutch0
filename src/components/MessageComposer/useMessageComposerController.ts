@@ -1,4 +1,4 @@
-import type { CursorChangeEvent, KeyEvent } from "@opentui/core";
+import type { KeyEvent } from "@opentui/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   NoFileSelector,
@@ -21,9 +21,13 @@ import {
 export function useMessageComposerController({
   composeScreen,
   filePaths,
+  getEditorCursorOffset,
+  getEditorMessage,
 }: {
   composeScreen: ComposeScreenState;
   filePaths: readonly FilePath[];
+  getEditorCursorOffset: () => number;
+  getEditorMessage: () => string;
 }) {
   const [highlightedFilePath, setHighlightedFilePath] =
     useState<HighlightedFilePath>(null);
@@ -84,13 +88,13 @@ export function useMessageComposerController({
     }
   }, [highlightedCommandName, commandSuggestionState.highlightedCommandName]);
 
-  const handleInput = useCallback((nextMessage: string) => {
-    updateMessage({ nextMessage });
-  }, []);
+  const handleContentChange = useCallback(() => {
+    updateMessage({ nextMessage: getEditorMessage() });
+  }, [getEditorMessage]);
 
-  const handleCursorChange = useCallback((event: CursorChangeEvent) => {
-    updateCursorPosition({ cursorPosition: event.visualColumn });
-  }, []);
+  const handleCursorChange = useCallback(() => {
+    updateCursorPosition({ cursorPosition: getEditorCursorOffset() });
+  }, [getEditorCursorOffset]);
 
   const handleKeyDown = useCallback(
     (event: KeyEvent) => {
@@ -114,8 +118,8 @@ export function useMessageComposerController({
     commandSuggestions: getCommandSuggestions(commandSuggestionState),
     fileSuggestions: getFileSuggestions(fileSuggestionState),
     inputHandlers: {
+      onContentChange: handleContentChange,
       onCursorChange: handleCursorChange,
-      onInput: handleInput,
       onKeyDown: handleKeyDown,
     },
     message: composeScreen.composer.message,

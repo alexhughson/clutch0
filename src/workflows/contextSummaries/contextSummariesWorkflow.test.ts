@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialAppState } from "../../app/appInitialState";
+import {
+  AGENTS_CONTEXT_ITEM_ID,
+  createAutomaticContextItems,
+} from "../../lib/context/automaticContextItems";
 import { createSavedLlmResponseContextItem } from "../../lib/context/contextItems";
 import type {
   ContextItemSummarizationInput,
@@ -61,6 +65,7 @@ test("context summaries use one worker handle per item and update the item", asy
     initialState: {
       workspace: {
         ...createInitialAppState().workspace,
+        automaticContextItems: [],
         contextItems: [item],
         focusedContextItemId: item.id,
       },
@@ -114,6 +119,7 @@ test("stale summary workers do not overwrite removed items", async () => {
     initialState: {
       workspace: {
         ...createInitialAppState().workspace,
+        automaticContextItems: [],
         contextItems: [item],
         focusedContextItemId: item.id,
       },
@@ -139,6 +145,42 @@ test("stale summary workers do not overwrite removed items", async () => {
   await flushPromises();
 
   expect(harness.state.workspace.contextItems).toEqual([]);
+});
+
+test("context summaries update automatic context items", async () => {
+  const calls: ContextItemSummarizationInput[] = [];
+  const harness = createHarness({
+    generateSummary: async (input) => {
+      calls.push(input);
+      return {
+        details: `Automatic summary for ${input.label}.`,
+        generatedAt: 2,
+        oneLine: `Summary: ${input.label}`,
+        sourceHash: input.sourceHash,
+      };
+    },
+    initialState: {
+      workspace: {
+        ...createInitialAppState().workspace,
+        automaticContextItems: createAutomaticContextItems(),
+        contextItems: [],
+      },
+    },
+  });
+
+  harness.contextSummaries.ensureWorkspaceSummaries();
+  await flushPromises();
+  await flushPromises();
+
+  expect(calls.map((input) => input.label)).toContain("AGENTS.md");
+  const agentsItem = harness.state.workspace.automaticContextItems.find(
+    (item) => item.id === AGENTS_CONTEXT_ITEM_ID,
+  );
+  expect(agentsItem?.getSummaryState().status).toBe("ready");
+  expect(agentsItem?.getSummaryView()).toMatchObject({
+    detail: "Automatic summary for AGENTS.md.",
+    title: "Summary: AGENTS.md",
+  });
 });
 
 function createDeferred<T>() {

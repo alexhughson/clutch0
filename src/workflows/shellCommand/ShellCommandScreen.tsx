@@ -1,6 +1,7 @@
 import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { ShellCommandTaskState } from "../../app/appTypes";
+import { isEnterKey } from "../../lib/keymap";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 import { useAppStore } from "../../store/appStore";
 
@@ -19,6 +20,9 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
 
   return (
     <box
+      title={`Shell command (${formatStatus(task.status)})`}
+      bottomTitle={getShellCommandHotkeys(task)}
+      bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{
         border: true,
@@ -30,25 +34,9 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
         width: "100%",
       }}
     >
-      <box
-        title="Command request"
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        <text>{task.prompt}</text>
-      </box>
-      <box
-        title={`Shell command (${formatStatus(task.status)})`}
-        bottomTitle={getShellCommandHotkeys(task)}
-        bottomTitleAlignment="right"
-        borderStyle="rounded"
-        style={{
-          border: true,
-          flexDirection: "column",
-          flexGrow: 1,
-          padding: 1,
-        }}
-      >
+      <text style={{ fg: "gray" }}>Request</text>
+      <text>{task.prompt}</text>
+      <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
         {task.status === "running" ? (
           <text>Asking the model to choose and run a shell command...</text>
         ) : null}
@@ -110,14 +98,14 @@ function handleShellCommandKey({
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
     return;
   }
 
   if (isEnterKey(event.name)) {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.clearResponseAndMessage();
+    actions.navigation.acceptAndClose();
   }
 }
 
@@ -129,12 +117,12 @@ function getShellCommandHotkeys(
   }
 
   if (task.status === "error") {
-    return "Enter clear · Esc return";
+    return "Enter clear · Esc edit prompt";
   }
 
   return task.savedContextItemId === undefined
-    ? "s save output to context · Enter clear · Esc return"
-    : "Enter clear · Esc return";
+    ? "s save output to context · Enter clear · Esc edit prompt"
+    : "Enter clear · Esc edit prompt";
 }
 
 function formatStatus(status: ShellCommandTaskState["status"]): string {
@@ -143,10 +131,4 @@ function formatStatus(status: ShellCommandTaskState["status"]): string {
   }
 
   return status;
-}
-
-function isEnterKey(keyName: string): boolean {
-  return (
-    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
-  );
 }

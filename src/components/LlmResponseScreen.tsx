@@ -4,6 +4,7 @@ import {
   HighlightedDiff,
   HighlightedMarkdown,
 } from "./SyntaxHighlightedContent";
+import { isEnterKey } from "../lib/keymap";
 import { applyPatchProposal } from "../lib/patch/patchEngine";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
 
@@ -22,9 +23,7 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
 
   return (
     <box
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         flexGrow: 1,
         gap: 1,
@@ -33,13 +32,10 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
         width: "100%",
       }}
     >
-      <box
-        title="Question"
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        <text>{request.question}</text>
-      </box>
+      <text
+        style={{ fg: "gray" }}
+      >{`Question · ${formatStatus(request.status)}`}</text>
+      <text>{request.question}</text>
       {request.patch === undefined ? <TextResponse request={request} /> : null}
       {request.patch === undefined ? null : <PatchReview request={request} />}
     </box>
@@ -49,35 +45,34 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
 function TextResponse({ request }: { request: LlmRequestState }) {
   return (
     <box
-      title={`Response (${formatStatus(request.status)})`}
-      bottomTitle={getTextResponseHotkeys(request)}
-      bottomTitleAlignment="right"
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         flexGrow: 1,
-        padding: 1,
+        gap: 1,
+        minHeight: 1,
+        width: "100%",
       }}
     >
-      {request.responseText.length > 0 ? (
-        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
+      <text style={{ fg: "gray" }}>Response</text>
+      <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
+        {request.responseText.length > 0 ? (
           <HighlightedMarkdown
             content={request.responseText}
             streaming={request.status === "loading"}
           />
-        </scrollbox>
-      ) : (
-        <text>
-          {request.status === "loading" ? "Waiting for model..." : ""}
-        </text>
-      )}
+        ) : (
+          <text>
+            {request.status === "loading" ? "Waiting for model..." : ""}
+          </text>
+        )}
+      </scrollbox>
       {request.status === "error" ? (
         <text style={{ fg: "red" }}>{request.errorMessage}</text>
       ) : null}
       {request.savedContextItemId === undefined ? null : (
         <text style={{ fg: "green" }}>Saved to context.</text>
       )}
+      <ResponseHotkeys hotkeys={getTextResponseHotkeys(request)} />
     </box>
   );
 }
@@ -90,17 +85,17 @@ function PatchReview({ request }: { request: LlmRequestState }) {
 
   return (
     <box
-      title={`Patch (${formatPatchStatus(patch.applyStatus)})`}
-      bottomTitle={getPatchReviewHotkeys(request)}
-      bottomTitleAlignment="right"
-      borderStyle="rounded"
       style={{
-        border: true,
         flexDirection: "column",
         flexGrow: 1,
-        padding: 1,
+        gap: 1,
+        minHeight: 1,
+        width: "100%",
       }}
     >
+      <text
+        style={{ fg: "gray" }}
+      >{`Patch · ${formatPatchStatus(patch.applyStatus)}`}</text>
       <text>{patch.proposal.summary}</text>
       {patch.status === "valid" ? (
         <scrollbox
@@ -131,8 +126,17 @@ function PatchReview({ request }: { request: LlmRequestState }) {
       {request.savedContextItemId === undefined ? null : (
         <text style={{ fg: "green" }}>Saved to context.</text>
       )}
+      <ResponseHotkeys hotkeys={getPatchReviewHotkeys(request)} />
     </box>
   );
+}
+
+function ResponseHotkeys({ hotkeys }: { hotkeys: string | undefined }) {
+  if (hotkeys === undefined) {
+    return null;
+  }
+
+  return <text style={{ fg: "gray" }}>{hotkeys}</text>;
 }
 
 function handleResponseKey({
@@ -185,14 +189,14 @@ function handleTextResponseKey({
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
     return;
   }
 
   if (isEnterKey(event.name)) {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.clearResponseAndMessage();
+    actions.navigation.acceptAndClose();
   }
 }
 
@@ -214,7 +218,10 @@ function handlePatchReviewKey({
     return;
   }
 
-  if (patch.status === "valid" && event.name === "a") {
+  if (
+    patch.status === "valid" &&
+    (event.name === "a" || isEnterKey(event.name))
+  ) {
     event.preventDefault();
     event.stopPropagation();
     void applyPatch(request, actions.response);
@@ -235,14 +242,14 @@ function handlePatchReviewKey({
   if (event.name === "e") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
     return;
   }
 
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.rejectResponse();
+    actions.navigation.rejectToEdit();
   }
 }
 
@@ -254,12 +261,12 @@ function getTextResponseHotkeys(request: LlmRequestState): string | undefined {
   }
 
   if (request.status === "error") {
-    return "Enter clear · Esc return";
+    return "Enter clear · Esc edit prompt";
   }
 
   return request.savedContextItemId === undefined
-    ? "s save to context · Enter clear · Esc return"
-    : "Enter clear · Esc return";
+    ? "s save to context · Enter clear · Esc edit prompt"
+    : "Enter clear · Esc edit prompt";
 }
 
 function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
@@ -274,14 +281,16 @@ function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
   }
 
   if (patch.status !== "valid") {
-    return "e edit message · Esc reject";
+    return "e/Esc edit message";
   }
 
   return [
-    patch.applyStatus === "apply-error" ? "a retry apply" : "a apply",
+    patch.applyStatus === "apply-error"
+      ? "Enter/a retry apply"
+      : "Enter/a apply",
     request.savedContextItemId === undefined ? "s save diff to context" : null,
     "e edit message",
-    "Esc reject",
+    "Esc edit message",
   ]
     .filter((item): item is string => item !== null)
     .join(" · ");
@@ -340,10 +349,4 @@ async function applyPatch(
       requestId: request.id,
     });
   }
-}
-
-function isEnterKey(keyName: string): boolean {
-  return (
-    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
-  );
 }

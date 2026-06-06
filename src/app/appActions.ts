@@ -7,8 +7,10 @@ import { createContextItemsActions } from "../workflows/contextItems/contextItem
 import { createContextSummariesActions } from "../workflows/contextSummaries/contextSummariesWorkflow";
 import { createCreateFileActions } from "../workflows/createFile/createFileWorkflow";
 import { createFindFilesActions } from "../workflows/findFiles/findFilesWorkflow";
+import { createMcpActions } from "../workflows/mcp/mcpWorkflow";
 import { createNavigationActions } from "../workflows/navigation/navigationWorkflow";
 import { createResponseActions } from "../workflows/response/responseWorkflow";
+import { createSayActions } from "../workflows/say/sayWorkflow";
 import { createShellCommandActions } from "../workflows/shellCommand/shellCommandWorkflow";
 import { createShowContextActions } from "../workflows/showContext/showContextWorkflow";
 
@@ -37,8 +39,10 @@ export function createAppActions({
     contextItems: createContextItemsActions({ set }),
     createFile: createCreateFileActions({ set }),
     findFiles: createFindFilesActions({ set }),
+    mcp: createMcpActions({ set }),
     navigation: createNavigationActions({ set }),
     response: createResponseActions({ set }),
+    say: createSayActions({ set }),
     shellCommand: createShellCommandActions({ get, set }),
     showContext: createShowContextActions({ get, set }),
   };

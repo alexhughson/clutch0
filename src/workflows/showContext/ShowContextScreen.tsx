@@ -1,6 +1,7 @@
 import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { ShowContextTaskState } from "../../app/appTypes";
+import { isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 
 type ShowContextScreenProps = {
@@ -18,6 +19,11 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
 
   return (
     <box
+      title={`Rendered LLM context (${task.status})`}
+      bottomTitle={
+        task.status === "loading" ? undefined : "Enter clear · Esc edit prompt"
+      }
+      bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{
         border: true,
@@ -29,27 +35,11 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
         width: "100%",
       }}
     >
-      <box
-        title="Context preview request"
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        <text>
-          {task.question.length === 0 ? "(no question)" : task.question}
-        </text>
-      </box>
-      <box
-        title={`Rendered LLM context (${task.status})`}
-        bottomTitle={task.status === "loading" ? undefined : "Esc return"}
-        bottomTitleAlignment="right"
-        borderStyle="rounded"
-        style={{
-          border: true,
-          flexDirection: "column",
-          flexGrow: 1,
-          padding: 1,
-        }}
-      >
+      <text style={{ fg: "gray" }}>Request</text>
+      <text>
+        {task.question.length === 0 ? "(no question)" : task.question}
+      </text>
+      <box style={{ flexDirection: "column", flexGrow: 1 }}>
         {task.status === "loading" ? <text>Building context...</text> : null}
         {task.status === "error" ? (
           <text style={{ fg: "red" }}>{task.errorMessage}</text>
@@ -80,6 +70,13 @@ function handleShowContextKey({
   if (event.name === "escape") {
     event.preventDefault();
     event.stopPropagation();
-    actions.navigation.showComposer();
+    actions.navigation.rejectToEdit();
+    return;
+  }
+
+  if (isEnterKey(event.name)) {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.navigation.acceptAndClose();
   }
 }

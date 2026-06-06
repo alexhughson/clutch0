@@ -7,16 +7,22 @@ import { loadFileList } from "./lib/fileListLoader";
 import { isClutchConfigured } from "./lib/config/clutchConfig";
 import { useAppStore } from "./store/appStore";
 import { loadAgentAskSkillSlashCommands } from "./workflows/agentAsk/agentAskResources";
-import { setAgentAskSkillSlashCommands } from "./workflows/llmTools/toolRegistry";
+import { loadMcpWorkflowResources } from "./workflows/mcp/mcpWorkflowTool";
+import {
+  setAgentAskSkillSlashCommands,
+  setMcpWorkflowResources,
+} from "./workflows/llmTools/toolRegistry";
 
 const agentAskSkillSlashCommands = await loadAgentAskSkillSlashCommands();
 setAgentAskSkillSlashCommands(agentAskSkillSlashCommands);
+const mcpWorkflowResources = await loadMcpWorkflowResources();
+setMcpWorkflowResources(mcpWorkflowResources);
 const filePaths = await loadFileList();
 if (!isClutchConfigured()) {
   useAppStore.getState().actions.config.openSetup();
 }
 const renderer = await createCliRenderer({
-  exitOnCtrlC: true,
+  exitOnCtrlC: false,
 });
 
 createRoot(renderer).render(<App filePaths={filePaths} />);

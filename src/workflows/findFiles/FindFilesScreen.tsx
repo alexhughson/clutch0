@@ -7,7 +7,7 @@ import {
   getFileContextItemId,
   hasContextItem,
 } from "../../lib/context/contextItems";
-import { getVerticalNavigationDirection } from "../../lib/keymap";
+import { getVerticalNavigationDirection, isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import { runPiFileSearchAgent } from "./piFileSearchAgent";
 
@@ -70,7 +70,7 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
     if (event.name === "escape") {
       event.preventDefault();
       event.stopPropagation();
-      actions.navigation.showComposer();
+      actions.navigation.rejectToEdit();
       return;
     }
 
@@ -120,18 +120,13 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
         width: "100%",
       }}
     >
-      <box
-        title="Search goal"
-        borderStyle="rounded"
-        style={{ border: true, flexDirection: "column", padding: 1 }}
-      >
-        <text>{screen.goal}</text>
-        {screen.hints.length === 0 ? null : (
-          <text
-            style={{ fg: "gray" }}
-          >{`Hints: ${screen.hints.join(", ")}`}</text>
-        )}
-      </box>
+      <text style={{ fg: "gray" }}>Search goal</text>
+      <text>{screen.goal}</text>
+      {screen.hints.length === 0 ? null : (
+        <text
+          style={{ fg: "gray" }}
+        >{`Hints: ${screen.hints.join(", ")}`}</text>
+      )}
       {screen.status === "searching" ? <SearchingView screen={screen} /> : null}
       {screen.status === "error" ? (
         <ErrorView errorMessage={screen.errorMessage ?? "Unknown error"} />
@@ -143,16 +138,8 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
 
 function SearchingView({ screen }: { screen: FindFilesScreenState }) {
   return (
-    <box
-      title="Searching"
-      borderStyle="rounded"
-      style={{
-        border: true,
-        flexDirection: "column",
-        flexGrow: 1,
-        padding: 1,
-      }}
-    >
+    <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
+      <text style={{ fg: "gray" }}>Searching</text>
       <text>Running a read-only pi agent to find relevant files...</text>
       <AgentOutputLog
         blocks={screen.agentOutput}
@@ -165,16 +152,8 @@ function SearchingView({ screen }: { screen: FindFilesScreenState }) {
 
 function ErrorView({ errorMessage }: { errorMessage: string }) {
   return (
-    <box
-      title="Search failed"
-      borderStyle="rounded"
-      style={{
-        border: true,
-        flexDirection: "column",
-        flexGrow: 1,
-        padding: 1,
-      }}
-    >
+    <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
+      <text style={{ fg: "gray" }}>Search failed</text>
       <text style={{ fg: "red" }}>{errorMessage}</text>
     </box>
   );
@@ -192,32 +171,16 @@ function ResultsView({ screen }: { screen: FindFilesScreenState }) {
 
   if (screen.candidates.length === 0) {
     return (
-      <box
-        title="Results"
-        borderStyle="rounded"
-        style={{
-          border: true,
-          flexDirection: "column",
-          flexGrow: 1,
-          padding: 1,
-        }}
-      >
+      <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
+        <text style={{ fg: "gray" }}>Results</text>
         <text>No relevant files were found.</text>
       </box>
     );
   }
 
   return (
-    <box
-      title="Results"
-      borderStyle="rounded"
-      style={{
-        border: true,
-        flexDirection: "column",
-        flexGrow: 1,
-        padding: 1,
-      }}
-    >
+    <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
+      <text style={{ fg: "gray" }}>Results</text>
       <scrollbox
         ref={scrollBoxRef}
         style={{ flexGrow: 1, height: "100%", width: "100%" }}
@@ -261,15 +224,9 @@ function getBottomTitle(screen: FindFilesScreenState): string | undefined {
     return "Esc back";
   }
 
-  return "Enter add · a add all · ↑/↓/Ctrl+n/Ctrl+p move · Esc done";
+  return "Enter add · a add all · ↑/↓/Ctrl+n/Ctrl+p move · Esc edit prompt";
 }
 
 function getCandidateRowId(index: number): string {
   return `find-files-candidate-${index}`;
-}
-
-function isEnterKey(keyName: string): boolean {
-  return (
-    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
-  );
 }

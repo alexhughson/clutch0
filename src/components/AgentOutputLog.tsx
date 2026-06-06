@@ -10,13 +10,17 @@ type AgentOutputLogProps = {
 export function AgentOutputLog({
   blocks,
   emptyMessage = "Waiting for agent output...",
-  height = 24,
+  height,
 }: AgentOutputLogProps) {
   return (
     <scrollbox
       stickyScroll
       stickyStart="bottom"
-      style={{ height, width: "100%" }}
+      style={{
+        flexGrow: height === undefined ? 1 : undefined,
+        height: height ?? "100%",
+        width: "100%",
+      }}
     >
       {blocks.length === 0 ? (
         <text style={{ fg: "gray" }}>{emptyMessage}</text>

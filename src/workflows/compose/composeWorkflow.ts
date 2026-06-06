@@ -1,4 +1,4 @@
-import { ContextDeck } from "../../app/contextDeck";
+import { ContextDeck, getNextContextItemFocusId } from "../../app/contextDeck";
 import type {
   AppActions,
   AppState,
@@ -10,6 +10,10 @@ import {
   getFileContextItemId,
   hasContextItem,
 } from "../../lib/context/contextItems";
+import {
+  getAutomaticFileContextItems,
+  getVisibleContextItems,
+} from "../../lib/context/automaticContextItems";
 import type { FilePath } from "../../types";
 
 type SetAppState = (
@@ -33,18 +37,9 @@ export function createComposeActions({
       set((state) =>
         acceptFileSelection(state, { cursorPosition, filePath, message }),
       ),
-    focusNextContextItem: () =>
-      set((state) => ({
-        workspace: ContextDeck.fromComposeScreen(state.workspace)
-          .focus("next")
-          .applyTo(state.workspace),
-      })),
+    focusNextContextItem: () => set((state) => focusContextItem(state, "next")),
     focusPreviousContextItem: () =>
-      set((state) => ({
-        workspace: ContextDeck.fromComposeScreen(state.workspace)
-          .focus("previous")
-          .applyTo(state.workspace),
-      })),
+      set((state) => focusContextItem(state, "previous")),
     removeContextItem: ({ itemId }) =>
       set((state) => ({
         workspace: ContextDeck.fromComposeScreen(state.workspace)
@@ -70,6 +65,32 @@ export function createComposeActions({
       })),
     startLlmRequest: ({ question, replacement }) =>
       startLlmRequest({ get, question, replacement, set }),
+  };
+}
+
+function focusContextItem(
+  state: AppState,
+  direction: "next" | "previous",
+): Partial<AppState> | AppState {
+  const focusedContextItemId = getNextContextItemFocusId({
+    contextItems: getVisibleContextItems(
+      state.workspace.contextItems,
+      state.workspace.automaticContextItems,
+    ),
+    direction,
+    focusedContextItemId: state.workspace.focusedContextItemId,
+  });
+
+  return {
+    activeTask:
+      focusedContextItemId !== null &&
+      state.activeTask?.kind === "context-item-viewer"
+        ? { ...state.activeTask, itemId: focusedContextItemId }
+        : state.activeTask,
+    workspace: {
+      ...state.workspace,
+      focusedContextItemId,
+    },
   };
 }
 
@@ -116,9 +137,13 @@ function startLlmRequest({
 }): number | null {
   const state = get();
   const requestId = state.nextLlmRequestId;
-  const contextItems = state.workspace.contextItems.filter(
-    (item) => item.id !== replacement?.contextItemId,
-  );
+  const contextItems = [
+    ...getAutomaticFileContextItems({
+      automaticContextItems: state.workspace.automaticContextItems,
+      contextItems: state.workspace.contextItems,
+    }),
+    ...state.workspace.contextItems,
+  ].filter((item) => item.id !== replacement?.contextItemId);
   const focusedContextItemId = contextItems.some(
     (item) => item.id === state.workspace.focusedContextItemId,
   )

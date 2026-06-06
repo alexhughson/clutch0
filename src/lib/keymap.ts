@@ -27,6 +27,12 @@ export function getVerticalNavigationDirection(
   return getKeyAction(event, verticalNavigationKeyBindings);
 }
 
+export function isEnterKey(keyName: string): boolean {
+  return (
+    keyName === "return" || keyName === "kpenter" || keyName === "linefeed"
+  );
+}
+
 export function getKeyAction<Action extends string>(
   event: KeyEvent,
   bindings: readonly KeyBinding<Action>[],
