@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText did not match the current file content.",
+      "path": "src/customerNote.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Return \"No note\" instead of \"None\" when note is null in customerNote.ts",
+    "edits": [
+      {
+        "path": "src/customerNote.ts",
+        "oldText": "if (note === null) {\n    return \"None\";\n}",
+        "newText": "if (note === null) {\n    return \"No note\";\n}"
+      }
+    ]
+  },
+  "status": "invalid"
+}

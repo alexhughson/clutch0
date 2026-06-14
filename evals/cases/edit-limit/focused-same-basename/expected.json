@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customer/settings.ts"],
+    "allowedPaths": ["src/customer/settings.ts"],
+    "forbiddenPaths": ["src/admin/settings.ts"],
+    "diffIncludes": ["+  retries: 3,"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customer/settings.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused src/customer/settings.ts file, setting retries to 3. src/admin/settings.ts must remain unchanged."
+  }
+}

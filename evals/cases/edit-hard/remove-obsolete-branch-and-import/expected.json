@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/providers.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should remove the legacy union member, remove the normalizeLegacy import, and remove the legacy branch while preserving beta and modern behavior."
+  }
+}

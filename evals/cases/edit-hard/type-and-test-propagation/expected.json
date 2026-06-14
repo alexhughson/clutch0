@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/discount.ts" }, { "path": "src/discount.test.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should add fixed to the DiscountKind union, handle it in describeDiscount, and add a matching test expectation."
+  }
+}

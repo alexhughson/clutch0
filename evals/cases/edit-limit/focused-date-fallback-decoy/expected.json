@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerDate.ts"],
+    "allowedPaths": ["src/customerDate.ts"],
+    "forbiddenPaths": ["src/adminDate.ts"],
+    "diffIncludes": ["+    return \"No date\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerDate.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerDate.ts file so missing dates render as \"No date\". adminDate.ts must remain unchanged."
+  }
+}

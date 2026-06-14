@@ -1,0 +1,24 @@
+Index: src/customerTitle.ts
+===================================================================
+--- src/customerTitle.ts
++++ src/customerTitle.ts
+@@ -1,6 +1,6 @@
+ export function displayTitle(title: string) {
+   if (title.trim().length === 0) {
+-    return "Missing title";
++    return "Untitled";
+   }
+   return title.trim();
+ }
+Index: src/adminTitle.ts
+===================================================================
+--- src/adminTitle.ts
++++ src/adminTitle.ts
+@@ -1,6 +1,6 @@
+ export function displayTitle(title: string) {
+   if (title.trim().length === 0) {
+-    return "Missing title";
++    return "Untitled";
+   }
+   return title.trim();
+ }

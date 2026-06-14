@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Create a shared src/isBillableInvoice.ts helper and update both selected invoice modules to use it. The helper should preserve the existing paid-or-sent logic.",
+  "workspace": {
+    "files": {
+      "src/invoiceBadge.ts": "export function invoiceBadge(status: \"draft\" | \"sent\" | \"paid\") {\n  const billable = status === \"sent\" || status === \"paid\";\n  return billable ? \"Billable\" : \"Draft\";\n}\n",
+      "src/invoiceActions.ts": "export function invoiceActions(status: \"draft\" | \"sent\" | \"paid\") {\n  const billable = status === \"sent\" || status === \"paid\";\n  return billable ? [\"remind\", \"refund\"] : [\"edit\"];\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/invoiceBadge.ts", "focused": true },
+    { "kind": "file", "path": "src/invoiceActions.ts" }
+  ]
+}

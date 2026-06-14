@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/errors.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update payment timeout error message",
+    "edits": [
+      {
+        "path": "src/errors.ts",
+        "oldText": "    return \"Request timed out\";",
+        "newText": "    return \"Payment timed out\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: AGENTS.md\n===================================================================\n--- AGENTS.md\n+++ AGENTS.md\n@@ -1,5 +1,7 @@\n # Clutch\n \n+pi-ai is the LLM model adapter layer.\n+\n OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.\n \n ## Core map",
+  "proposal": {
+    "summary": "Add clarification that pi-ai is the LLM model adapter layer",
+    "edits": [
+      {
+        "path": "AGENTS.md",
+        "oldText": "# Clutch",
+        "newText": "# Clutch\n\npi-ai is the LLM model adapter layer."
+      }
+    ]
+  },
+  "status": "valid"
+}

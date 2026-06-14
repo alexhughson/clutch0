@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerDisplayName.ts\n===================================================================\n--- src/customerDisplayName.ts\n+++ src/customerDisplayName.ts\n@@ -1,6 +1,6 @@\n export function displayName(name: string) {\n   if (name.trim().length === 0) {\n-    return \"Unknown\";\n+    return \"Anonymous\";\n   }\n   return name.trim();\n }\nIndex: src/adminDisplayName.ts\n===================================================================\n--- src/adminDisplayName.ts\n+++ src/adminDisplayName.ts\n@@ -1,6 +1,6 @@\n export function displayName(name: string) {\n   if (name.trim().length === 0) {\n-    return \"Unknown\";\n+    return \"Anonymous\";\n   }\n   return name.trim();\n }",
+  "proposal": {
+    "summary": "Replace placeholder \"Unknown\" with \"Anonymous\" for blank display names",
+    "edits": [
+      {
+        "path": "src/customerDisplayName.ts",
+        "oldText": "    return \"Unknown\";",
+        "newText": "    return \"Anonymous\";"
+      },
+      {
+        "path": "src/adminDisplayName.ts",
+        "oldText": "    return \"Unknown\";",
+        "newText": "    return \"Anonymous\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

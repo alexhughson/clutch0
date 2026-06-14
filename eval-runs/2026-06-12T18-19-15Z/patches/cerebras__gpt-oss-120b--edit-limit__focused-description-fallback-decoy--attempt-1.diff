@@ -1,0 +1,24 @@
+Index: src/customerDescription.ts
+===================================================================
+--- src/customerDescription.ts
++++ src/customerDescription.ts
+@@ -1,6 +1,6 @@
+ export function descriptionLabel(description: string) {
+   if (description.trim().length === 0) {
+-    return "Missing";
++    return "No description";
+   }
+   return description.trim();
+ }
+Index: src/adminDescription.ts
+===================================================================
+--- src/adminDescription.ts
++++ src/adminDescription.ts
+@@ -1,6 +1,6 @@
+ export function descriptionLabel(description: string) {
+   if (description.trim().length === 0) {
+-    return "Missing";
++    return "No description";
+   }
+   return description.trim();
+ }

@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/nav.ts\n===================================================================\n--- src/nav.ts\n+++ src/nav.ts\n@@ -1,6 +1,7 @@\n export const navItems = [\n   { label: \"Home\", href: \"/\" },\n   { label: \"Account\", href: \"/account\" },\n+  { label: \"Billing\", href: \"/billing\" },\n   { label: \"Security\", href: \"/security\" },\n   { label: \"Support\", href: \"/support\" },\n ];\nIndex: src/nav.test.ts\n===================================================================\n--- src/nav.test.ts\n+++ src/nav.test.ts\n@@ -4,6 +4,7 @@\n   expect(navItems.map((item) => item.label)).toEqual([\n     \"Home\",\n     \"Account\",\n+    \"Billing\",\n     \"Security\",\n     \"Support\",\n   ]);",
+  "proposal": {
+    "summary": "Add Billing to navigation between Account and Security, and update the nav order test accordingly.",
+    "edits": [
+      {
+        "path": "src/nav.ts",
+        "oldText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];\n",
+        "newText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Billing\", href: \"/billing\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];\n"
+      },
+      {
+        "path": "src/nav.test.ts",
+        "oldText": "import { navItems } from \"./nav\";\n\ntest(\"nav order\", () => {\n  expect(navItems.map((item) => item.label)).toEqual([\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]);\n});\n",
+        "newText": "import { navItems } from \"./nav\";\n\ntest(\"nav order\", () => {\n  expect(navItems.map((item) => item.label)).toEqual([\n    \"Home\",\n    \"Account\",\n    \"Billing\",\n    \"Security\",\n    \"Support\",\n  ]);\n});\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

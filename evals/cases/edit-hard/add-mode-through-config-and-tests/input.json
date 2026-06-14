@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Add a scheduled delivery mode. It should be enabled by default and label as \"Scheduled delivery\". Update tests.",
+  "workspace": {
+    "files": {
+      "src/deliveryModes.ts": "export type DeliveryMode = \"pickup\" | \"shipping\";\n\nexport const enabledDeliveryModes: DeliveryMode[] = [\"pickup\", \"shipping\"];\n\nexport function deliveryModeLabel(mode: DeliveryMode) {\n  if (mode === \"pickup\") {\n    return \"Pickup\";\n  }\n  return \"Shipping\";\n}\n",
+      "src/deliveryModes.test.ts": "import { deliveryModeLabel, enabledDeliveryModes } from \"./deliveryModes\";\n\ntest(\"default delivery modes\", () => {\n  expect(enabledDeliveryModes).toEqual([\"pickup\", \"shipping\"]);\n});\n\ntest(\"delivery labels\", () => {\n  expect(deliveryModeLabel(\"pickup\")).toBe(\"Pickup\");\n  expect(deliveryModeLabel(\"shipping\")).toBe(\"Shipping\");\n});\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/deliveryModes.ts", "focused": true },
+    { "kind": "file", "path": "src/deliveryModes.test.ts" }
+  ]
+}

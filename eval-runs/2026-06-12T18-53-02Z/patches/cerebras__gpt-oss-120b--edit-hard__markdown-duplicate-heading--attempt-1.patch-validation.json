@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: docs/delivery.md\n===================================================================\n--- docs/delivery.md\n+++ docs/delivery.md\n@@ -4,7 +4,7 @@\n \n ### Retry policy\n \n-- Retry delay: 5 minutes\n+- Retry delay: 2 minutes\n - Retry attempts: 3\n - Dead letter queue: enabled",
+  "proposal": {
+    "summary": "Update Webhook Delivery retry delay to 2 minutes",
+    "edits": [
+      {
+        "path": "docs/delivery.md",
+        "oldText": "## Webhook Delivery\n\n### Retry policy\n\n- Retry delay: 5 minutes\n- Retry attempts: 3\n- Dead letter queue: enabled",
+        "newText": "## Webhook Delivery\n\n### Retry policy\n\n- Retry delay: 2 minutes\n- Retry attempts: 3\n- Dead letter queue: enabled"
+      }
+    ]
+  },
+  "status": "valid"
+}

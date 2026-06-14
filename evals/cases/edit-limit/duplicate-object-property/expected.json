@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/copy.ts"],
+    "allowedPaths": ["src/copy.ts"],
+    "diffIncludes": ["+  emptyTitle: \"No items in cart\","]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/copy.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change checkoutCopy.emptyTitle only. profileCopy.emptyTitle must remain \"Nothing here\"."
+  }
+}

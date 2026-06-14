@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Use \"No email\" when the email is blank.",
+  "workspace": {
+    "files": {
+      "src/customerEmail.ts": "export function emailLabel(email: string) {\n  if (email.trim().length === 0) {\n    return \"Missing\";\n  }\n  return email.trim();\n}\n",
+      "src/adminEmail.ts": "export function emailLabel(email: string) {\n  if (email.trim().length === 0) {\n    return \"Missing\";\n  }\n  return email.trim();\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerEmail.ts", "focused": true },
+    { "kind": "file", "path": "src/adminEmail.ts" }
+  ]
+}

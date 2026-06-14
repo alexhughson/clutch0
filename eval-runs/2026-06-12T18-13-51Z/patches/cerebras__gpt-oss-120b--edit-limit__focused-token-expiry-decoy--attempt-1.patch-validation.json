@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerToken.ts\n===================================================================\n--- src/customerToken.ts\n+++ src/customerToken.ts\n@@ -1,6 +1,6 @@\n export function tokenState(expired: boolean) {\n   if (expired) {\n-    return \"active\";\n+    return \"inactive\";\n   }\n   return \"active\";\n }\nIndex: src/adminToken.ts\n===================================================================\n--- src/adminToken.ts\n+++ src/adminToken.ts\n@@ -1,6 +1,6 @@\n export function tokenState(expired: boolean) {\n   if (expired) {\n-    return \"active\";\n+    return \"inactive\";\n   }\n   return \"active\";\n }",
+  "proposal": {
+    "summary": "Treat expired tokens as inactive by returning \"inactive\" when expired flag is true",
+    "edits": [
+      {
+        "path": "src/customerToken.ts",
+        "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}",
+        "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}"
+      },
+      {
+        "path": "src/adminToken.ts",
+        "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}",
+        "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

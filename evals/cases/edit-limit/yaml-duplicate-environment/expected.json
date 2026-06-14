@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["deploy/limits.yml"],
+    "allowedPaths": ["deploy/limits.yml"],
+    "diffIncludes": ["+    timeout: 45"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "deploy/limits.yml" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change production.worker.timeout to 45 only. staging.worker.timeout and both web timeout values must remain 30."
+  }
+}

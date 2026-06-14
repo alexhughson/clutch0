@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/mobileTheme.ts\n===================================================================\n--- src/mobileTheme.ts\n+++ src/mobileTheme.ts\n@@ -1,6 +1,6 @@\n export const theme = {\n   button: {\n-    radius: 6,\n+    radius: 10,\n     padding: 12,\n   },\n };",
+  "proposal": {
+    "summary": "Increase button radius from 6 to 10 in mobileTheme.ts",
+    "edits": [
+      {
+        "path": "src/mobileTheme.ts",
+        "oldText": "button: {\n    radius: 6,\n    padding: 12,\n  },",
+        "newText": "button: {\n    radius: 10,\n    padding: 12,\n  },"
+      }
+    ]
+  },
+  "status": "valid"
+}

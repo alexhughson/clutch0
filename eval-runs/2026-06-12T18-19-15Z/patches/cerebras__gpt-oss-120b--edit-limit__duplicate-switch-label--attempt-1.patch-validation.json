@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/statusLabels.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update paymentStatusLabel pending label to 'Awaiting payment'",
+    "edits": [
+      {
+        "path": "src/statusLabels.ts",
+        "oldText": "return \"Pending\";",
+        "newText": "return \"Awaiting payment\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

@@ -3,6 +3,7 @@ import {
   MAX_TOTAL_FILE_CONTEXT_CHARACTERS,
   getContextItemById,
 } from "../context/contextItems";
+import { getAutomaticFileContextItems } from "../context/automaticContextItems";
 import { loadFileList } from "../fileListLoader";
 import { readGitDiff } from "../git/gitDiff";
 import type { ContextItem, LlmFileContext } from "../../types";
@@ -27,6 +28,40 @@ export type BuiltLlmContext = {
   context: Context;
   files: LlmFileContext[];
 };
+
+export type AssembledLlmContextInput = {
+  contextItems: ContextItem[];
+  focusedContextItemId: string | null;
+};
+
+export function assembleLlmContextInput({
+  automaticContextItems,
+  contextItems,
+  excludedContextItemId,
+  focusedContextItemId,
+}: {
+  automaticContextItems: readonly ContextItem[];
+  contextItems: readonly ContextItem[];
+  excludedContextItemId?: string;
+  focusedContextItemId: string | null;
+}): AssembledLlmContextInput {
+  const assembledContextItems = [
+    ...getAutomaticFileContextItems({
+      automaticContextItems,
+      contextItems,
+    }),
+    ...contextItems,
+  ].filter((item) => item.id !== excludedContextItemId);
+
+  return {
+    contextItems: assembledContextItems,
+    focusedContextItemId: assembledContextItems.some(
+      (item) => item.id === focusedContextItemId,
+    )
+      ? focusedContextItemId
+      : null,
+  };
+}
 
 export async function buildLlmContext({
   contextItems,

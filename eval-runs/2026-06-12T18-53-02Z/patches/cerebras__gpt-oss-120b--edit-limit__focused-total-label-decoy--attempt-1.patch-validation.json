@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerTotal.ts\n===================================================================\n--- src/customerTotal.ts\n+++ src/customerTotal.ts\n@@ -1,3 +1,3 @@\n export function totalLabel(value: number) {\n-  return String(value);\n+  return `Total: ${value}`;\n }",
+  "proposal": {
+    "summary": "Prefix total labels with \"Total: \" in customerTotal.ts",
+    "edits": [
+      {
+        "path": "src/customerTotal.ts",
+        "oldText": "  return String(value);",
+        "newText": "  return `Total: ${value}`;"
+      }
+    ]
+  },
+  "status": "valid"
+}

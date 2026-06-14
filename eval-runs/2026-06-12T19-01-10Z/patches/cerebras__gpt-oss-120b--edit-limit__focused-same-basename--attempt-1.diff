@@ -1,0 +1,10 @@
+Index: src/customer/settings.ts
+===================================================================
+--- src/customer/settings.ts
++++ src/customer/settings.ts
+@@ -1,4 +1,4 @@
+ export const defaults = {
+-  retries: 2,
++  retries: 3,
+   timeoutMs: 5000,
+ };

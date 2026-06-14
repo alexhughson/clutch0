@@ -1,0 +1,9 @@
+{
+  "question": "What would you change in this parser before we implement anything?",
+  "workspace": {
+    "files": {
+      "src/parser.ts": "export function parseId(value: string) {\n  return Number.parseInt(value, 10);\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/parser.ts", "focused": true }]
+}

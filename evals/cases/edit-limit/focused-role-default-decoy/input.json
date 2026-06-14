@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Default missing roles to \"guest\".",
+  "workspace": {
+    "files": {
+      "src/customerRole.ts": "export function normalizeRole(role: string | null) {\n  if (role === null) {\n    return \"member\";\n  }\n  return role;\n}\n",
+      "src/adminRole.ts": "export function normalizeRole(role: string | null) {\n  if (role === null) {\n    return \"member\";\n  }\n  return role;\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerRole.ts", "focused": true },
+    { "kind": "file", "path": "src/adminRole.ts" }
+  ]
+}

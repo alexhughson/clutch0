@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["docs/runtime.md"],
+    "allowedPaths": ["docs/runtime.md"],
+    "diffIncludes": ["+  - timeout: 45 seconds"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "docs/runtime.md" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only the nested timeout under Runtime Settings to 45 seconds. It must preserve indentation and leave the Quick Start timeout at 30 seconds."
+  }
+}

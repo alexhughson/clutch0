@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/messages.ts"],
+    "allowedPaths": ["src/messages.ts"],
+    "diffIncludes": ["+    return \"Webhook queued\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/messages.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only webhookMessage's queued branch to return \"Webhook queued\". emailMessage's queued branch must still return \"Queued\"."
+  }
+}

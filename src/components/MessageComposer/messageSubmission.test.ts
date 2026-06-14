@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { setAgentAskSkillSlashCommands } from "../../workflows/llmTools/toolRegistry";
 import { getSubmissionIntent } from "./messageSubmission";
 
 test("plain text submits an LLM request", () => {
@@ -32,6 +33,34 @@ test("slash commands route to domain intents", () => {
     kind: "agent-edit",
     prompt: "fix",
   });
+});
+
+test("agent skill slash commands route to structured skill intent", () => {
+  setAgentAskSkillSlashCommands([
+    {
+      allowedToolNames: [],
+      description: "Use project review instructions.",
+      name: "skill:project-review",
+      promptDirective: "",
+      taskKind: "agent-skill",
+      title: "Skill: project-review",
+    },
+  ]);
+
+  try {
+    expect(getSubmissionIntent("/skill:project-review auth routing")).toEqual({
+      kind: "agent-skill",
+      prompt: "auth routing",
+      skillName: "project-review",
+    });
+    expect(getSubmissionIntent("/skill:project-review")).toEqual({
+      kind: "agent-skill",
+      prompt: "",
+      skillName: "project-review",
+    });
+  } finally {
+    setAgentAskSkillSlashCommands([]);
+  }
 });
 
 test("tool slash commands keep their allowed tool rail", () => {

@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerBadge.ts\n===================================================================\n--- src/customerBadge.ts\n+++ src/customerBadge.ts\n@@ -1,6 +1,6 @@\n export function badgeText(status: \"active\" | \"paused\") {\n   if (status === \"paused\") {\n-    return \"Paused\";\n+    return \"On hold\";\n   }\n   return \"Active\";\n }\nIndex: src/adminBadge.ts\n===================================================================\n--- src/adminBadge.ts\n+++ src/adminBadge.ts\n@@ -1,6 +1,6 @@\n export function badgeText(status: \"active\" | \"paused\") {\n   if (status === \"paused\") {\n-    return \"Paused\";\n+    return \"On hold\";\n   }\n   return \"Active\";\n }",
+  "proposal": {
+    "summary": "Update paused badge text to display \"On hold\" in customer and admin badges.",
+    "edits": [
+      {
+        "path": "src/customerBadge.ts",
+        "oldText": "export function badgeText(status: \"active\" | \"paused\") {\n  if (status === \"paused\") {\n    return \"Paused\";\n  }\n  return \"Active\";\n}\n",
+        "newText": "export function badgeText(status: \"active\" | \"paused\") {\n  if (status === \"paused\") {\n    return \"On hold\";\n  }\n  return \"Active\";\n}\n"
+      },
+      {
+        "path": "src/adminBadge.ts",
+        "oldText": "export function badgeText(status: \"active\" | \"paused\") {\n  if (status === \"paused\") {\n    return \"Paused\";\n  }\n  return \"Active\";\n}\n",
+        "newText": "export function badgeText(status: \"active\" | \"paused\") {\n  if (status === \"paused\") {\n    return \"On hold\";\n  }\n  return \"Active\";\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

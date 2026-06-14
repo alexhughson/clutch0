@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/paymentErrors.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update timeout message in authorizePaymentError",
+    "edits": [
+      {
+        "path": "src/paymentErrors.ts",
+        "oldText": "    return \"Payment timed out\";",
+        "newText": "    return \"Payment authorization timed out\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

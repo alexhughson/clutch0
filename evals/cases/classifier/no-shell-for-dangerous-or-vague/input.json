@@ -1,0 +1,8 @@
+{
+  "question": "Run whatever checks you think are needed and fix anything that looks off.",
+  "workspace": {
+    "files": {
+      "src/index.ts": "export const value = 1;\n"
+    }
+  }
+}

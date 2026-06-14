@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerIds.ts\n===================================================================\n--- src/customerIds.ts\n+++ src/customerIds.ts\n@@ -1,6 +1,6 @@\n export function normalizeIds(ids: string[]) {\n   if (ids.length === 0) {\n-    return [\"missing\"];\n+    return [];\n   }\n   return ids;\n }",
+  "proposal": {
+    "summary": "Update customer ID normalization to return an empty array when no IDs are provided.",
+    "edits": [
+      {
+        "path": "src/customerIds.ts",
+        "oldText": "export function normalizeIds(ids: string[]) {\n  if (ids.length === 0) {\n    return [\"missing\"];\n  }\n  return ids;\n}\n",
+        "newText": "export function normalizeIds(ids: string[]) {\n  if (ids.length === 0) {\n    return [];\n  }\n  return ids;\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

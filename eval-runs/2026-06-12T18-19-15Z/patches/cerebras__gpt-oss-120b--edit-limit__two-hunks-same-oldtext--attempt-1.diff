@@ -1,0 +1,16 @@
+Index: src/spacing.ts
+===================================================================
+--- src/spacing.ts
++++ src/spacing.ts
+@@ -1,9 +1,9 @@
+ export const mobileSpacing = {
+-  compact: 8,
++  compact: 6,
+   spacious: 16,
+ };
+ 
+ export const desktopSpacing = {
+-  compact: 8,
++  compact: 10,
+   spacious: 24,
+ };

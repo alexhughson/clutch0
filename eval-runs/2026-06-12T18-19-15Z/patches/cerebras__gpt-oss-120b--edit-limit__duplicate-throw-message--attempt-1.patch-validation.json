@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/ids.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update parseInvoiceId error message to 'Missing invoice id'",
+    "edits": [
+      {
+        "path": "src/ids.ts",
+        "oldText": "    throw new Error(\"Missing id\");",
+        "newText": "    throw new Error(\"Missing invoice id\");"
+      }
+    ]
+  },
+  "status": "invalid"
+}

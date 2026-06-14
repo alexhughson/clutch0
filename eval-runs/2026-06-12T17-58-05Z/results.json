@@ -1,0 +1,2681 @@
+{
+  "errors": [],
+  "judge": "openai:gpt-5.4-mini",
+  "repeat": 1,
+  "results": [
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to change checkoutCopy.emptyTitle to \"No items in cart\". Keep profileCopy.emptyTitle unchanged. We have file copy.ts with the relevant lines.\n\nWe must call propose_patch with appropriate edit. Need to replace `emptyTitle: \"Nothing here\",` in checkoutCopy block. Ensure uniqueness.\n\nLet's find exact old text: In checkoutCopy, current line is `emptyTitle: \"Nothing here\",`. That's unique enough? It also appears in profileCopy block. Actually both have same line `emptyTitle: \"Nothing here\",`. So need more context to uniquely target checkoutCopy's line. Use surrounding lines.\n\nWe can include the block part:\n\n```\nexport const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"Nothing here\",\n  emptyBody: \"Add an item before checking out.\",\n};\n```\n\nReplace just that line.\n\nBut oldText must be exact substring. Could use the line with preceding spaces.\n\nIn file, indentation is two spaces? Actually the file shows two spaces before fields. So line is two spaces then `emptyTitle: \"Nothing here\",`. It appears twice (both checkoutCopy and profileCopy). To uniquely replace only the first occurrence, we can include preceding context like `title: \"Checkout\",\\n  emptyTitle: \"Nothing here\",`. That will be unique.\n\nThus oldText: `title: \"Checkout\",\\n  emptyTitle: \"Nothing here\",` (including newline). Replace with `title: \"Checkout\",\\n  emptyTitle: \"No items in cart\",`.\n\nMake sure to preserve indentation. Provide edit.\n\nLet's propose patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "3b75a7ffb",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\"",
+                  "edits": [
+                    {
+                      "path": "src/copy.ts",
+                      "oldText": "title: \"Checkout\",\n  emptyTitle: \"Nothing here\",",
+                      "newText": "title: \"Checkout\",\n  emptyTitle: \"No items in cart\","
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 681,
+              "output": 414,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 1095,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287085938,
+            "responseId": "chatcmpl-7570397f-d899-42e5-8e44-d6fdf62b88b3"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "3b75a7ffb",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\"",
+              "edits": [
+                {
+                  "path": "src/copy.ts",
+                  "oldText": "title: \"Checkout\",\n  emptyTitle: \"Nothing here\",",
+                  "newText": "title: \"Checkout\",\n  emptyTitle: \"No items in cart\","
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "3b75a7ffb",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\"",
+                "edits": [
+                  {
+                    "path": "src/copy.ts",
+                    "oldText": "title: \"Checkout\",\n  emptyTitle: \"Nothing here\",",
+                    "newText": "title: \"Checkout\",\n  emptyTitle: \"No items in cart\","
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/duplicate-object-property",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch validly changes only checkoutCopy.emptyTitle to \"No items in cart\" in src/copy.ts and does not alter profileCopy.emptyTitle.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/copy.ts\n===================================================================\n--- src/copy.ts\n+++ src/copy.ts\n@@ -1,6 +1,6 @@\n export const checkoutCopy = {\n   title: \"Checkout\",\n-  emptyTitle: \"Nothing here\",\n+  emptyTitle: \"No items in cart\",\n   emptyBody: \"Add an item before checking out.\",\n };",
+            "proposal": {
+              "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\"",
+              "edits": [
+                {
+                  "path": "src/copy.ts",
+                  "oldText": "title: \"Checkout\",\n  emptyTitle: \"Nothing here\",",
+                  "newText": "title: \"Checkout\",\n  emptyTitle: \"No items in cart\","
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__duplicate-object-property--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__duplicate-object-property--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/duplicate-object-property",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to change the timeout message in authorizePaymentError to \"Payment authorization timed out\". Leave capturePayment unchanged.\n\nWe have file src/paymentErrors.ts. The function authorizePaymentError returns \"Payment timed out\". Should change that string accordingly.\n\nWe need to propose a patch with exact oldText. Let's locate the line:\n\n```\nif (code === \"timeout\") {\n    return \"Payment timed out\";\n}\n```\n\nWe'll replace the return string. The oldText is `\"Payment timed out\"` string; but we need to replace the whole line perhaps.\n\nThe line is `return \"Payment timed out\";`. We'll replace with `return \"Payment authorization timed out\";`.\n\nThus patch.\n\nWe'll propose a patch with summary: Change timeout message in authorizePaymentError.\n\nProceed.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "b49e4afbe",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Change timeout message in authorizePaymentError to 'Payment authorization timed out'",
+                  "edits": [
+                    {
+                      "path": "src/paymentErrors.ts",
+                      "oldText": "return \"Payment timed out\";",
+                      "newText": "return \"Payment authorization timed out\";"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 185,
+              "output": 227,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 924,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287087925,
+            "responseId": "chatcmpl-840fc977-ecbe-41cc-8689-dbcd30ec8ecd"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "b49e4afbe",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Change timeout message in authorizePaymentError to 'Payment authorization timed out'",
+              "edits": [
+                {
+                  "path": "src/paymentErrors.ts",
+                  "oldText": "return \"Payment timed out\";",
+                  "newText": "return \"Payment authorization timed out\";"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "b49e4afbe",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Change timeout message in authorizePaymentError to 'Payment authorization timed out'",
+                "edits": [
+                  {
+                    "path": "src/paymentErrors.ts",
+                    "oldText": "return \"Payment timed out\";",
+                    "newText": "return \"Payment authorization timed out\";"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/duplicate-return-payment-timeout",
+          "failures": [
+            "patch proposal was invalid: [{\"editIndex\":0,\"message\":\"oldText matched 2 times; it must match exactly once.\",\"path\":\"src/paymentErrors.ts\"}]",
+            "expected a valid generated diff for diff assertions",
+            "judge score 2 was below 4: The proposed patch targets the right file and message, but it uses a non-unique oldText that matches two locations, violating the requirement to change only authorizePaymentError and leaving capturePayment unchanged."
+          ],
+          "judge": {
+            "passed": false,
+            "rationale": "The proposed patch targets the right file and message, but it uses a non-unique oldText that matches two locations, violating the requirement to change only authorizePaymentError and leaving capturePayment unchanged.",
+            "score": 2
+          },
+          "passed": false,
+          "patchValidation": {
+            "errors": [
+              {
+                "editIndex": 0,
+                "message": "oldText matched 2 times; it must match exactly once.",
+                "path": "src/paymentErrors.ts"
+              }
+            ],
+            "proposal": {
+              "summary": "Change timeout message in authorizePaymentError to 'Payment authorization timed out'",
+              "edits": [
+                {
+                  "path": "src/paymentErrors.ts",
+                  "oldText": "return \"Payment timed out\";",
+                  "newText": "return \"Payment authorization timed out\";"
+                }
+              ]
+            },
+            "status": "invalid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__duplicate-return-payment-timeout--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/duplicate-return-payment-timeout",
+      "passed": false,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "User wants to \"Show unknown statuses as 'Not available'.\" There is function renderStatus in both files that returns \"Unknown\" for unknown status. Need to change return value to \"Not available\". Update both files. Provide propose_patch with two edits.\n\nWe need exact oldText to replace. In each file oldText likely the block with return \"Unknown\". But need to include enough lines to uniquely identify. Could replace the line: return \"Unknown\"; with return \"Not available\";. Provide separate edits.\n\nMake summary: Change unknown status display to \"Not available\".\n\nLet's ensure the oldText exists exactly. In both files: line `return \"Unknown\";`. That should be unique.\n\nProvide patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "420cf42ff",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Change unknown status rendering to \"Not available\" in customerStatus.ts and adminStatus.ts",
+                  "edits": [
+                    {
+                      "path": "src/customerStatus.ts",
+                      "oldText": "return \"Unknown\";",
+                      "newText": "return \"Not available\";"
+                    },
+                    {
+                      "path": "src/adminStatus.ts",
+                      "oldText": "return \"Unknown\";",
+                      "newText": "return \"Not available\";"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 181,
+              "output": 239,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 932,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287089677,
+            "responseId": "chatcmpl-8e0f11a5-4bc7-4c83-a59d-f3293973787c"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "420cf42ff",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Change unknown status rendering to \"Not available\" in customerStatus.ts and adminStatus.ts",
+              "edits": [
+                {
+                  "path": "src/customerStatus.ts",
+                  "oldText": "return \"Unknown\";",
+                  "newText": "return \"Not available\";"
+                },
+                {
+                  "path": "src/adminStatus.ts",
+                  "oldText": "return \"Unknown\";",
+                  "newText": "return \"Not available\";"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "420cf42ff",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Change unknown status rendering to \"Not available\" in customerStatus.ts and adminStatus.ts",
+                "edits": [
+                  {
+                    "path": "src/customerStatus.ts",
+                    "oldText": "return \"Unknown\";",
+                    "newText": "return \"Not available\";"
+                  },
+                  {
+                    "path": "src/adminStatus.ts",
+                    "oldText": "return \"Unknown\";",
+                    "newText": "return \"Not available\";"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-file-implicit-same-function",
+          "failures": [
+            "patch included forbidden path src/adminStatus.ts",
+            "patch edited unexpected path(s) src/adminStatus.ts; allowed src/customerStatus.ts",
+            "judge score 1 was below 4: The patch is invalid for the rubric because it edits src/adminStatus.ts, which must remain unchanged. It should have modified only src/customerStatus.ts."
+          ],
+          "judge": {
+            "passed": false,
+            "rationale": "The patch is invalid for the rubric because it edits src/adminStatus.ts, which must remain unchanged. It should have modified only src/customerStatus.ts.",
+            "score": 1
+          },
+          "passed": false,
+          "patchValidation": {
+            "diffText": "Index: src/customerStatus.ts\n===================================================================\n--- src/customerStatus.ts\n+++ src/customerStatus.ts\n@@ -2,5 +2,5 @@\n   if (status === \"active\") {\n     return \"Active\";\n   }\n-  return \"Unknown\";\n+  return \"Not available\";\n }\nIndex: src/adminStatus.ts\n===================================================================\n--- src/adminStatus.ts\n+++ src/adminStatus.ts\n@@ -2,5 +2,5 @@\n   if (status === \"active\") {\n     return \"Active\";\n   }\n-  return \"Unknown\";\n+  return \"Not available\";\n }",
+            "proposal": {
+              "summary": "Change unknown status rendering to \"Not available\" in customerStatus.ts and adminStatus.ts",
+              "edits": [
+                {
+                  "path": "src/customerStatus.ts",
+                  "oldText": "return \"Unknown\";",
+                  "newText": "return \"Not available\";"
+                },
+                {
+                  "path": "src/adminStatus.ts",
+                  "oldText": "return \"Unknown\";",
+                  "newText": "return \"Not available\";"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-file-implicit-same-function--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-file-implicit-same-function--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-file-implicit-same-function",
+      "passed": false,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to update escalation contact to customers@example.com. There's a file docs/customer-runbook.md with Contact: support@example.com. Should change that line.\n\nWe need to produce a propose_patch with summary and edits. Only edit the specific file.\n\nWe must use exact oldText. Include enough surrounding lines to uniquely identify. The file content is:\n\n# Customer Runbook\n\n## Escalation\n\nContact: support@example.com\nWindow: business hours\n\nThus oldText could be \"Contact: support@example.com\". Replace with \"Contact: customers@example.com\". Provide summary: Change escalation contact address.\n\nLet's propose patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "c0fa3bd14",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update escalation contact email in customer runbook",
+                  "edits": [
+                    {
+                      "path": "docs/customer-runbook.md",
+                      "oldText": "Contact: support@example.com",
+                      "newText": "Contact: customers@example.com"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 157,
+              "output": 186,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 855,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287091711,
+            "responseId": "chatcmpl-13e821ff-0c0d-495b-8eb5-e4c321084813"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "c0fa3bd14",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update escalation contact email in customer runbook",
+              "edits": [
+                {
+                  "path": "docs/customer-runbook.md",
+                  "oldText": "Contact: support@example.com",
+                  "newText": "Contact: customers@example.com"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "c0fa3bd14",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update escalation contact email in customer runbook",
+                "edits": [
+                  {
+                    "path": "docs/customer-runbook.md",
+                    "oldText": "Contact: support@example.com",
+                    "newText": "Contact: customers@example.com"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-markdown-implicit",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates only docs/customer-runbook.md and leaves the admin runbook unchanged, matching the focused edit requirement.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/customer-runbook.md\n===================================================================\n--- docs/customer-runbook.md\n+++ docs/customer-runbook.md\n@@ -2,5 +2,5 @@\n \n ## Escalation\n \n-Contact: support@example.com\n+Contact: customers@example.com\n Window: business hours",
+            "proposal": {
+              "summary": "Update escalation contact email in customer runbook",
+              "edits": [
+                {
+                  "path": "docs/customer-runbook.md",
+                  "oldText": "Contact: support@example.com",
+                  "newText": "Contact: customers@example.com"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-markdown-implicit--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-markdown-implicit--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-markdown-implicit",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to edit docs/config.md: change timeoutMs from 30000 to 45000 only in Production example, leaving Staging unchanged.\n\nWe have the file content. We need to propose a patch with exact oldText snippet.\n\nWe must ensure oldText uniquely identifies the part to replace. The Production example block includes:\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```\n\nChange 30000 to 45000. So oldText could be that line `\"timeoutMs\": 30000,` within Production block. But need enough surrounding to be unique. The Staging also contains same line `\"timeoutMs\": 30000,`. But we need to target only Production. To differentiate, we can include the preceding line `\"mode\": \"production\",`. So oldText could be something like:\n\n```\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```\n\nBut that includes whole block. Replacement will adjust the timeoutMs line. So newText would be same block with 45000.\n\nThus oldText is exactly that block including braces and spacing.\n\nCheck the file: The block is inside triple backticks with json. The spacing is two spaces indent? Actually the snippet as shown:\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```\n\nSpacing: It appears two spaces before keys. We'll replicate exactly.\n\nThus propose patch: edit docs/config.md, replace the Production block with updated timeout.\n\nLet's construct the oldText and newText accordingly.\n\nWe need to ensure the snippet includes line breaks etc. Provide oldText as exactly as in file.\n\nLet's copy:\n\n```\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```\n\nAnd new:\n\n```\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}\n```\n\nMake sure to preserve indentation and line breaks.\n\nProceed to call propose_patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "9f591a0c6",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update Production timeoutMs from 30000 to 45000 in docs/config.md",
+                  "edits": [
+                    {
+                      "path": "docs/config.md",
+                      "oldText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}",
+                      "newText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 180,
+              "output": 565,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 1257,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287094062,
+            "responseId": "chatcmpl-bba2d2f3-772e-4c06-92a5-6e286d5014f4"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "9f591a0c6",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update Production timeoutMs from 30000 to 45000 in docs/config.md",
+              "edits": [
+                {
+                  "path": "docs/config.md",
+                  "oldText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}",
+                  "newText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "9f591a0c6",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update Production timeoutMs from 30000 to 45000 in docs/config.md",
+                "edits": [
+                  {
+                    "path": "docs/config.md",
+                    "oldText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}",
+                    "newText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/markdown-code-fence-production-only",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates only the Production example timeoutMs from 30000 to 45000 in docs/config.md, and leaves the Staging example unchanged.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/config.md\n===================================================================\n--- docs/config.md\n+++ docs/config.md\n@@ -15,7 +15,7 @@\n ```json\n {\n   \"mode\": \"production\",\n-  \"timeoutMs\": 30000,\n+  \"timeoutMs\": 45000,\n   \"retries\": 2\n }\n ```",
+            "proposal": {
+              "summary": "Update Production timeoutMs from 30000 to 45000 in docs/config.md",
+              "edits": [
+                {
+                  "path": "docs/config.md",
+                  "oldText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}",
+                  "newText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__markdown-code-fence-production-only--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__markdown-code-fence-production-only--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/markdown-code-fence-production-only",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to edit docs/rollout.md: Mark Notify support complete under API Rollout only (i.e., check the box). Leave UI Rollout's Notify support unchecked. So change \"- [ ] Notify support\" under API Rollout to \"- [x] Notify support\". UI part stays unchanged.\n\nWe must propose a patch using propose_patch tool. Need oldText exact lines. Let's capture surrounding lines to uniquely identify. The file content:\n\n# Rollout\n\n## API Rollout\n\n- [ ] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics\n\n## UI Rollout\n\n- [ ] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics\n\nWe need to replace the line \"- [ ] Notify support\" under API Rollout with \"- [x] Notify support\". Ensure oldText is unique: maybe include preceding line \"## API Rollout\" and newline? But oldText must be exact snippet to replace. Could replace just that line. That line appears twice (under API and UI), so it's not unique. Must include context to make unique, e.g., preceding line \"## API Rollout\\n\\n- [ ] Notify support\". That snippet likely unique. So oldText = \"## API Rollout\\n\\n- [ ] Notify support\". newText = \"## API Rollout\\n\\n- [x] Notify support\". That works.\n\nMake patch.\n\n",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "7dc4beb0c",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Mark Notify support as complete under API Rollout",
+                  "edits": [
+                    {
+                      "path": "docs/rollout.md",
+                      "oldText": "## API Rollout\n\n- [ ] Notify support",
+                      "newText": "## API Rollout\n\n- [x] Notify support"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 157,
+              "output": 360,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 1029,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287095512,
+            "responseId": "chatcmpl-3c60e97c-7ef0-4d40-ac23-a7dad0342e4b"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "7dc4beb0c",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Mark Notify support as complete under API Rollout",
+              "edits": [
+                {
+                  "path": "docs/rollout.md",
+                  "oldText": "## API Rollout\n\n- [ ] Notify support",
+                  "newText": "## API Rollout\n\n- [x] Notify support"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "7dc4beb0c",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Mark Notify support as complete under API Rollout",
+                "edits": [
+                  {
+                    "path": "docs/rollout.md",
+                    "oldText": "## API Rollout\n\n- [ ] Notify support",
+                    "newText": "## API Rollout\n\n- [x] Notify support"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/markdown-duplicate-checklist",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The proposed patch correctly checks only the Notify support item under API Rollout, and the validation shows no change to the UI Rollout checklist item.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/rollout.md\n===================================================================\n--- docs/rollout.md\n+++ docs/rollout.md\n@@ -2,7 +2,7 @@\n \n ## API Rollout\n \n-- [ ] Notify support\n+- [x] Notify support\n - [ ] Update dashboard\n - [ ] Verify metrics",
+            "proposal": {
+              "summary": "Mark Notify support as complete under API Rollout",
+              "edits": [
+                {
+                  "path": "docs/rollout.md",
+                  "oldText": "## API Rollout\n\n- [ ] Notify support",
+                  "newText": "## API Rollout\n\n- [x] Notify support"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__markdown-duplicate-checklist--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__markdown-duplicate-checklist--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/markdown-duplicate-checklist",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "The user wants: \"Under Billing only, add the line 'Owner: Revenue Ops' below the Status line.\"\n\nWe have selected context: docs/billing.md has content:\n\n```\n# Billing\n\n## Queue\n\nStatus: Active\nSLA: 2 hours\n```\n\nWe need to add a line after Status line: \"Owner: Revenue Ops\". So after \"Status: Active\" line, before \"SLA: 2 hours\". Provide a diff.\n\nWe need to call propose_patch with summary and edit. oldText must be unique. We'll replace a snippet that includes the Status line perhaps. For example oldText:\n\n```\nStatus: Active\nSLA: 2 hours\n```\n\nWe replace with:\n\n```\nStatus: Active\nOwner: Revenue Ops\nSLA: 2 hours\n```\n\nMake sure exact match includes newline etc. Provide patch.\n\nProceed.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "ca94abd88",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Add Owner line under Billing Queue status",
+                  "edits": [
+                    {
+                      "path": "docs/billing.md",
+                      "oldText": "Status: Active\nSLA: 2 hours",
+                      "newText": "Status: Active\nOwner: Revenue Ops\nSLA: 2 hours"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 151,
+              "output": 255,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 918,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287097966,
+            "responseId": "chatcmpl-010f1375-cbb4-46a1-b397-eaabfed66282"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "ca94abd88",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Add Owner line under Billing Queue status",
+              "edits": [
+                {
+                  "path": "docs/billing.md",
+                  "oldText": "Status: Active\nSLA: 2 hours",
+                  "newText": "Status: Active\nOwner: Revenue Ops\nSLA: 2 hours"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "ca94abd88",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Add Owner line under Billing Queue status",
+                "edits": [
+                  {
+                    "path": "docs/billing.md",
+                    "oldText": "Status: Active\nSLA: 2 hours",
+                    "newText": "Status: Active\nOwner: Revenue Ops\nSLA: 2 hours"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/markdown-two-files-same-heading",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly adds 'Owner: Revenue Ops' under Status in docs/billing.md only, and does not touch docs/support.md. It is valid and matches the rubric exactly.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/billing.md\n===================================================================\n--- docs/billing.md\n+++ docs/billing.md\n@@ -3,4 +3,5 @@\n ## Queue\n \n Status: Active\n+Owner: Revenue Ops\n SLA: 2 hours",
+            "proposal": {
+              "summary": "Add Owner line under Billing Queue status",
+              "edits": [
+                {
+                  "path": "docs/billing.md",
+                  "oldText": "Status: Active\nSLA: 2 hours",
+                  "newText": "Status: Active\nOwner: Revenue Ops\nSLA: 2 hours"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__markdown-two-files-same-heading--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__markdown-two-files-same-heading--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/markdown-two-files-same-heading",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to modify recordEvent to require a source argument, and update callers to pass right source. Also test should assert source is preserved. Need to edit src/events.ts, src/orders.ts, src/refunds.ts, src/support.ts, src/events.test.ts.\n\nrecordEvent signature: function recordEvent(name: EventName, source: string) { return { name, source }; }\n\nUpdate callers: recordOrderCreated should call recordEvent(\"order.created\", ???). The request: \"Make recordEvent require a source argument and update all selected callers to pass the right source.\" But what source? Probably each caller should pass a string indicating source (maybe module name?). For simplicity, we can pass a literal like \"order\" for order created, \"refund\" for refund, \"support\" for support. Or maybe \"order\" etc. However test should assert that source is preserved. The test currently only checks support ticket. We'll need to update test to pass source argument and expect appropriate source.\n\nBut the instruction: \"Make recordEvent require a source argument and update all selected callers to pass the right source. The test should assert that source is preserved.\" So we need to modify test accordingly.\n\nLet's decide source strings: For order created, source \"order\". For refund created, source \"refund\". For support ticket, source \"support\". Or maybe \"order.created\" etc. But more logical is pass a source identifier. Let's set source to \"order\" etc.\n\nUpdate src/orders.ts: return recordEvent(\"order.created\", \"order\");\n\nSimilarly refunds: recordEvent(\"refund.created\", \"refund\");\n\nsupport.ts: recordEvent(\"support.ticket\", \"support\");\n\nUpdate test: calling recordEvent directly? In test they import recordEvent and call recordEvent(\"support.ticket\") - now require source. For test, we can call recordEvent(\"support.ticket\",\"support\") and expect {name:\"support.ticket\", source:\"support\"}.\n\nAlso maybe test each module's function? Not needed but acceptable.\n\nImplement patches.\n\nWe need to propose patch with edits each file.\n\nWe'll create edits for each file.\n\nMake sure oldText unique.\n\nIn src/events.ts old function:\n\nexport function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}\n\nReplace with:\n\nexport function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}\n\nUpdate imports not needed.\n\nIn src/orders.ts old function body lines can be replaced.\n\nFile content:\n\nimport { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}\n\nReplace return line.\n\nUse oldText: '  return recordEvent(\"order.created\");' replace with new.\n\nNew: '  return recordEvent(\"order.created\", \"order\");'\n\nSimilarly refunds.\n\nSupport file.\n\nTest file: replace call.\n\nOld: expect(recordEvent(\"support.ticket\")).toEqual({ name: \"support.ticket\", source: \"unknown\", });\n\nReplace with new: expect(recordEvent(\"support.ticket\", \"support\")).toEqual({ name: \"support.ticket\", source: \"support\", });\n\nThus patches.\n\nMake sure oldText lines unique.\n\nI'll include each edit.\n\n",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "fc8d243b1",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Require source argument for recordEvent and update callers and test accordingly",
+                  "edits": [
+                    {
+                      "path": "src/events.ts",
+                      "oldText": "export function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}",
+                      "newText": "export function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}"
+                    },
+                    {
+                      "path": "src/orders.ts",
+                      "oldText": "  return recordEvent(\"order.created\");",
+                      "newText": "  return recordEvent(\"order.created\", \"order\");"
+                    },
+                    {
+                      "path": "src/refunds.ts",
+                      "oldText": "  return recordEvent(\"refund.created\");",
+                      "newText": "  return recordEvent(\"refund.created\", \"refund\");"
+                    },
+                    {
+                      "path": "src/support.ts",
+                      "oldText": "  return recordEvent(\"support.ticket\");",
+                      "newText": "  return recordEvent(\"support.ticket\", \"support\");"
+                    },
+                    {
+                      "path": "src/events.test.ts",
+                      "oldText": "expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });",
+                      "newText": "expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 333,
+              "output": 931,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 1776,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287100101,
+            "responseId": "chatcmpl-1131ae55-933b-4c2f-9fbd-d488201e0a44"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "fc8d243b1",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Require source argument for recordEvent and update callers and test accordingly",
+              "edits": [
+                {
+                  "path": "src/events.ts",
+                  "oldText": "export function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}",
+                  "newText": "export function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}"
+                },
+                {
+                  "path": "src/orders.ts",
+                  "oldText": "  return recordEvent(\"order.created\");",
+                  "newText": "  return recordEvent(\"order.created\", \"order\");"
+                },
+                {
+                  "path": "src/refunds.ts",
+                  "oldText": "  return recordEvent(\"refund.created\");",
+                  "newText": "  return recordEvent(\"refund.created\", \"refund\");"
+                },
+                {
+                  "path": "src/support.ts",
+                  "oldText": "  return recordEvent(\"support.ticket\");",
+                  "newText": "  return recordEvent(\"support.ticket\", \"support\");"
+                },
+                {
+                  "path": "src/events.test.ts",
+                  "oldText": "expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });",
+                  "newText": "expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "fc8d243b1",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Require source argument for recordEvent and update callers and test accordingly",
+                "edits": [
+                  {
+                    "path": "src/events.ts",
+                    "oldText": "export function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}",
+                    "newText": "export function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}"
+                  },
+                  {
+                    "path": "src/orders.ts",
+                    "oldText": "  return recordEvent(\"order.created\");",
+                    "newText": "  return recordEvent(\"order.created\", \"order\");"
+                  },
+                  {
+                    "path": "src/refunds.ts",
+                    "oldText": "  return recordEvent(\"refund.created\");",
+                    "newText": "  return recordEvent(\"refund.created\", \"refund\");"
+                  },
+                  {
+                    "path": "src/support.ts",
+                    "oldText": "  return recordEvent(\"support.ticket\");",
+                    "newText": "  return recordEvent(\"support.ticket\", \"support\");"
+                  },
+                  {
+                    "path": "src/events.test.ts",
+                    "oldText": "expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });",
+                    "newText": "expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/multi-file-source-propagation",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch makes recordEvent require a source argument, preserves that source in the returned payload, updates the orders/refunds/support callers with appropriate source values, and updates the test to assert a non-unknown source.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/events.ts\n===================================================================\n--- src/events.ts\n+++ src/events.ts\n@@ -1,5 +1,5 @@\n export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n \n-export function recordEvent(name: EventName) {\n-  return { name, source: \"unknown\" };\n+export function recordEvent(name: EventName, source: string) {\n+  return { name, source };\n }\nIndex: src/orders.ts\n===================================================================\n--- src/orders.ts\n+++ src/orders.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordOrderCreated() {\n-  return recordEvent(\"order.created\");\n+  return recordEvent(\"order.created\", \"order\");\n }\nIndex: src/refunds.ts\n===================================================================\n--- src/refunds.ts\n+++ src/refunds.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordRefundCreated() {\n-  return recordEvent(\"refund.created\");\n+  return recordEvent(\"refund.created\", \"refund\");\n }\nIndex: src/support.ts\n===================================================================\n--- src/support.ts\n+++ src/support.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordSupportTicket() {\n-  return recordEvent(\"support.ticket\");\n+  return recordEvent(\"support.ticket\", \"support\");\n }\nIndex: src/events.test.ts\n===================================================================\n--- src/events.test.ts\n+++ src/events.test.ts\n@@ -1,8 +1,8 @@\n import { recordEvent } from \"./events\";\n \n test(\"records event payload\", () => {\n-  expect(recordEvent(\"support.ticket\")).toEqual({\n+  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n     name: \"support.ticket\",\n-    source: \"unknown\",\n+    source: \"support\",\n   });\n });",
+            "proposal": {
+              "summary": "Require source argument for recordEvent and update callers and test accordingly",
+              "edits": [
+                {
+                  "path": "src/events.ts",
+                  "oldText": "export function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}",
+                  "newText": "export function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}"
+                },
+                {
+                  "path": "src/orders.ts",
+                  "oldText": "  return recordEvent(\"order.created\");",
+                  "newText": "  return recordEvent(\"order.created\", \"order\");"
+                },
+                {
+                  "path": "src/refunds.ts",
+                  "oldText": "  return recordEvent(\"refund.created\");",
+                  "newText": "  return recordEvent(\"refund.created\", \"refund\");"
+                },
+                {
+                  "path": "src/support.ts",
+                  "oldText": "  return recordEvent(\"support.ticket\");",
+                  "newText": "  return recordEvent(\"support.ticket\", \"support\");"
+                },
+                {
+                  "path": "src/events.test.ts",
+                  "oldText": "expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });",
+                  "newText": "expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__multi-file-source-propagation--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__multi-file-source-propagation--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/multi-file-source-propagation",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to change only the secondary action button label to \"Keep editing\". The file currently has two buttons: primary with label \"Continue\", secondary also \"Continue\". We need to change secondary button label to \"Keep editing\". So edit src/actions.tsx: locate line `<button data-kind=\"secondary\">Continue</button>` and replace with `<button data-kind=\"secondary\">Keep editing</button>`.\n\nWe must propose a patch via propose_patch tool. Provide summary and edits.\n\nMake sure oldText is unique exact string. Provide full line as oldText. Likely line includes indentation. Let's capture: `      <button data-kind=\"secondary\">Continue</button>` including two spaces? Actually file snippet shows two spaces before button? It shows 6 spaces? It's within return with indent. Use exactly as appears: two spaces? Let's copy line as displayed: `      <button data-kind=\"secondary\">Continue</button>`.\n\nWill replace with same indentation: `      <button data-kind=\"secondary\">Keep editing</button>`.\n\nProceed.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "7696908b4",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Change secondary button label to \"Keep editing\"",
+                  "edits": [
+                    {
+                      "path": "src/actions.tsx",
+                      "oldText": "      <button data-kind=\"secondary\">Continue</button>",
+                      "newText": "      <button data-kind=\"secondary\">Keep editing</button>"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 146,
+              "output": 288,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 946,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287101878,
+            "responseId": "chatcmpl-42c8d0b3-8f9b-42ca-9838-ff19fae4045b"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "7696908b4",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Change secondary button label to \"Keep editing\"",
+              "edits": [
+                {
+                  "path": "src/actions.tsx",
+                  "oldText": "      <button data-kind=\"secondary\">Continue</button>",
+                  "newText": "      <button data-kind=\"secondary\">Keep editing</button>"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "7696908b4",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Change secondary button label to \"Keep editing\"",
+                "edits": [
+                  {
+                    "path": "src/actions.tsx",
+                    "oldText": "      <button data-kind=\"secondary\">Continue</button>",
+                    "newText": "      <button data-kind=\"secondary\">Keep editing</button>"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/tsx-duplicate-button-label",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch changes only the secondary button label to \"Keep editing\" and leaves the primary button label as \"Continue\". It is valid and matches the required path and diff.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/actions.tsx\n===================================================================\n--- src/actions.tsx\n+++ src/actions.tsx\n@@ -2,7 +2,7 @@\n   return (\n     <footer>\n       <button data-kind=\"primary\">Continue</button>\n-      <button data-kind=\"secondary\">Continue</button>\n+      <button data-kind=\"secondary\">Keep editing</button>\n     </footer>\n   );\n }",
+            "proposal": {
+              "summary": "Change secondary button label to \"Keep editing\"",
+              "edits": [
+                {
+                  "path": "src/actions.tsx",
+                  "oldText": "      <button data-kind=\"secondary\">Continue</button>",
+                  "newText": "      <button data-kind=\"secondary\">Keep editing</button>"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__tsx-duplicate-button-label--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__tsx-duplicate-button-label--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/tsx-duplicate-button-label",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to change mobile compact spacing to 6, desktop compact spacing to 10. Leave spacious unchanged. The file has mobileSpacing.compact = 8, desktopSpacing.compact = 8. So we need edit.\n\nWe need to propose a patch using propose_patch. Provide summary and edits. Need exact oldText unique. Let's pick lines: \"compact: 8,\" under mobileSpacing and also under desktopSpacing.\n\nBut each edit must have unique oldText. Could do two separate edits.\n\nFor mobile:\noldText: \"compact: 8,\" (but appears twice, not unique). Need surrounding context.\n\nMaybe use the full block for mobileSpacing:\n\n```\nexport const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};\n```\n\nReplace that block with updated compact 6.\n\nSimilarly for desktop.\n\nLet's craft.\n\nEdit1:\n\noldText:\n```\nexport const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};\n```\n\nnewText:\n```\nexport const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};\n```\n\nEdit2:\n\noldText:\n```\nexport const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};\n```\n\nnewText:\n```\nexport const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};\n```\n\nThat should be unique.\n\nNow produce propose_patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "45d187c8e",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update mobile compact spacing to 6 and desktop compact spacing to 10 while keeping spacious spacing unchanged",
+                  "edits": [
+                    {
+                      "path": "src/spacing.ts",
+                      "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};",
+                      "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};"
+                    },
+                    {
+                      "path": "src/spacing.ts",
+                      "oldText": "export const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};",
+                      "newText": "export const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 144,
+              "output": 459,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 1115,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287103642,
+            "responseId": "chatcmpl-06da4549-0a5f-44b1-9c18-da9ad8e5cf16"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "45d187c8e",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update mobile compact spacing to 6 and desktop compact spacing to 10 while keeping spacious spacing unchanged",
+              "edits": [
+                {
+                  "path": "src/spacing.ts",
+                  "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};",
+                  "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};"
+                },
+                {
+                  "path": "src/spacing.ts",
+                  "oldText": "export const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};",
+                  "newText": "export const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "45d187c8e",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update mobile compact spacing to 6 and desktop compact spacing to 10 while keeping spacious spacing unchanged",
+                "edits": [
+                  {
+                    "path": "src/spacing.ts",
+                    "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};",
+                    "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};"
+                  },
+                  {
+                    "path": "src/spacing.ts",
+                    "oldText": "export const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};",
+                    "newText": "export const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/two-hunks-same-oldtext",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates mobile compact spacing to 6 and desktop compact spacing to 10, while leaving both spacious values unchanged, with a focused edit to the allowed file.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/spacing.ts\n===================================================================\n--- src/spacing.ts\n+++ src/spacing.ts\n@@ -1,9 +1,9 @@\n export const mobileSpacing = {\n-  compact: 8,\n+  compact: 6,\n   spacious: 16,\n };\n \n export const desktopSpacing = {\n-  compact: 8,\n+  compact: 10,\n   spacious: 24,\n };",
+            "proposal": {
+              "summary": "Update mobile compact spacing to 6 and desktop compact spacing to 10 while keeping spacious spacing unchanged",
+              "edits": [
+                {
+                  "path": "src/spacing.ts",
+                  "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};",
+                  "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};"
+                },
+                {
+                  "path": "src/spacing.ts",
+                  "oldText": "export const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};",
+                  "newText": "export const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__two-hunks-same-oldtext--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__two-hunks-same-oldtext--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/two-hunks-same-oldtext",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to change worker.timeout from 30 to 45 in production only, leaving staging unchanged. So edit the file deploy/limits.yml. Find the production worker timeout line.\n\nCurrent file content:\n\nstaging:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n\nproduction:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n\nWe need to replace production worker timeout: 30 with timeout: 45.\n\nExact oldText must be unique. Use the line \"    timeout: 30\" under production worker. But there are also other timeout lines. To ensure uniqueness, include a few surrounding lines.\n\nOriginal snippet:\n\nproduction:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n\nThere are two identical \"    timeout: 30\" lines, one under worker and one under web. Must identify the worker one. Use a context snippet that includes preceding line \"    concurrency: 4\". So oldText could be:\n\n\"    concurrency: 4\\n    timeout: 30\"\n\nBut that also appears under both staging and production for worker? In staging worker also concurrency: 4 and timeout:30. So there are two identical snippets: under staging worker and production worker. That's not unique.\n\nWe need a larger unique context: include the parent \"production:\\n  worker:\" preceding. So oldText could be:\n\n\"production:\\n  worker:\\n    concurrency: 4\\n    timeout: 30\"\n\nCheck uniqueness: In file, only production section has that combination. Staging section earlier also has similar but preceded by \"staging\". So the exact string \"production:\\n  worker:\\n    concurrency: 4\\n    timeout: 30\" is unique.\n\nThus replace that with same but timeout: 45.\n\nSo new text:\n\nproduction:\n  worker:\n    concurrency: 4\n    timeout: 45\n\nWill keep rest unchanged.\n\nThus propose patch summary: Change production worker timeout to 45.\n\nLet's draft propose_patch.\n\n",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "ceb3a9e43",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Change production worker timeout from 30 to 45 while leaving staging unchanged",
+                  "edits": [
+                    {
+                      "path": "deploy/limits.yml",
+                      "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30",
+                      "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 167,
+              "output": 547,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 1226,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287105843,
+            "responseId": "chatcmpl-24d07094-f9da-43b8-afa7-ef6c58e1257c"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "ceb3a9e43",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Change production worker timeout from 30 to 45 while leaving staging unchanged",
+              "edits": [
+                {
+                  "path": "deploy/limits.yml",
+                  "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30",
+                  "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "ceb3a9e43",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Change production worker timeout from 30 to 45 while leaving staging unchanged",
+                "edits": [
+                  {
+                    "path": "deploy/limits.yml",
+                    "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30",
+                    "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/yaml-duplicate-environment",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly changes only production.worker.timeout from 30 to 45, leaves staging unchanged, and keeps both web timeout values at 30.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: deploy/limits.yml\n===================================================================\n--- deploy/limits.yml\n+++ deploy/limits.yml\n@@ -9,7 +9,7 @@\n production:\n   worker:\n     concurrency: 4\n-    timeout: 30\n+    timeout: 45\n   web:\n     concurrency: 8\n     timeout: 30",
+            "proposal": {
+              "summary": "Change production worker timeout from 30 to 45 while leaving staging unchanged",
+              "edits": [
+                {
+                  "path": "deploy/limits.yml",
+                  "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30",
+                  "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__yaml-duplicate-environment--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__yaml-duplicate-environment--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/yaml-duplicate-environment",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_gspbiHrHSfZwk79iWAN24uDX|fc_05afc6352bcadd45016a2c48c4471081a0a2bc98f414863e7a",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\" without changing profileCopy.",
+                  "edits": [
+                    {
+                      "path": "src/copy.ts",
+                      "oldText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"Nothing here\",\n  emptyBody: \"Add an item before checking out.\",\n};",
+                      "newText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"No items in cart\",\n  emptyBody: \"Add an item before checking out.\",\n};"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 598,
+              "output": 134,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 732,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287107550,
+            "responseId": "resp_05afc6352bcadd45016a2c48c3a86481a0904f2f608c391a6c"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_gspbiHrHSfZwk79iWAN24uDX|fc_05afc6352bcadd45016a2c48c4471081a0a2bc98f414863e7a",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\" without changing profileCopy.",
+              "edits": [
+                {
+                  "path": "src/copy.ts",
+                  "oldText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"Nothing here\",\n  emptyBody: \"Add an item before checking out.\",\n};",
+                  "newText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"No items in cart\",\n  emptyBody: \"Add an item before checking out.\",\n};"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_gspbiHrHSfZwk79iWAN24uDX|fc_05afc6352bcadd45016a2c48c4471081a0a2bc98f414863e7a",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\" without changing profileCopy.",
+                "edits": [
+                  {
+                    "path": "src/copy.ts",
+                    "oldText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"Nothing here\",\n  emptyBody: \"Add an item before checking out.\",\n};",
+                    "newText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"No items in cart\",\n  emptyBody: \"Add an item before checking out.\",\n};"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/duplicate-object-property",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The proposed patch correctly updates only checkoutCopy.emptyTitle to \"No items in cart\" and leaves profileCopy.emptyTitle unchanged. The patch is valid and matches the rubric.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/copy.ts\n===================================================================\n--- src/copy.ts\n+++ src/copy.ts\n@@ -1,6 +1,6 @@\n export const checkoutCopy = {\n   title: \"Checkout\",\n-  emptyTitle: \"Nothing here\",\n+  emptyTitle: \"No items in cart\",\n   emptyBody: \"Add an item before checking out.\",\n };",
+            "proposal": {
+              "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\" without changing profileCopy.",
+              "edits": [
+                {
+                  "path": "src/copy.ts",
+                  "oldText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"Nothing here\",\n  emptyBody: \"Add an item before checking out.\",\n};",
+                  "newText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"No items in cart\",\n  emptyBody: \"Add an item before checking out.\",\n};"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__duplicate-object-property--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__duplicate-object-property--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/duplicate-object-property",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "",
+                "thinkingSignature": "{\"id\":\"rs_02a7706270f41dac016a2c48cca6cc819e9d30996c0582a974\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLEjM4wYnQajUlUhnuWV6PEtpQaFTqkFU03za9CvmNwDQEPhJWa88Md-QEo9LaSAwcEUMV2g5AE1oWxGQjN3yi6Qw7FQKrD9KlbXwu5Fnw4dqZy6gIBtsp1ReByOU2ZVnqN7OoCmzm-UoLrt94LQVKJAjEhZuypP4W5k5lhpNBqBEdb1IQzrPeaz5auqERi0Z7ZEe9yMGdesr3224zCbrAlzel9mcHuG0SDTcu4_E5NpMDt7XOZS-f0qCBOTOIxv7LGa0zAlsyh6ggLV3Y96ry4zUToyBqx5li_fi3cCiIoF2V29b2vcBXZNcOdw93X6WBPQlGjQPnRyNUFWIpwHoWIlQ0KLE49Qv7oF791Bq_rDco1G_7QNq6tywIw6RplGn8RzFN7j5iSidEFAO4cQzTaFr2E4p0H5RWpEAuDEys75eYVd4Z7UyIapOE8BFwpyiU90ZdfKxwl5PopHgEiPkjrf-swqqBY2qLZS6PL46pWZyqjKz-cevMBdRE-yOKJjkYtGXdt75luU5npIqpBJUzqFicksf1GPmz8ZNibcMgbCKp6TXIqS0rLGdLcsK-j1fBD1YoWG_8dE2vYq2xZ1tQrC8vcHnYB2ZndyD8TxJaYCE4vJ4Fgixt9vQ2dzCG0k-dua8AKKrHdTnflRPRsfzNgCU_hhM-X-3tu-o4bv1AeEHanbJM4Y-0x5ZAS8gq8rLi6CU5TvxWjAMKASHKAOqgKj__2DPOOcZG0qUk5Rw_F1cCPLn8KKroFCuCygei-R1e0MdVnm35plbiEX6-zQ0WwmSM3VBQDDcOcaLzzjcRgPFAN3PdkdaZe7vBHlk8no7ITsIiOdYeTvr8aDVY9pLTqQR1YVbA5d7kYlPVA7mbLP9Nrx5FazFJbMI18ZxTzCmN4Yj2o3z7tH9vJwfINWcWsWorwsWu7n2FKuvcMI55IZvS05_nPPotttKb4y_QyCgxEeIuiNjPOu8pa8F8oOxvHxaGw==\",\"summary\":[]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_PIKGgAlCpNiRyOTmxfgOQSHF|fc_02a7706270f41dac016a2c48ccebd8819e9e12200a0fb624dc",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update authorizePayment timeout message without changing capturePayment.",
+                  "edits": [
+                    {
+                      "path": "src/paymentErrors.ts",
+                      "oldText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment timed out\";\n  }\n  return \"Payment declined\";\n}\n",
+                      "newText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment authorization timed out\";\n  }\n  return \"Payment declined\";\n}\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 614,
+              "output": 159,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 773,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287115871,
+            "responseId": "resp_02a7706270f41dac016a2c48cbf97c819eac5f9114c9746d0f"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_PIKGgAlCpNiRyOTmxfgOQSHF|fc_02a7706270f41dac016a2c48ccebd8819e9e12200a0fb624dc",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update authorizePayment timeout message without changing capturePayment.",
+              "edits": [
+                {
+                  "path": "src/paymentErrors.ts",
+                  "oldText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment timed out\";\n  }\n  return \"Payment declined\";\n}\n",
+                  "newText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment authorization timed out\";\n  }\n  return \"Payment declined\";\n}\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_PIKGgAlCpNiRyOTmxfgOQSHF|fc_02a7706270f41dac016a2c48ccebd8819e9e12200a0fb624dc",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update authorizePayment timeout message without changing capturePayment.",
+                "edits": [
+                  {
+                    "path": "src/paymentErrors.ts",
+                    "oldText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment timed out\";\n  }\n  return \"Payment declined\";\n}\n",
+                    "newText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment authorization timed out\";\n  }\n  return \"Payment declined\";\n}\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/duplicate-return-payment-timeout",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch makes the requested timeout-message change in authorizePaymentError only, leaves capturePayment unchanged, and validates cleanly with a single precise edit.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/paymentErrors.ts\n===================================================================\n--- src/paymentErrors.ts\n+++ src/paymentErrors.ts\n@@ -1,6 +1,6 @@\n export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n   if (code === \"timeout\") {\n-    return \"Payment timed out\";\n+    return \"Payment authorization timed out\";\n   }\n   return \"Payment declined\";\n }",
+            "proposal": {
+              "summary": "Update authorizePayment timeout message without changing capturePayment.",
+              "edits": [
+                {
+                  "path": "src/paymentErrors.ts",
+                  "oldText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment timed out\";\n  }\n  return \"Payment declined\";\n}\n",
+                  "newText": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment authorization timed out\";\n  }\n  return \"Payment declined\";\n}\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__duplicate-return-payment-timeout--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__duplicate-return-payment-timeout--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/duplicate-return-payment-timeout",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "**Considering file patching**\n\nI need to focus on patching the selected file. The user mentioned something about unknown statuses, which are marked as \"Not available.\" I should look into editing customerStatus.ts, and possibly involve admin aspects too. It seems like the request is singular but relates to the context around unknown statuses, especially within customerStatus.ts. My goal will be to use the proposed patch for precise adjustments.",
+                "thinkingSignature": "{\"id\":\"rs_0d158c21360dd377016a2c48d11ec08191baed9954ce30965c\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLEjSlXeZBaCWoEzimjuUhwfdhU6jjnRDpxq1tzfp3JdSKSLIMciGyOQWF7rgkIAh2PgEjbuxHbo6ePqIR5Yn2kSYw-504lAJbnEwLE4NDCIiIIJSw6nBx9CEK31-YHQrqSR1V4a9tx-_tutn9Nhasw8Ll0dBMPMZHANTyB1T63DCAIXM_ma8dswluS2EHgFBG5Fkq4FGP5sTzyOvfUQqQ0pG7EfLEza55Xx3jEqqRBTOP954JrxM9STlRzvdEMwBTK7wlK0sjLf8yXukvNr6wuerYAyE720qf-rLSW63Jp_y2NobddiSXSxevV84g4ni5_S4Oe-XAiOBWgDQUuh1R5MXLZ7fhAutQoPDmKeqBShRIo-GLTT35BylyPFilQiITXDqckhRwtVNQPkZ4RJXIKh1v84ijgSvXD3kpntxyYiFwW6jiH1P8cUzeatI3p_bR-avF_k0MB34ilACG_mO14NxGiSztb16pwHXfF4uMb-yRPs_ObJjvk7RpPHBHqUQnNHEdZ4D_a5_rPWZXlRpDaclTiw2Sv8aQGaiBr9u6oLEGyIbyhxCOTZiloO1DLARb-vvmkFJ0ZbhZsbapkY8N1YRzL16iKF91noDS4gFqBfdeG5UFrgmM8haoWwaWba33goemx1aV_me-_FAA5I7wFUurkKtDrn6-7BngMvJLYhMbfFze7VdJv5rkCtYGmBXQCoZ6i-ANXJVP1s_BhptRgGwBkbgHO4lFCrPth2Xhpla7iRSjjNzJq0I-kYGcEjGRNN-iv_EW4HtYz7a_MmctIYjCpLtgcwhMVugWuQoMd2ThVbPsMUGth3dN-meUBOJAT99lrITkFqwvkOpSL5uZIIR09IlQLXecDanjSvwl429lTVVwyDHCFP4dLcOvkznRk6XhsmPtt2DcNRzTjwgGgkoicWoBptASZacFCpohzDkDLGjSz9ngA_m9AQIDfY_LqP5FmqoaFl-Z4J4sjWGJ5D2xpIk1mopnH_4r7rY5Eh6F9uMdufHjbSrmNIiM9nnBm7q1U2XueDmBOvzJB-7YgId-PWQF2Dhi-6OWq3UQDXTNQlHPf1LNua3Vr5-wpRIZ-efrGXKOcpSabC-yQJjUWZngKzNv5E5oUpzqqIxbPgLg_9wag4Gohzl7ASgyT_JLS6_X5nFp0zBAfwLoD_VN-Hx9q_70chb_ewPYhOIcJ9sb6NeqSCJ9cUrt14bHGpxqFVW_5_oXAOCruAeX6FxgZF4ldJ1YtPZ3FIOTQR_LPexPKd3G0IJa1rcnGkr8yYb14oOl9H4-2Ab8y1UsDeqYeO6VmLUELc7TSHjwt51isZjsBN5s4hDiE7B0Ti5bSVroE69\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"**Considering file patching**\\n\\nI need to focus on patching the selected file. The user mentioned something about unknown statuses, which are marked as \\\"Not available.\\\" I should look into editing customerStatus.ts, and possibly involve admin aspects too. It seems like the request is singular but relates to the context around unknown statuses, especially within customerStatus.ts. My goal will be to use the proposed patch for precise adjustments.\"}]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_x67bUt7hF1ZJLS7Ka7f7iJ76|fc_0d158c21360dd377016a2c48d2f0a88191b02ed74f2aa4c7b5",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update customer status rendering so unknown statuses display as \"Not available\".",
+                  "edits": [
+                    {
+                      "path": "src/customerStatus.ts",
+                      "oldText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}\n",
+                      "newText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Not available\";\n}\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 610,
+              "output": 198,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 808,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287120564,
+            "responseId": "resp_0d158c21360dd377016a2c48d0ab488191a197b2ed720d26d3"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_x67bUt7hF1ZJLS7Ka7f7iJ76|fc_0d158c21360dd377016a2c48d2f0a88191b02ed74f2aa4c7b5",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update customer status rendering so unknown statuses display as \"Not available\".",
+              "edits": [
+                {
+                  "path": "src/customerStatus.ts",
+                  "oldText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}\n",
+                  "newText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Not available\";\n}\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_x67bUt7hF1ZJLS7Ka7f7iJ76|fc_0d158c21360dd377016a2c48d2f0a88191b02ed74f2aa4c7b5",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update customer status rendering so unknown statuses display as \"Not available\".",
+                "edits": [
+                  {
+                    "path": "src/customerStatus.ts",
+                    "oldText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}\n",
+                    "newText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Not available\";\n}\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-file-implicit-same-function",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch edits only src/customerStatus.ts, changes the unknown-status fallback to \"Not available\", and leaves src/adminStatus.ts untouched. It matches the rubric exactly and validates as a valid patch.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/customerStatus.ts\n===================================================================\n--- src/customerStatus.ts\n+++ src/customerStatus.ts\n@@ -2,5 +2,5 @@\n   if (status === \"active\") {\n     return \"Active\";\n   }\n-  return \"Unknown\";\n+  return \"Not available\";\n }",
+            "proposal": {
+              "summary": "Update customer status rendering so unknown statuses display as \"Not available\".",
+              "edits": [
+                {
+                  "path": "src/customerStatus.ts",
+                  "oldText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}\n",
+                  "newText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Not available\";\n}\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__focused-file-implicit-same-function--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__focused-file-implicit-same-function--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-file-implicit-same-function",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_zhd4uDLVt74sQPWW2xun2yLb|fc_0d0bc4643f26ce25016a2c48d5515881a18c2e0afc4788f6ca",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update the customer runbook escalation contact email.",
+                  "edits": [
+                    {
+                      "path": "docs/customer-runbook.md",
+                      "oldText": "## Escalation\n\nContact: support@example.com\nWindow: business hours\n",
+                      "newText": "## Escalation\n\nContact: customers@example.com\nWindow: business hours\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 586,
+              "output": 81,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 667,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287124526,
+            "responseId": "resp_0d0bc4643f26ce25016a2c48d4a1f081a18b79b77242125847"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_zhd4uDLVt74sQPWW2xun2yLb|fc_0d0bc4643f26ce25016a2c48d5515881a18c2e0afc4788f6ca",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update the customer runbook escalation contact email.",
+              "edits": [
+                {
+                  "path": "docs/customer-runbook.md",
+                  "oldText": "## Escalation\n\nContact: support@example.com\nWindow: business hours\n",
+                  "newText": "## Escalation\n\nContact: customers@example.com\nWindow: business hours\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_zhd4uDLVt74sQPWW2xun2yLb|fc_0d0bc4643f26ce25016a2c48d5515881a18c2e0afc4788f6ca",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update the customer runbook escalation contact email.",
+                "edits": [
+                  {
+                    "path": "docs/customer-runbook.md",
+                    "oldText": "## Escalation\n\nContact: support@example.com\nWindow: business hours\n",
+                    "newText": "## Escalation\n\nContact: customers@example.com\nWindow: business hours\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-markdown-implicit",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly edits only docs/customer-runbook.md to change the escalation contact to customers@example.com, and leaves the admin runbook unchanged. It is valid and fully matches the rubric.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/customer-runbook.md\n===================================================================\n--- docs/customer-runbook.md\n+++ docs/customer-runbook.md\n@@ -2,5 +2,5 @@\n \n ## Escalation\n \n-Contact: support@example.com\n+Contact: customers@example.com\n Window: business hours",
+            "proposal": {
+              "summary": "Update the customer runbook escalation contact email.",
+              "edits": [
+                {
+                  "path": "docs/customer-runbook.md",
+                  "oldText": "## Escalation\n\nContact: support@example.com\nWindow: business hours\n",
+                  "newText": "## Escalation\n\nContact: customers@example.com\nWindow: business hours\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__focused-markdown-implicit--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__focused-markdown-implicit--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-markdown-implicit",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_5vjxanmZQI1fmHEaadVR26ju|fc_07231510eeb8cb9d016a2c48d7c730819f8321611ce71b4e2f",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update only the Production config example timeout from 30000 to 45000 in docs/config.md.",
+                  "edits": [
+                    {
+                      "path": "docs/config.md",
+                      "oldText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```",
+                      "newText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}\n```"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 609,
+              "output": 132,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 741,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287126869,
+            "responseId": "resp_07231510eeb8cb9d016a2c48d6f9dc819fb6346fa9408ae582"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_5vjxanmZQI1fmHEaadVR26ju|fc_07231510eeb8cb9d016a2c48d7c730819f8321611ce71b4e2f",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update only the Production config example timeout from 30000 to 45000 in docs/config.md.",
+              "edits": [
+                {
+                  "path": "docs/config.md",
+                  "oldText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```",
+                  "newText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}\n```"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_5vjxanmZQI1fmHEaadVR26ju|fc_07231510eeb8cb9d016a2c48d7c730819f8321611ce71b4e2f",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update only the Production config example timeout from 30000 to 45000 in docs/config.md.",
+                "edits": [
+                  {
+                    "path": "docs/config.md",
+                    "oldText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```",
+                    "newText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}\n```"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/markdown-code-fence-production-only",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates only the Production example timeoutMs from 30000 to 45000 in docs/config.md, and leaves the Staging example unchanged. It is valid and matches the rubric exactly.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/config.md\n===================================================================\n--- docs/config.md\n+++ docs/config.md\n@@ -15,7 +15,7 @@\n ```json\n {\n   \"mode\": \"production\",\n-  \"timeoutMs\": 30000,\n+  \"timeoutMs\": 45000,\n   \"retries\": 2\n }\n ```",
+            "proposal": {
+              "summary": "Update only the Production config example timeout from 30000 to 45000 in docs/config.md.",
+              "edits": [
+                {
+                  "path": "docs/config.md",
+                  "oldText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```",
+                  "newText": "## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}\n```"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__markdown-code-fence-production-only--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__markdown-code-fence-production-only--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/markdown-code-fence-production-only",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_bDZc4lsw5nCRY8l5DpgQTvEn|fc_05a02a12253a99a7016a2c48dd14b481a28cb0a03e1445e381",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Mark Notify support complete only under API Rollout in docs/rollout.md.",
+                  "edits": [
+                    {
+                      "path": "docs/rollout.md",
+                      "oldText": "## API Rollout\n\n- [ ] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics",
+                      "newText": "## API Rollout\n\n- [x] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 586,
+              "output": 101,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 687,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287129830,
+            "responseId": "resp_05a02a12253a99a7016a2c48da055881a28c72813c07a34ad7"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_bDZc4lsw5nCRY8l5DpgQTvEn|fc_05a02a12253a99a7016a2c48dd14b481a28cb0a03e1445e381",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Mark Notify support complete only under API Rollout in docs/rollout.md.",
+              "edits": [
+                {
+                  "path": "docs/rollout.md",
+                  "oldText": "## API Rollout\n\n- [ ] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics",
+                  "newText": "## API Rollout\n\n- [x] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_bDZc4lsw5nCRY8l5DpgQTvEn|fc_05a02a12253a99a7016a2c48dd14b481a28cb0a03e1445e381",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Mark Notify support complete only under API Rollout in docs/rollout.md.",
+                "edits": [
+                  {
+                    "path": "docs/rollout.md",
+                    "oldText": "## API Rollout\n\n- [ ] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics",
+                    "newText": "## API Rollout\n\n- [x] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/markdown-duplicate-checklist",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch is valid and makes the required single change: it checks only the Notify support item under API Rollout while leaving the UI Rollout item unchecked.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/rollout.md\n===================================================================\n--- docs/rollout.md\n+++ docs/rollout.md\n@@ -2,7 +2,7 @@\n \n ## API Rollout\n \n-- [ ] Notify support\n+- [x] Notify support\n - [ ] Update dashboard\n - [ ] Verify metrics",
+            "proposal": {
+              "summary": "Mark Notify support complete only under API Rollout in docs/rollout.md.",
+              "edits": [
+                {
+                  "path": "docs/rollout.md",
+                  "oldText": "## API Rollout\n\n- [ ] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics",
+                  "newText": "## API Rollout\n\n- [x] Notify support\n- [ ] Update dashboard\n- [ ] Verify metrics"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__markdown-duplicate-checklist--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__markdown-duplicate-checklist--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/markdown-duplicate-checklist",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "",
+                "thinkingSignature": "{\"id\":\"rs_065b8f85346a8869016a2c48e0d13881a1aad9540d5cae6082\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLEjh_RGnz8ouQYxnZ4OLgbBaOEkFOYwFmVtI6HzXDesORUyfueSY7KuTRsbui31Esk__Qe1kt2h6rgCEYNWgOkg31u0RSH3a-8q_m9hz2vzXocHZLMU49MZw4hf5LLz2SgkVvt4wSQ7mvVW21UJvy68wRWa3qTS9j8nW6FU97_nZXzaIwrhy_wjz8Dc2Wpxwytu1TCSgN2kuCVqQaY3MReQbHAL1267-YxvGjE4s8LGpG-YWEgYQWClxPziWuTAttEtdIMy-Fdvb1gdfdIuULvO3hsoF1x8kaCzjTVM9HxxugfVdKjDAiZ1Tzw6pLL0oxhKhY9G8hidItN3ZD70de7Y-EtKcClPOlc9g_NDCd3b_GlsTnT0CwltMxGNNaERxogS2AdoLcQ9TnoCaS41J8dNfHQnecLiFR3wTOBkLKYfgE4rL8dB-TZi1nKhvO9Xgra8oRslwpo50VTITb1iNUkSDOTCcDfdh1koxUaN3t7Jy_5YKDKOZDqQgDCcnqmsjY_jdQ0hUkiVe7mKoDvzA6U7sgMVBAzaGsavfwYSsRBMANKmlPyNzcXyRYthIcdH5SSDt78_-utwYckiSOuUqu7VDGoADSAnHcMVnXMXarC_hKe4qPMzeqrCvGs0Ws737-UlBW8iPlvFfPnaAFjxxbQtfSuVpKGhwUVuSAYMNDIjPcV1l_8-_PXHxijTE3xbOnPTevMp-Tx_fZfbiPt3aSkFfaE9NtZ-AKNIij_pYg2BVvtTu6U_wSHG3ak_N_zowVVmE572VVn5MGmw6b3pkIbgu2EC1qV2aLC1xR45VzGHICPw-jwtWuGwdsNHwaV_VEkaN7I_DZTVi5vCIVlnabm2ejelk556v063hp2TcuearOimCWITrrxJLLDoLWObWotZ03N4cULc3rvbh1T4NBYXQryflP1ZRmXIgaIzzHz_qGDaJZse2_IX9LKqhEXTAHSXC\",\"summary\":[]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_9iljs7zj8Bv8vPIZUX4msJGL|fc_065b8f85346a8869016a2c48e1369c81a18d2aba4d8d29a5e5",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Add owner line to Billing queue details only.",
+                  "edits": [
+                    {
+                      "path": "docs/billing.md",
+                      "oldText": "## Queue\n\nStatus: Active\nSLA: 2 hours\n",
+                      "newText": "## Queue\n\nStatus: Active\nOwner: Revenue Ops\nSLA: 2 hours\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 580,
+              "output": 91,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 671,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287135886,
+            "responseId": "resp_065b8f85346a8869016a2c48e0003081a1b98876b8964cccba"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_9iljs7zj8Bv8vPIZUX4msJGL|fc_065b8f85346a8869016a2c48e1369c81a18d2aba4d8d29a5e5",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Add owner line to Billing queue details only.",
+              "edits": [
+                {
+                  "path": "docs/billing.md",
+                  "oldText": "## Queue\n\nStatus: Active\nSLA: 2 hours\n",
+                  "newText": "## Queue\n\nStatus: Active\nOwner: Revenue Ops\nSLA: 2 hours\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_9iljs7zj8Bv8vPIZUX4msJGL|fc_065b8f85346a8869016a2c48e1369c81a18d2aba4d8d29a5e5",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Add owner line to Billing queue details only.",
+                "edits": [
+                  {
+                    "path": "docs/billing.md",
+                    "oldText": "## Queue\n\nStatus: Active\nSLA: 2 hours\n",
+                    "newText": "## Queue\n\nStatus: Active\nOwner: Revenue Ops\nSLA: 2 hours\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/markdown-two-files-same-heading",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly adds 'Owner: Revenue Ops' below 'Status: Active' in docs/billing.md only, and does not touch docs/support.md. The diff is valid and matches the requested edit.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: docs/billing.md\n===================================================================\n--- docs/billing.md\n+++ docs/billing.md\n@@ -3,4 +3,5 @@\n ## Queue\n \n Status: Active\n+Owner: Revenue Ops\n SLA: 2 hours",
+            "proposal": {
+              "summary": "Add owner line to Billing queue details only.",
+              "edits": [
+                {
+                  "path": "docs/billing.md",
+                  "oldText": "## Queue\n\nStatus: Active\nSLA: 2 hours\n",
+                  "newText": "## Queue\n\nStatus: Active\nOwner: Revenue Ops\nSLA: 2 hours\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__markdown-two-files-same-heading--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__markdown-two-files-same-heading--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/markdown-two-files-same-heading",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "",
+                "thinkingSignature": "{\"id\":\"rs_0f53bebcdf31c529016a2c48e32fa481a382bc9d886b3d72c4\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLEjj0KvavZklXLzq8QD8pioMNEXzvakJRJcCGpnm589fpZ22Aisl7nJdt4XOFZrEP6yth1ShN6MVSU_aQsPZ9luIAbEjz8-2M5xkFhhlS6d5Dz4_qVnPuP38nf_fTunlXT1Xy6zGy9F-snZLj7_G66GpKAvt8OmTxWPXnkrjbPywhB1ymtia2KafUuLjlPVIR2dRzzs9CaxXnoCjimyxCed3GQsgB1I_lVUnApSzZPF_KLVLw_zQsalOHB5aY_L96Yegi0Nw_1GLX6-_1EINtXnO-f27IflZKy5wyz7mc5GPMR6Uy_J2OIWToN3-PcFQdCHiQevmSbkYmxC98Lx8C_TJQowbIt85PTHoQKA3dqDOzVmO22JZxDHRFLX0F_yVByO_Lz06_CbQ59kItexuPZEGDeTsYFAn0NgqcSVtmpcoRTrZWodn2US44_J4xaBw2zBrqA5L7BTl5wFJGprCw1Kv9OXG02fyE8gkVfjAJ8MPXlptCxWm1GiESxlJ8vXWh2K61Tk_i4wlLXb9zecZwW1RMXxN3QtufNImKhwQ320YE4FCAvQocIePrlNMQ3KqbPtO6w5pkiUiI_gIqogi9eoxa3epkoRW2AvNWwpmC7qqqznaVz_W_lwzmPgkJVa-NuIJFEHAXnBxhJv4jmU0OmAfz_ZM3T5hLUXIc-eAQGzju7ET7x2gAhGxrnqbl7Uekjg7J7jB49S8oc3KHBf4cNWcTeeDVMVjSu2NlylZVWJE8np5xwZdASCHFnWVC_azcvndfhXUFQV3-rD28y4kYR7RzkfRod0vCbxy0ktNQGm-CBuSu4W97TI_6SsaSDOmKQ3NLB4loe8iaV63wRbmW4ynTuXD6_hBQhnozwoBpJu3LaXkKHJa_1RJK-LUZ9O2LUfCtfJtH3R5VnxGGXd6zR2DUHbo8D--Y4avlLAQo1RqYuDmWtj5pjJJSPgFNtuWWaLNdovaCkifnGPOlKTocYrZAA==\",\"summary\":[]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_YbHa7Tv6SHT7R5TQpmxUOHAc|fc_0f53bebcdf31c529016a2c48e36b7081a3964ffb4e32dc3feb",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Require a source argument for recordEvent, update selected callers to pass explicit sources, and assert source is preserved in the test.",
+                  "edits": [
+                    {
+                      "path": "src/events.ts",
+                      "oldText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}\n",
+                      "newText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}\n"
+                    },
+                    {
+                      "path": "src/orders.ts",
+                      "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}\n",
+                      "newText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\", \"orders\");\n}\n"
+                    },
+                    {
+                      "path": "src/refunds.ts",
+                      "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\");\n}\n",
+                      "newText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\", \"refunds\");\n}\n"
+                    },
+                    {
+                      "path": "src/support.ts",
+                      "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\");\n}\n",
+                      "newText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\", \"support\");\n}\n"
+                    },
+                    {
+                      "path": "src/events.test.ts",
+                      "oldText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });\n});\n",
+                      "newText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });\n});\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 762,
+              "output": 563,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 1325,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287138654,
+            "responseId": "resp_0f53bebcdf31c529016a2c48e2c5cc81a39a6b1e6592df14c8"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_YbHa7Tv6SHT7R5TQpmxUOHAc|fc_0f53bebcdf31c529016a2c48e36b7081a3964ffb4e32dc3feb",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Require a source argument for recordEvent, update selected callers to pass explicit sources, and assert source is preserved in the test.",
+              "edits": [
+                {
+                  "path": "src/events.ts",
+                  "oldText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}\n",
+                  "newText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}\n"
+                },
+                {
+                  "path": "src/orders.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\", \"orders\");\n}\n"
+                },
+                {
+                  "path": "src/refunds.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\");\n}\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\", \"refunds\");\n}\n"
+                },
+                {
+                  "path": "src/support.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\");\n}\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\", \"support\");\n}\n"
+                },
+                {
+                  "path": "src/events.test.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });\n});\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });\n});\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_YbHa7Tv6SHT7R5TQpmxUOHAc|fc_0f53bebcdf31c529016a2c48e36b7081a3964ffb4e32dc3feb",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Require a source argument for recordEvent, update selected callers to pass explicit sources, and assert source is preserved in the test.",
+                "edits": [
+                  {
+                    "path": "src/events.ts",
+                    "oldText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}\n",
+                    "newText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}\n"
+                  },
+                  {
+                    "path": "src/orders.ts",
+                    "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}\n",
+                    "newText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\", \"orders\");\n}\n"
+                  },
+                  {
+                    "path": "src/refunds.ts",
+                    "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\");\n}\n",
+                    "newText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\", \"refunds\");\n}\n"
+                  },
+                  {
+                    "path": "src/support.ts",
+                    "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\");\n}\n",
+                    "newText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\", \"support\");\n}\n"
+                  },
+                  {
+                    "path": "src/events.test.ts",
+                    "oldText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });\n});\n",
+                    "newText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });\n});\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/multi-file-source-propagation",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch makes recordEvent require a source argument, preserves that source in the returned payload, updates orders/refunds/support callers with explicit sources, and updates the test to assert the preserved non-unknown source.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/events.ts\n===================================================================\n--- src/events.ts\n+++ src/events.ts\n@@ -1,5 +1,5 @@\n export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n \n-export function recordEvent(name: EventName) {\n-  return { name, source: \"unknown\" };\n+export function recordEvent(name: EventName, source: string) {\n+  return { name, source };\n }\nIndex: src/orders.ts\n===================================================================\n--- src/orders.ts\n+++ src/orders.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordOrderCreated() {\n-  return recordEvent(\"order.created\");\n+  return recordEvent(\"order.created\", \"orders\");\n }\nIndex: src/refunds.ts\n===================================================================\n--- src/refunds.ts\n+++ src/refunds.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordRefundCreated() {\n-  return recordEvent(\"refund.created\");\n+  return recordEvent(\"refund.created\", \"refunds\");\n }\nIndex: src/support.ts\n===================================================================\n--- src/support.ts\n+++ src/support.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordSupportTicket() {\n-  return recordEvent(\"support.ticket\");\n+  return recordEvent(\"support.ticket\", \"support\");\n }\nIndex: src/events.test.ts\n===================================================================\n--- src/events.test.ts\n+++ src/events.test.ts\n@@ -1,8 +1,8 @@\n import { recordEvent } from \"./events\";\n \n test(\"records event payload\", () => {\n-  expect(recordEvent(\"support.ticket\")).toEqual({\n+  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n     name: \"support.ticket\",\n-    source: \"unknown\",\n+    source: \"support\",\n   });\n });",
+            "proposal": {
+              "summary": "Require a source argument for recordEvent, update selected callers to pass explicit sources, and assert source is preserved in the test.",
+              "edits": [
+                {
+                  "path": "src/events.ts",
+                  "oldText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}\n",
+                  "newText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}\n"
+                },
+                {
+                  "path": "src/orders.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\", \"orders\");\n}\n"
+                },
+                {
+                  "path": "src/refunds.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\");\n}\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\", \"refunds\");\n}\n"
+                },
+                {
+                  "path": "src/support.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\");\n}\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\", \"support\");\n}\n"
+                },
+                {
+                  "path": "src/events.test.ts",
+                  "oldText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });\n});\n",
+                  "newText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });\n});\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__multi-file-source-propagation--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__multi-file-source-propagation--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/multi-file-source-propagation",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "",
+                "thinkingSignature": "{\"id\":\"rs_0ae5dd0d862516ea016a2c48e9a5cc819fa365c1b129243c7c\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLEjqsT0YKZ01GSrW9QoYnnMDGAbhmsZ198HYOl2NWYTmy_DLKbq7ufuFMhAHpSkMHV_s2LlXZKxTBsVJV0M0_1oXwtmozVjdnu5yhpSFqDGLFamSn5nBAaG8xrNqRiCf7NBJPpwCuOHUXvPQ6EJqv-lbBO_R_S3JeaM7-q7hlpVMbyG7KgHyLdXDn2nFa8Q2E5cE_nVJ2sAJY77QqF9zk7ghDIx_B2Wja0PEWXF8tp1W_MWGcZHGEPHsPF4wJg78uzsE4oUCYkvro3sZiQ_uQyswO_K4vMCUv6GLLg9KrAcPVCCIy2zaWYqJO3WK2JtWMh5iE72zUQjRLLFlVUn7vGiitDZgUKQ_TWXunBxLMvlBy4dcopCEC4leLdEB_F5IMuT5TulRT_KHx2H5KJr2_53RdZ0DwM9a1hzq6CrxvNdpJEJp9xAqNQzXbHhHSxfil0RYRUvqojoSoDWLmoBsUt97mwe-UNqrYG8YTPkA3tEFEJ6ZxPeG9i5BpE1mr5nTYFYIlaoYXEOranuOpG0-ibBXkCdERMACP5s1-RYaZ42_ipASu-t4BMWtAKa7-AJnh12K03SZ8lq0adHBTea6hSjgbVyCeWzMw6bxnrD2WVjQtvFAIjBEP7pZM5fsAwXpwdyk69yLMnrpGQI4J4LCRi6NF29V4Nuem7pE13VgUg-xkaXIhlglyGxYT4-XPyzuuWwKWELvqBDRn2i7Qd7uOtp_2htHg6EqTMu54yKndEeRQi9iBxVz3awltq8lbItJF9Cb_BW2maNGa3c7I5a9Zuo1WQjO6qL2dmkFgJOr6IL3voBgrxmhK9FFcpC_Ax3ZKNijglyPPLGHDbzt9NrBsmarMUpCbkUD4aE_9brb2x0yPIeORRQintF4bxsdjV8vzcm0fSWxAbHV2NOAaOHKlGUsclhm5LrQSjcl8P56QeUJJRB0DpBoMOeQ1AMp5jF0ddf1_rF1AfJyiYhAGKand9sw-g==\",\"summary\":[]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_7hnvXdW219CtqWcBN138bY0u|fc_0ae5dd0d862516ea016a2c48ea28ac819f95724a5c9940d2ea",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update the secondary action button label to \"Keep editing\" while leaving the primary label unchanged.",
+                  "edits": [
+                    {
+                      "path": "src/actions.tsx",
+                      "oldText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Continue</button>\n    </footer>\n  );\n}\n",
+                      "newText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Keep editing</button>\n    </footer>\n  );\n}\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 575,
+              "output": 171,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 746,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287145048,
+            "responseId": "resp_0ae5dd0d862516ea016a2c48e92750819fa686b83e3b43a88f"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_7hnvXdW219CtqWcBN138bY0u|fc_0ae5dd0d862516ea016a2c48ea28ac819f95724a5c9940d2ea",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update the secondary action button label to \"Keep editing\" while leaving the primary label unchanged.",
+              "edits": [
+                {
+                  "path": "src/actions.tsx",
+                  "oldText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Continue</button>\n    </footer>\n  );\n}\n",
+                  "newText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Keep editing</button>\n    </footer>\n  );\n}\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_7hnvXdW219CtqWcBN138bY0u|fc_0ae5dd0d862516ea016a2c48ea28ac819f95724a5c9940d2ea",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update the secondary action button label to \"Keep editing\" while leaving the primary label unchanged.",
+                "edits": [
+                  {
+                    "path": "src/actions.tsx",
+                    "oldText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Continue</button>\n    </footer>\n  );\n}\n",
+                    "newText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Keep editing</button>\n    </footer>\n  );\n}\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/tsx-duplicate-button-label",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch changes only the secondary button label to \"Keep editing\" and leaves the primary \"Continue\" label unchanged, matching the rubric exactly.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/actions.tsx\n===================================================================\n--- src/actions.tsx\n+++ src/actions.tsx\n@@ -2,7 +2,7 @@\n   return (\n     <footer>\n       <button data-kind=\"primary\">Continue</button>\n-      <button data-kind=\"secondary\">Continue</button>\n+      <button data-kind=\"secondary\">Keep editing</button>\n     </footer>\n   );\n }",
+            "proposal": {
+              "summary": "Update the secondary action button label to \"Keep editing\" while leaving the primary label unchanged.",
+              "edits": [
+                {
+                  "path": "src/actions.tsx",
+                  "oldText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Continue</button>\n    </footer>\n  );\n}\n",
+                  "newText": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Keep editing</button>\n    </footer>\n  );\n}\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__tsx-duplicate-button-label--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__tsx-duplicate-button-label--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/tsx-duplicate-button-label",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_sPBIv8xBV3EYJrzDYRzTuOgF|fc_0454c807f98139db016a2c48ecf07481929eba35dbbcd65185",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update compact spacing values for mobile and desktop while leaving spacious values unchanged.",
+                  "edits": [
+                    {
+                      "path": "src/spacing.ts",
+                      "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};\n",
+                      "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 573,
+              "output": 149,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 722,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287148014,
+            "responseId": "resp_0454c807f98139db016a2c48ec22f481929472925e2ff2ce75"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_sPBIv8xBV3EYJrzDYRzTuOgF|fc_0454c807f98139db016a2c48ecf07481929eba35dbbcd65185",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update compact spacing values for mobile and desktop while leaving spacious values unchanged.",
+              "edits": [
+                {
+                  "path": "src/spacing.ts",
+                  "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};\n",
+                  "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_sPBIv8xBV3EYJrzDYRzTuOgF|fc_0454c807f98139db016a2c48ecf07481929eba35dbbcd65185",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update compact spacing values for mobile and desktop while leaving spacious values unchanged.",
+                "edits": [
+                  {
+                    "path": "src/spacing.ts",
+                    "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};\n",
+                    "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/two-hunks-same-oldtext",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates mobile compact spacing to 6 and desktop compact spacing to 10, leaves spacious values unchanged, and makes a minimal targeted edit in the required file.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/spacing.ts\n===================================================================\n--- src/spacing.ts\n+++ src/spacing.ts\n@@ -1,9 +1,9 @@\n export const mobileSpacing = {\n-  compact: 8,\n+  compact: 6,\n   spacious: 16,\n };\n \n export const desktopSpacing = {\n-  compact: 8,\n+  compact: 10,\n   spacious: 24,\n };",
+            "proposal": {
+              "summary": "Update compact spacing values for mobile and desktop while leaving spacious values unchanged.",
+              "edits": [
+                {
+                  "path": "src/spacing.ts",
+                  "oldText": "export const mobileSpacing = {\n  compact: 8,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 8,\n  spacious: 24,\n};\n",
+                  "newText": "export const mobileSpacing = {\n  compact: 6,\n  spacious: 16,\n};\n\nexport const desktopSpacing = {\n  compact: 10,\n  spacious: 24,\n};\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__two-hunks-same-oldtext--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__two-hunks-same-oldtext--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/two-hunks-same-oldtext",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "toolCall",
+                "id": "call_PgKVWGl9EHnoQ1Uk2zUGdGjR|fc_07e810c45795c997016a2c48f188b8819d9cb0e0609ace1aae",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update production worker timeout from 30 to 45, leaving staging unchanged.",
+                  "edits": [
+                    {
+                      "path": "deploy/limits.yml",
+                      "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n",
+                      "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45\n  web:\n    concurrency: 8\n    timeout: 30\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 596,
+              "output": 122,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 718,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781287152833,
+            "responseId": "resp_07e810c45795c997016a2c48f0f0b8819d960322e040218cfd"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_PgKVWGl9EHnoQ1Uk2zUGdGjR|fc_07e810c45795c997016a2c48f188b8819d9cb0e0609ace1aae",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update production worker timeout from 30 to 45, leaving staging unchanged.",
+              "edits": [
+                {
+                  "path": "deploy/limits.yml",
+                  "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n",
+                  "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45\n  web:\n    concurrency: 8\n    timeout: 30\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_PgKVWGl9EHnoQ1Uk2zUGdGjR|fc_07e810c45795c997016a2c48f188b8819d9cb0e0609ace1aae",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update production worker timeout from 30 to 45, leaving staging unchanged.",
+                "edits": [
+                  {
+                    "path": "deploy/limits.yml",
+                    "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n",
+                    "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45\n  web:\n    concurrency: 8\n    timeout: 30\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/yaml-duplicate-environment",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch is valid and changes only production.worker.timeout from 30 to 45, leaving staging and both web timeout values unchanged as required.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: deploy/limits.yml\n===================================================================\n--- deploy/limits.yml\n+++ deploy/limits.yml\n@@ -9,7 +9,7 @@\n production:\n   worker:\n     concurrency: 4\n-    timeout: 30\n+    timeout: 45\n   web:\n     concurrency: 8\n     timeout: 30",
+            "proposal": {
+              "summary": "Update production worker timeout from 30 to 45, leaving staging unchanged.",
+              "edits": [
+                {
+                  "path": "deploy/limits.yml",
+                  "oldText": "production:\n  worker:\n    concurrency: 4\n    timeout: 30\n  web:\n    concurrency: 8\n    timeout: 30\n",
+                  "newText": "production:\n  worker:\n    concurrency: 4\n    timeout: 45\n  web:\n    concurrency: 8\n    timeout: 30\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__yaml-duplicate-environment--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__yaml-duplicate-environment--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/yaml-duplicate-environment",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    }
+  ],
+  "runDir": "eval-runs/2026-06-12T17-58-05Z",
+  "targets": [
+    "cerebras:gpt-oss-120b",
+    "openai:gpt-5.4"
+  ]
+}

@@ -30,19 +30,21 @@ export function createShellCommandActions({
       set((state) => finishShellCommand(state, requestId, result)),
     saveOutputToContext: ({ requestId }) =>
       set((state) => saveShellCommandOutputToContext(state, requestId)),
-    start: ({ prompt, replacement }) =>
-      startShellCommand({ get, prompt, replacement, set }),
+    start: ({ prompt, rejectComposer, replacement }) =>
+      startShellCommand({ get, prompt, rejectComposer, replacement, set }),
   };
 }
 
 function startShellCommand({
   get,
   prompt,
+  rejectComposer,
   replacement,
   set,
 }: {
   get: GetAppState;
   prompt: string;
+  rejectComposer?: AppState["workspace"]["composer"];
   replacement?: ShellCommandReplacementTarget;
   set: SetAppState;
 }): number | null {
@@ -57,6 +59,7 @@ function startShellCommand({
       id: requestId,
       kind: "shell-command",
       prompt,
+      ...(rejectComposer === undefined ? {} : { rejectComposer }),
       replacement,
       status: "running",
     },
@@ -80,6 +83,9 @@ function finishShellCommand(
         id: requestId,
         kind: "shell-command",
         prompt: state.activeTask.request.question,
+        ...(state.activeTask.rejectComposer === undefined
+          ? {}
+          : { rejectComposer: state.activeTask.rejectComposer }),
         result,
         status: "done",
       },

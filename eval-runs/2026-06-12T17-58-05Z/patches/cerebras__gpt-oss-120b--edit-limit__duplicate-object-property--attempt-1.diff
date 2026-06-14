@@ -1,0 +1,11 @@
+Index: src/copy.ts
+===================================================================
+--- src/copy.ts
++++ src/copy.ts
+@@ -1,6 +1,6 @@
+ export const checkoutCopy = {
+   title: "Checkout",
+-  emptyTitle: "Nothing here",
++  emptyTitle: "No items in cart",
+   emptyBody: "Add an item before checking out.",
+ };

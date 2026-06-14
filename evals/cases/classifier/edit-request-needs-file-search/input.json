@@ -1,0 +1,8 @@
+{
+  "question": "Fix the checkout total bug.",
+  "workspace": {
+    "files": {
+      "src/checkout/totals.ts": "export function checkoutTotal(lines: { price: number }[]) {\n  return lines.length;\n}\n"
+    }
+  }
+}

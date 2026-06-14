@@ -1,0 +1,566 @@
+{
+  "errors": [],
+  "judge": "openai:gpt-5.4-mini",
+  "repeat": 1,
+  "results": [
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "find_relevant_files",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "User wants to find relevant source files for stack trace. They gave stack trace locations. The source files exist per directory tree. We need to locate those files. Since no context content provided, we need to use find_relevant_files to retrieve the files. So ask tool to find files src/orders/submit.ts and src/checkout/CheckoutForm.tsx. Use find_relevant_files with goal: \"open the source files for submitOrder and CheckoutForm.handleSubmit\".",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "cecb4964d",
+                "name": "find_relevant_files",
+                "arguments": {
+                  "goal": "Open source files referenced in the stack trace: src/orders/submit.ts and src/checkout/CheckoutForm.tsx",
+                  "hints": [
+                    "submitOrder",
+                    "CheckoutForm.handleSubmit"
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 1172,
+              "output": 154,
+              "cacheRead": 128,
+              "cacheWrite": 0,
+              "totalTokens": 1454,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781290365259,
+            "responseId": "chatcmpl-45987e96-16ea-4d73-bbcf-ba519980de9d"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "cecb4964d",
+            "name": "find_relevant_files",
+            "arguments": {
+              "goal": "Open source files referenced in the stack trace: src/orders/submit.ts and src/checkout/CheckoutForm.tsx",
+              "hints": [
+                "submitOrder",
+                "CheckoutForm.handleSubmit"
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "cecb4964d",
+              "name": "find_relevant_files",
+              "arguments": {
+                "goal": "Open source files referenced in the stack trace: src/orders/submit.ts and src/checkout/CheckoutForm.tsx",
+                "hints": [
+                  "submitOrder",
+                  "CheckoutForm.handleSubmit"
+                ]
+              }
+            }
+          ],
+          "casePath": "classifier/find-debug-stacktrace",
+          "failures": [],
+          "passed": true,
+          "target": "cerebras:gpt-oss-120b"
+        }
+      ],
+      "casePath": "classifier/find-debug-stacktrace",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to add a Billing nav item after Account and before Security. Update test to reflect new order.\n\nWe have nav.ts with navItems array. Need to insert Billing before Security.\n\nAlso test expects array of labels; need to adjust expected order.\n\nMake changes in src/nav.ts: add { label: \"Billing\", href: \"/billing\" } after Account.\n\nUpdate test in src/nav.test.ts expected array to include \"Billing\" between Account and Security.\n\nWe must provide propose_patch with summary and edits.\n\nWe need exact oldText matches.\n\nIn nav.ts, existing text is:\n\nexport const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];\n\nWe need to modify the array. OldText should encompass the block to replace, maybe up to before Security.\n\nSimplest: replace whole array block. Provide oldText exactly as in file, including line breaks.\n\nLet's copy exactly:\n\nexport const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];\n\nWe'll replace with new array with Billing inserted.\n\nnewText:\n\nexport const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Billing\", href: \"/billing\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];\n\nSimilarly edit test file. OldText is the expect line? It contains the array in test.\n\nThe test code:\n\ntest(\"nav order\", () => {\n  expect(navItems.map((item) => item.label)).toEqual([\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]);\n});\n\nWe need to replace the expected array to include \"Billing\". We can replace the lines inside toEqual([...]) block.\n\nSimplest: replace the whole argument array block.\n\nCurrent oldText includes:\n\n[\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]\n\nIncluding brackets and indentation.\n\nWe need new array:\n\n[\n    \"Home\",\n    \"Account\",\n    \"Billing\",\n    \"Security\",\n    \"Support\",\n  ]\n\nThus edit oldText = exactly that slice. But need to include the brackets.\n\nLet's capture oldText exactly as:\n\n[\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]\n\nAnd newText with Billing inserted.\n\nMake sure indentation matches.\n\nNow propose_patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "4e44cd895",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Add Billing nav item and update test to reflect new order",
+                  "edits": [
+                    {
+                      "path": "src/nav.ts",
+                      "oldText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];",
+                      "newText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Billing\", href: \"/billing\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];"
+                    },
+                    {
+                      "path": "src/nav.test.ts",
+                      "oldText": "[\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]",
+                      "newText": "[\n    \"Home\",\n    \"Account\",\n    \"Billing\",\n    \"Security\",\n    \"Support\",\n  ]"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 1002,
+              "output": 855,
+              "cacheRead": 128,
+              "cacheWrite": 0,
+              "totalTokens": 1985,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781290365604,
+            "responseId": "chatcmpl-7a6ad31b-2b13-43fc-b099-c499060af936"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "4e44cd895",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Add Billing nav item and update test to reflect new order",
+              "edits": [
+                {
+                  "path": "src/nav.ts",
+                  "oldText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];",
+                  "newText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Billing\", href: \"/billing\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];"
+                },
+                {
+                  "path": "src/nav.test.ts",
+                  "oldText": "[\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]",
+                  "newText": "[\n    \"Home\",\n    \"Account\",\n    \"Billing\",\n    \"Security\",\n    \"Support\",\n  ]"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "4e44cd895",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Add Billing nav item and update test to reflect new order",
+                "edits": [
+                  {
+                    "path": "src/nav.ts",
+                    "oldText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];",
+                    "newText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Billing\", href: \"/billing\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];"
+                  },
+                  {
+                    "path": "src/nav.test.ts",
+                    "oldText": "[\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]",
+                    "newText": "[\n    \"Home\",\n    \"Account\",\n    \"Billing\",\n    \"Security\",\n    \"Support\",\n  ]"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-hard/order-sensitive-route-insertion",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch inserts Billing exactly after Account and before Security in both src/nav.ts and the test expectation, matching the required order.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/nav.ts\n===================================================================\n--- src/nav.ts\n+++ src/nav.ts\n@@ -1,6 +1,7 @@\n export const navItems = [\n   { label: \"Home\", href: \"/\" },\n   { label: \"Account\", href: \"/account\" },\n+  { label: \"Billing\", href: \"/billing\" },\n   { label: \"Security\", href: \"/security\" },\n   { label: \"Support\", href: \"/support\" },\n ];\nIndex: src/nav.test.ts\n===================================================================\n--- src/nav.test.ts\n+++ src/nav.test.ts\n@@ -4,6 +4,7 @@\n   expect(navItems.map((item) => item.label)).toEqual([\n     \"Home\",\n     \"Account\",\n+    \"Billing\",\n     \"Security\",\n     \"Support\",\n   ]);",
+            "proposal": {
+              "summary": "Add Billing nav item and update test to reflect new order",
+              "edits": [
+                {
+                  "path": "src/nav.ts",
+                  "oldText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];",
+                  "newText": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Billing\", href: \"/billing\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];"
+                },
+                {
+                  "path": "src/nav.test.ts",
+                  "oldText": "[\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]",
+                  "newText": "[\n    \"Home\",\n    \"Account\",\n    \"Billing\",\n    \"Security\",\n    \"Support\",\n  ]"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-hard__order-sensitive-route-insertion--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-hard__order-sensitive-route-insertion--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-hard/order-sensitive-route-insertion",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to update loading, empty, and error labels to be more specific. Retry unchanged. So we need to modify uiLabels object values for loading, empty, error to be more specific strings. The request: \"Update the loading, empty, and error labels to be more specific. Leave retry unchanged.\"\n\nWe have file content:\n\nexport const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};\n\nWe need to propose patch. Provide specific messages. But we need to decide what \"more specific\" means. Could be \"Loading data...\", \"No items found\", \"An error occurred\". Let's make reasonable specifics:\n\nloading: \"Loading data...\"\nempty: \"No items to display\"\nerror: \"An error occurred. Please try again.\"\n\nWe'll keep retry unchanged.\n\nWe need to match exact oldText block. The oldText should be the entire object or maybe entire file.\n\nWe can replace the whole object definition.\n\noldText could be:\n\nexport const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};\n\nincluding newline at end? The file includes exactly that. We'll replace with new version.\n\nMake sure to preserve indentation and line breaks.\n\nSo newText:\n\nexport const uiLabels = {\n  loading: \"Loading data...\",\n  empty: \"No items to display\",\n  error: \"An error occurred. Please try again.\",\n  retry: \"Retry\"\n};\n\nOk. Generate propose_patch.\n\n",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "f42623511",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Make uiLabels more specific for loading, empty, and error messages",
+                  "edits": [
+                    {
+                      "path": "src/uiLabels.ts",
+                      "oldText": "export const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};",
+                      "newText": "export const uiLabels = {\n  loading: \"Loading data...\",\n  empty: \"No items to display\",\n  error: \"An error occurred. Please try again.\",\n  retry: \"Retry\"\n};"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 141,
+              "output": 456,
+              "cacheRead": 896,
+              "cacheWrite": 0,
+              "totalTokens": 1493,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781290368346,
+            "responseId": "chatcmpl-c5f7c389-de02-43aa-8a96-01641243a49a"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "f42623511",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Make uiLabels more specific for loading, empty, and error messages",
+              "edits": [
+                {
+                  "path": "src/uiLabels.ts",
+                  "oldText": "export const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};",
+                  "newText": "export const uiLabels = {\n  loading: \"Loading data...\",\n  empty: \"No items to display\",\n  error: \"An error occurred. Please try again.\",\n  retry: \"Retry\"\n};"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "f42623511",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Make uiLabels more specific for loading, empty, and error messages",
+                "edits": [
+                  {
+                    "path": "src/uiLabels.ts",
+                    "oldText": "export const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};",
+                    "newText": "export const uiLabels = {\n  loading: \"Loading data...\",\n  empty: \"No items to display\",\n  error: \"An error occurred. Please try again.\",\n  retry: \"Retry\"\n};"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-hard/three-label-coordinated-update",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch updates loading, empty, and error to more specific labels, leaves retry unchanged, and makes no unrelated changes.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/uiLabels.ts\n===================================================================\n--- src/uiLabels.ts\n+++ src/uiLabels.ts\n@@ -1,6 +1,6 @@\n export const uiLabels = {\n-  loading: \"Loading\",\n-  empty: \"Empty\",\n-  error: \"Error\",\n+  loading: \"Loading data...\",\n+  empty: \"No items to display\",\n+  error: \"An error occurred. Please try again.\",\n   retry: \"Retry\"\n };",
+            "proposal": {
+              "summary": "Make uiLabels more specific for loading, empty, and error messages",
+              "edits": [
+                {
+                  "path": "src/uiLabels.ts",
+                  "oldText": "export const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};",
+                  "newText": "export const uiLabels = {\n  loading: \"Loading data...\",\n  empty: \"No items to display\",\n  error: \"An error occurred. Please try again.\",\n  retry: \"Retry\"\n};"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-hard__three-label-coordinated-update--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-hard__three-label-coordinated-update--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-hard/three-label-coordinated-update",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to change only the billing feature flag disabled reason to \"Billing disabled\". In billingFlag function, the returned object for disabled case currently has reason: \"Off\". Change that to \"Billing disabled\". SupportFlag should stay unchanged.\n\nWe must propose a patch with summary and edit. Need to include exact oldText that matches once. Could replace the whole line or block. Provide oldText: the line `return { enabled: false, reason: \"Off\" };`. But there might be similar line in supportFlag. Indeed same line appears there, so that line is not unique; need enclosing block to make unique. So we need to include a snippet that uniquely identifies the billingFlag's disabled return.\n\nOption: Include the whole if block for billingFlag. OldText could be:\n\n```\nif (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n```\n\nBut that block may be identical in supportFlag; however the surrounding context includes the function name and maybe preceding line `export function billingFlag(enabled: boolean) {`. Better include the function definition and the if block.\n\nThus oldText could be:\n\n```\nexport function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}\n```\n\nBut that includes the whole function; however there is also supportFlag function with same pattern. So oldText would not be unique? The function name differs (billingFlag vs supportFlag). The oldText snippet includes the function name, so unique. That's okay.\n\nThus we will replace that with same but reason changed.\n\nMake patch.\n\n",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "f079f8b5a",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update billing flag disabled reason to \"Billing disabled\"",
+                  "edits": [
+                    {
+                      "path": "src/flags.ts",
+                      "oldText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}",
+                      "newText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Billing disabled\" };\n  }\n  return { enabled: true };\n}"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 188,
+              "output": 484,
+              "cacheRead": 896,
+              "cacheWrite": 0,
+              "totalTokens": 1568,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781290370644,
+            "responseId": "chatcmpl-5978c8a7-5ce1-4992-87f7-4fb8d703e38b"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "f079f8b5a",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update billing flag disabled reason to \"Billing disabled\"",
+              "edits": [
+                {
+                  "path": "src/flags.ts",
+                  "oldText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}",
+                  "newText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Billing disabled\" };\n  }\n  return { enabled: true };\n}"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "f079f8b5a",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update billing flag disabled reason to \"Billing disabled\"",
+                "edits": [
+                  {
+                    "path": "src/flags.ts",
+                    "oldText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}",
+                    "newText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Billing disabled\" };\n  }\n  return { enabled: true };\n}"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/duplicate-feature-flag-branch",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates only billingFlag’s disabled reason to \"Billing disabled\" in src/flags.ts and leaves supportFlag unchanged, matching the rubric exactly.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/flags.ts\n===================================================================\n--- src/flags.ts\n+++ src/flags.ts\n@@ -1,6 +1,6 @@\n export function billingFlag(enabled: boolean) {\n   if (!enabled) {\n-    return { enabled: false, reason: \"Off\" };\n+    return { enabled: false, reason: \"Billing disabled\" };\n   }\n   return { enabled: true };\n }",
+            "proposal": {
+              "summary": "Update billing flag disabled reason to \"Billing disabled\"",
+              "edits": [
+                {
+                  "path": "src/flags.ts",
+                  "oldText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}",
+                  "newText": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Billing disabled\" };\n  }\n  return { enabled: true };\n}"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__duplicate-feature-flag-branch--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__duplicate-feature-flag-branch--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/duplicate-feature-flag-branch",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "The user wants to \"Treat whitespace-only values as invalid.\" In the code, currently isValid checks length > 0. That would treat whitespace-only strings as valid because length > 0 (e.g., \"   \" length 3). The request wants to treat whitespace-only values as invalid, meaning isValid should return false if string trimmed is empty. So need to change isValid in src/customerValidator.ts (focused) to check if trimmed length > 0, i.e., return value.trim().length > 0. Could also check (value.trim() !== \"\"). Equivalent.\n\nThus we propose patch for src/customerValidator.ts. Need to replace the function body (or entire function). Let's locate existing function:\n\n```\nexport function isValid(value: string) {\n  return value.length > 0;\n}\n```\n\nWe need to modify to:\n\n```\nexport function isValid(value: string) {\n  return value.trim().length > 0;\n}\n```\n\nWe should keep same formatting.\n\nThus propose patch with summary: Update isValid to treat whitespace-only strings as invalid by trimming.\n\nNow produce propose_patch.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "605209d02",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Treat whitespace-only values as invalid by trimming input before length check",
+                  "edits": [
+                    {
+                      "path": "src/customerValidator.ts",
+                      "oldText": "export function isValid(value: string) {\n  return value.length > 0;\n}",
+                      "newText": "export function isValid(value: string) {\n  return value.trim().length > 0;\n}"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 152,
+              "output": 324,
+              "cacheRead": 896,
+              "cacheWrite": 0,
+              "totalTokens": 1372,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781290372855,
+            "responseId": "chatcmpl-587a3625-a7f4-4806-89fd-cb800380ca71"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "605209d02",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Treat whitespace-only values as invalid by trimming input before length check",
+              "edits": [
+                {
+                  "path": "src/customerValidator.ts",
+                  "oldText": "export function isValid(value: string) {\n  return value.length > 0;\n}",
+                  "newText": "export function isValid(value: string) {\n  return value.trim().length > 0;\n}"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "605209d02",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Treat whitespace-only values as invalid by trimming input before length check",
+                "edits": [
+                  {
+                    "path": "src/customerValidator.ts",
+                    "oldText": "export function isValid(value: string) {\n  return value.length > 0;\n}",
+                    "newText": "export function isValid(value: string) {\n  return value.trim().length > 0;\n}"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-validator-decoy",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates only src/customerValidator.ts to trim before checking length, making whitespace-only values invalid. adminValidator.ts is left unchanged, and the patch is valid.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/customerValidator.ts\n===================================================================\n--- src/customerValidator.ts\n+++ src/customerValidator.ts\n@@ -1,3 +1,3 @@\n export function isValid(value: string) {\n-  return value.length > 0;\n+  return value.trim().length > 0;\n }",
+            "proposal": {
+              "summary": "Treat whitespace-only values as invalid by trimming input before length check",
+              "edits": [
+                {
+                  "path": "src/customerValidator.ts",
+                  "oldText": "export function isValid(value: string) {\n  return value.length > 0;\n}",
+                  "newText": "export function isValid(value: string) {\n  return value.trim().length > 0;\n}"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-validator-decoy--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-validator-decoy--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-validator-decoy",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    }
+  ],
+  "runDir": "eval-runs/2026-06-12T18-52-45Z",
+  "targets": [
+    "cerebras:gpt-oss-120b"
+  ]
+}

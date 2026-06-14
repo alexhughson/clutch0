@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/refunds.ts\n===================================================================\n--- src/refunds.ts\n+++ src/refunds.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordRefundCreated() {\n-  return recordEvent(\"refund.created\");\n+  return recordEvent(\"refund.created\", \"refund\");\n }",
+  "proposal": {
+    "summary": "Make recordEvent require source argument and update callers and test",
+    "edits": [
+      {
+        "path": "src/refunds.ts",
+        "oldText": "return recordEvent(\"refund.created\");",
+        "newText": "return recordEvent(\"refund.created\", \"refund\");"
+      }
+    ]
+  },
+  "status": "valid"
+}

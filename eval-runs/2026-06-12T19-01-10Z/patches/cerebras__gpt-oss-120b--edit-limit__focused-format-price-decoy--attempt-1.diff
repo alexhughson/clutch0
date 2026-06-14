@@ -1,0 +1,12 @@
+Index: src/customerPrice.ts
+===================================================================
+--- src/customerPrice.ts
++++ src/customerPrice.ts
+@@ -1,6 +1,6 @@
+ export function formatPrice(cents: number) {
+   if (cents === 0) {
+-    return "0 cents";
++    return "Free";
+   }
+   return `${cents} cents`;
+ }

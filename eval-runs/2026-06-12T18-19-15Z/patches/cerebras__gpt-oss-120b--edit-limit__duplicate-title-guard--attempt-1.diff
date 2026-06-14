@@ -1,0 +1,13 @@
+Index: src/normalize.ts
+===================================================================
+--- src/normalize.ts
++++ src/normalize.ts
+@@ -7,7 +7,7 @@
+ 
+ export function normalizeTitle(value: string) {
+   if (value.trim().length === 0) {
+-    return "Unknown";
++    return "Untitled";
+   }
+   return value.trim();
+ }

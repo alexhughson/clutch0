@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerPhone.ts\n===================================================================\n--- src/customerPhone.ts\n+++ src/customerPhone.ts\n@@ -1,6 +1,6 @@\n export function phoneLabel(phone: string) {\n   if (phone.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No phone\";\n   }\n   return phone.trim();\n }",
+  "proposal": {
+    "summary": "Change blank phone label from \"Missing\" to \"No phone\" in customerPhone.ts",
+    "edits": [
+      {
+        "path": "src/customerPhone.ts",
+        "oldText": "    return \"Missing\";",
+        "newText": "    return \"No phone\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

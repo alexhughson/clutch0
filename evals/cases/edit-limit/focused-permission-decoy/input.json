@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused customer permissions file only, allow managers to archive.",
+  "workspace": {
+    "files": {
+      "src/customerPermissions.ts": "export function canArchive(role: \"agent\" | \"manager\") {\n  return role === \"agent\";\n}\n",
+      "src/adminPermissions.ts": "export function canArchive(role: \"agent\" | \"manager\") {\n  return role === \"agent\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerPermissions.ts", "focused": true },
+    { "kind": "file", "path": "src/adminPermissions.ts" }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "classification": "text",
+  "allowedClassifications": ["text", "find_relevant_files"],
+  "forbiddenClassifications": ["run_shell_command"]
+}

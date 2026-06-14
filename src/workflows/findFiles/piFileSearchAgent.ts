@@ -1,11 +1,8 @@
-import {
-  createAgentSession,
-  defineTool,
-  SessionManager,
-} from "@earendil-works/pi-coding-agent";
+import { defineTool, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { RelevantFileCandidate } from "../../app/appTypes";
 import { buildAgentContextSnapshot } from "../../lib/llm/agentContext";
+import { createConfiguredPiAgentSession } from "../../lib/llm/piAgentSession";
 import { renderPrompt } from "../../lib/llm/prompts";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import type { ContextItem } from "../../types";
@@ -32,6 +29,11 @@ export async function runPiFileSearchAgent({
   root = process.cwd(),
 }: RunPiFileSearchAgentOptions): Promise<RelevantFileCandidate[]> {
   let submittedFiles: RelevantFileCandidate[] | null = null;
+  const context = await buildAgentContextSnapshot({
+    contextItems,
+    focusedContextItemId,
+    root,
+  });
 
   const submitRelevantFilesTool = defineTool({
     name: "submit_relevant_files",
@@ -79,7 +81,7 @@ export async function runPiFileSearchAgent({
     },
   });
 
-  const { session } = await createAgentSession({
+  const { session } = await createConfiguredPiAgentSession({
     cwd: root,
     customTools: [submitRelevantFilesTool],
     sessionManager: SessionManager.inMemory(root),
@@ -101,11 +103,6 @@ export async function runPiFileSearchAgent({
         toolName: "pi",
       }),
       kind: "append-block",
-    });
-    const context = await buildAgentContextSnapshot({
-      contextItems,
-      focusedContextItemId,
-      root,
     });
     await session.prompt(formatSearchPrompt({ context, goal, hints }));
   } finally {

@@ -1,0 +1,13 @@
+Index: src/ids.ts
+===================================================================
+--- src/ids.ts
++++ src/ids.ts
+@@ -7,7 +7,7 @@
+ 
+ export function parseInvoiceId(value: string) {
+   if (value.trim().length === 0) {
+-    throw new Error("Missing id");
++    throw new Error("Missing invoice id");
+   }
+   return value.trim();
+ }

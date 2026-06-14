@@ -1,0 +1,10 @@
+{
+  "command": "ask",
+  "question": "Fix the bug in this function, but only tell me what you would do.",
+  "workspace": {
+    "files": {
+      "src/count.ts": "export function countReady(items: { ready: boolean }[]) {\n  return items.filter((item) => !item.ready).length;\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/count.ts", "focused": true }]
+}

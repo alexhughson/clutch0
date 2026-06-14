@@ -1,0 +1,11 @@
+Index: src/paging.ts
+===================================================================
+--- src/paging.ts
++++ src/paging.ts
+@@ -1,5 +1,5 @@
+ export function pageCount(totalItems: number, pageSize: number) {
+-  return Math.floor(totalItems / pageSize);
++  return Math.ceil(totalItems / pageSize);
+ }
+ 
+ export function firstPage() {

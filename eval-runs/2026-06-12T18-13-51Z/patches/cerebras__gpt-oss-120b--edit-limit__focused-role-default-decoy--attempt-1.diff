@@ -1,0 +1,24 @@
+Index: src/customerRole.ts
+===================================================================
+--- src/customerRole.ts
++++ src/customerRole.ts
+@@ -1,6 +1,6 @@
+ export function normalizeRole(role: string | null) {
+   if (role === null) {
+-    return "member";
++    return "guest";
+   }
+   return role;
+ }
+Index: src/adminRole.ts
+===================================================================
+--- src/adminRole.ts
++++ src/adminRole.ts
+@@ -1,6 +1,6 @@
+ export function normalizeRole(role: string | null) {
+   if (role === null) {
+-    return "member";
++    return "guest";
+   }
+   return role;
+ }

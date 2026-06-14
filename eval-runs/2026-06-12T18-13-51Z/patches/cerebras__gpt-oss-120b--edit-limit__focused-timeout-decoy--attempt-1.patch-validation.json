@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerTimeout.ts\n===================================================================\n--- src/customerTimeout.ts\n+++ src/customerTimeout.ts\n@@ -1,4 +1,4 @@\n export const requestConfig = {\n-  timeoutMs: 5000,\n+  timeoutMs: 8000,\n   retries: 2,\n };\nIndex: src/adminTimeout.ts\n===================================================================\n--- src/adminTimeout.ts\n+++ src/adminTimeout.ts\n@@ -1,4 +1,4 @@\n export const requestConfig = {\n-  timeoutMs: 5000,\n+  timeoutMs: 8000,\n   retries: 2,\n };",
+  "proposal": {
+    "summary": "Increase request timeout from 5000ms to 8000ms in both customer and admin timeout config files",
+    "edits": [
+      {
+        "path": "src/customerTimeout.ts",
+        "oldText": "  timeoutMs: 5000,",
+        "newText": "  timeoutMs: 8000,"
+      },
+      {
+        "path": "src/adminTimeout.ts",
+        "oldText": "  timeoutMs: 5000,",
+        "newText": "  timeoutMs: 8000,"
+      }
+    ]
+  },
+  "status": "valid"
+}

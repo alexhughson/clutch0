@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/copy.ts\n===================================================================\n--- src/copy.ts\n+++ src/copy.ts\n@@ -1,6 +1,6 @@\n export const checkoutCopy = {\n   start: \"Begin order\",\n   finish: \"Finish order\",\n-  cancel: \"Cancel purchase\",\n-  receipt: \"Purchase receipt\",\n+  cancel: \"Cancel order\",\n+  receipt: \"Order receipt\",\n };",
+  "proposal": {
+    "summary": "Rename remaining purchase strings to order strings in checkoutCopy",
+    "edits": [
+      {
+        "path": "src/copy.ts",
+        "oldText": "  cancel: \"Cancel purchase\",",
+        "newText": "  cancel: \"Cancel order\","
+      },
+      {
+        "path": "src/copy.ts",
+        "oldText": "  receipt: \"Purchase receipt\",",
+        "newText": "  receipt: \"Order receipt\","
+      }
+    ]
+  },
+  "status": "valid"
+}

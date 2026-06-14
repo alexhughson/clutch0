@@ -1,0 +1,9 @@
+{
+  "command": "cmd",
+  "question": "Print the package scripts.",
+  "workspace": {
+    "files": {
+      "package.json": "{ \"scripts\": { \"test\": \"bun test\" } }\n"
+    }
+  }
+}

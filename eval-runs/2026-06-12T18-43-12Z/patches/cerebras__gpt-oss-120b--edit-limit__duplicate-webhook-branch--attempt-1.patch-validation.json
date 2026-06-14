@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/messages.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update webhookMessage queued response text",
+    "edits": [
+      {
+        "path": "src/messages.ts",
+        "oldText": "    return \"Queued\";",
+        "newText": "    return \"Webhook queued\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

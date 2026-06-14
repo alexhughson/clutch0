@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: docs/billing.md\n===================================================================\n--- docs/billing.md\n+++ docs/billing.md\n@@ -3,4 +3,5 @@\n ## Queue\n \n Status: Active\n+Owner: Revenue Ops\n SLA: 2 hours",
+  "proposal": {
+    "summary": "Add Owner line under Status in Billing docs only",
+    "edits": [
+      {
+        "path": "docs/billing.md",
+        "oldText": "## Queue\n\nStatus: Active\nSLA: 2 hours\n",
+        "newText": "## Queue\n\nStatus: Active\nOwner: Revenue Ops\nSLA: 2 hours\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,12 @@
+Index: src/customerNote.ts
+===================================================================
+--- src/customerNote.ts
++++ src/customerNote.ts
+@@ -1,6 +1,6 @@
+ export function notePreview(note: string | null) {
+   if (note === null) {
+-    return "None";
++    return "No note";
+   }
+   return note;
+ }

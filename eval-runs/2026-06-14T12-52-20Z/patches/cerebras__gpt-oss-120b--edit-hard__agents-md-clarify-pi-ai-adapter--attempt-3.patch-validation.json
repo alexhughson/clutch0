@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: AGENTS.md\n===================================================================\n--- AGENTS.md\n+++ AGENTS.md\n@@ -2,6 +2,8 @@\n \n OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.\n \n+**Note:** *pi-ai* serves as the LLM model adapter layer, handling model selection and configuration.\n+\n ## Core map\n \n - App shell: `src/index.tsx`, `src/App.tsx`",
+  "proposal": {
+    "summary": "Clarify pi-ai as LLM model adapter layer in AGENTS.md",
+    "edits": [
+      {
+        "path": "AGENTS.md",
+        "oldText": "OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.",
+        "newText": "OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.\n\n**Note:** *pi-ai* serves as the LLM model adapter layer, handling model selection and configuration."
+      }
+    ]
+  },
+  "status": "valid"
+}

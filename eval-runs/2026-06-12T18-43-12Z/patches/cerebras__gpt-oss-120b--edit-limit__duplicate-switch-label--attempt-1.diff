@@ -1,0 +1,13 @@
+Index: src/statusLabels.ts
+===================================================================
+--- src/statusLabels.ts
++++ src/statusLabels.ts
+@@ -1,7 +1,7 @@
+ export function paymentStatusLabel(status: "pending" | "done") {
+   switch (status) {
+     case "pending":
+-      return "Pending";
++      return "Awaiting payment";
+     case "done":
+       return "Done";
+   }

@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/flags.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Change disabled reason for billingFlag to \"Billing disabled\"",
+    "edits": [
+      {
+        "path": "src/flags.ts",
+        "oldText": "return { enabled: false, reason: \"Off\" };",
+        "newText": "return { enabled: false, reason: \"Billing disabled\" };"
+      }
+    ]
+  },
+  "status": "invalid"
+}

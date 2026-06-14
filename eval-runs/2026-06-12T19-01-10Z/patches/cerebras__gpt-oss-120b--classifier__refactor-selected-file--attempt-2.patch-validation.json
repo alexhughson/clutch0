@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/status.ts\n===================================================================\n--- src/status.ts\n+++ src/status.ts\n@@ -1,5 +1,8 @@\n+const STATUS_LABELS = {\n+  open: \"Open\",\n+  closed: \"Closed\",\n+} as const;\n+\n export function statusLabel(status: \"open\" | \"closed\") {\n-  if (status === \"open\") return \"Open\";\n-  if (status === \"closed\") return \"Closed\";\n-  return \"Closed\";\n+  return STATUS_LABELS[status];\n }",
+  "proposal": {
+    "summary": "Refactor statusLabel to use a lookup map, removing duplicated label strings",
+    "edits": [
+      {
+        "path": "src/status.ts",
+        "oldText": "export function statusLabel(status: \"open\" | \"closed\") {\n  if (status === \"open\") return \"Open\";\n  if (status === \"closed\") return \"Closed\";\n  return \"Closed\";\n}\n",
+        "newText": "const STATUS_LABELS = {\n  open: \"Open\",\n  closed: \"Closed\",\n} as const;\n\nexport function statusLabel(status: \"open\" | \"closed\") {\n  return STATUS_LABELS[status];\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

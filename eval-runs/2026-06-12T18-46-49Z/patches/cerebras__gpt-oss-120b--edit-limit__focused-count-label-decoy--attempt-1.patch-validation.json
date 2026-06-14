@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerCount.ts\n===================================================================\n--- src/customerCount.ts\n+++ src/customerCount.ts\n@@ -1,6 +1,6 @@\n export function countLabel(count: number) {\n   if (count === 0) {\n-    return \"0 items\";\n+    return \"None\";\n   }\n   return `${count} items`;\n }",
+  "proposal": {
+    "summary": "Show zero counts as \"None\" in src/customerCount.ts",
+    "edits": [
+      {
+        "path": "src/customerCount.ts",
+        "oldText": "    return \"0 items\";",
+        "newText": "    return \"None\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,12 @@
+Index: src/uiLabels.ts
+===================================================================
+--- src/uiLabels.ts
++++ src/uiLabels.ts
+@@ -1,6 +1,6 @@
+ export const uiLabels = {
+   loading: "Loading",
+   empty: "Empty",
+-  error: "Error",
++  error: "An error occurred",
+   retry: "Retry"
+ };

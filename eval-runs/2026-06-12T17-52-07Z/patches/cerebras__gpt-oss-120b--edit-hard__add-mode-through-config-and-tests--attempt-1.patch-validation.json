@@ -1,0 +1,34 @@
+{
+  "diffText": "Index: src/deliveryModes.ts\n===================================================================\n--- src/deliveryModes.ts\n+++ src/deliveryModes.ts\n@@ -1,10 +1,13 @@\n-export type DeliveryMode = \"pickup\" | \"shipping\";\n+export type DeliveryMode = \"pickup\" | \"shipping\" | \"scheduled\";\n \n-export const enabledDeliveryModes: DeliveryMode[] = [\"pickup\", \"shipping\"];\n+export const enabledDeliveryModes: DeliveryMode[] = [\"pickup\", \"shipping\", \"scheduled\"];\n \n export function deliveryModeLabel(mode: DeliveryMode) {\n   if (mode === \"pickup\") {\n     return \"Pickup\";\n   }\n+  if (mode === \"scheduled\") {\n+    return \"Scheduled delivery\";\n+  }\n   return \"Shipping\";\n }\nIndex: src/deliveryModes.test.ts\n===================================================================\n--- src/deliveryModes.test.ts\n+++ src/deliveryModes.test.ts\n@@ -1,10 +1,11 @@\n import { deliveryModeLabel, enabledDeliveryModes } from \"./deliveryModes\";\n \n test(\"default delivery modes\", () => {\n-  expect(enabledDeliveryModes).toEqual([\"pickup\", \"shipping\"]);\n+  expect(enabledDeliveryModes).toEqual([\"pickup\", \"shipping\", \"scheduled\"]);\n });\n \n test(\"delivery labels\", () => {\n   expect(deliveryModeLabel(\"pickup\")).toBe(\"Pickup\");\n   expect(deliveryModeLabel(\"shipping\")).toBe(\"Shipping\");\n+  expect(deliveryModeLabel(\"scheduled\")).toBe(\"Scheduled delivery\");\n });",
+  "proposal": {
+    "summary": "Add scheduled delivery mode, enable by default, and update label and tests",
+    "edits": [
+      {
+        "path": "src/deliveryModes.ts",
+        "oldText": "export type DeliveryMode = \"pickup\" | \"shipping\";",
+        "newText": "export type DeliveryMode = \"pickup\" | \"shipping\" | \"scheduled\";"
+      },
+      {
+        "path": "src/deliveryModes.ts",
+        "oldText": "export const enabledDeliveryModes: DeliveryMode[] = [\"pickup\", \"shipping\"];",
+        "newText": "export const enabledDeliveryModes: DeliveryMode[] = [\"pickup\", \"shipping\", \"scheduled\"];"
+      },
+      {
+        "path": "src/deliveryModes.ts",
+        "oldText": "export function deliveryModeLabel(mode: DeliveryMode) {\n  if (mode === \"pickup\") {\n    return \"Pickup\";\n  }\n  return \"Shipping\";\n}",
+        "newText": "export function deliveryModeLabel(mode: DeliveryMode) {\n  if (mode === \"pickup\") {\n    return \"Pickup\";\n  }\n  if (mode === \"scheduled\") {\n    return \"Scheduled delivery\";\n  }\n  return \"Shipping\";\n}"
+      },
+      {
+        "path": "src/deliveryModes.test.ts",
+        "oldText": "expect(enabledDeliveryModes).toEqual([\"pickup\", \"shipping\"]);",
+        "newText": "expect(enabledDeliveryModes).toEqual([\"pickup\", \"shipping\", \"scheduled\"]);"
+      },
+      {
+        "path": "src/deliveryModes.test.ts",
+        "oldText": "expect(deliveryModeLabel(\"pickup\")).toBe(\"Pickup\");\n  expect(deliveryModeLabel(\"shipping\")).toBe(\"Shipping\");",
+        "newText": "expect(deliveryModeLabel(\"pickup\")).toBe(\"Pickup\");\n  expect(deliveryModeLabel(\"shipping\")).toBe(\"Shipping\");\n  expect(deliveryModeLabel(\"scheduled\")).toBe(\"Scheduled delivery\");"
+      }
+    ]
+  },
+  "status": "valid"
+}

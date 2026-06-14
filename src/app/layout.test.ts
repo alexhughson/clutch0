@@ -58,6 +58,7 @@ test("only passive panes share context-list keyboard navigation", () => {
 
 function configTask(mode: "first-run" | "settings"): AppTask {
   return {
+    agent: { model: "gpt-test", provider: "openai" },
     configuredProviders: [],
     kind: "config",
     mode,

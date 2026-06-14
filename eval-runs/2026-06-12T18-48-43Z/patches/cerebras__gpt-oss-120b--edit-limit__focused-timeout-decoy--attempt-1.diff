@@ -1,0 +1,10 @@
+Index: src/customerTimeout.ts
+===================================================================
+--- src/customerTimeout.ts
++++ src/customerTimeout.ts
+@@ -1,4 +1,4 @@
+ export const requestConfig = {
+-  timeoutMs: 5000,
++  timeoutMs: 8000,
+   retries: 2,
+ };

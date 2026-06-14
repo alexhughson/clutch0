@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: docs/config.md\n===================================================================\n--- docs/config.md\n+++ docs/config.md\n@@ -15,7 +15,7 @@\n ```json\n {\n   \"mode\": \"production\",\n-  \"timeoutMs\": 30000,\n+  \"timeoutMs\": 45000,\n   \"retries\": 2\n }\n ```",
+  "proposal": {
+    "summary": "Update Production timeoutMs from 30000 to 45000",
+    "edits": [
+      {
+        "path": "docs/config.md",
+        "oldText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}",
+        "newText": "{\n  \"mode\": \"production\",\n  \"timeoutMs\": 45000,\n  \"retries\": 2\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

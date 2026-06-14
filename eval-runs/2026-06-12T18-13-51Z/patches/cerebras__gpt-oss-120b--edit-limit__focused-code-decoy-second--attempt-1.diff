@@ -1,0 +1,24 @@
+Index: src/mobileTheme.ts
+===================================================================
+--- src/mobileTheme.ts
++++ src/mobileTheme.ts
+@@ -1,6 +1,6 @@
+ export const theme = {
+   button: {
+-    radius: 6,
++    radius: 10,
+     padding: 12,
+   },
+ };
+Index: src/desktopTheme.ts
+===================================================================
+--- src/desktopTheme.ts
++++ src/desktopTheme.ts
+@@ -1,6 +1,6 @@
+ export const theme = {
+   button: {
+-    radius: 6,
++    radius: 10,
+     padding: 12,
+   },
+ };

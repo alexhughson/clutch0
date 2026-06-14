@@ -1,0 +1,9 @@
+{
+  "question": "Make a plan for how you would split this module. Do not edit yet.",
+  "workspace": {
+    "files": {
+      "src/module.ts": "export function one() { return 1; }\nexport function two() { return 2; }\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/module.ts", "focused": true }]
+}

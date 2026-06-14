@@ -1,5 +1,6 @@
 import type { ContextItemReplacementTarget } from "../../app/appTypes";
-import { getAutomaticFileContextItems } from "../../lib/context/automaticContextItems";
+import type { ComposerState } from "../../app/appTypes";
+import { assembleLlmContextInput } from "../../lib/llm/context";
 import {
   LlmCompletionError,
   streamLlmInteraction,
@@ -12,24 +13,20 @@ export function startLlmRequest(
   options: {
     allowedToolNames?: readonly string[];
     commandDirective?: string;
+    rejectComposer?: ComposerState;
     replacement?: ContextItemReplacementTarget;
   } = {},
 ) {
   const currentState = useAppStore.getState();
-  const contextItems = [
-    ...getAutomaticFileContextItems({
-      automaticContextItems: currentState.workspace.automaticContextItems,
-      contextItems: currentState.workspace.contextItems,
-    }),
-    ...currentState.workspace.contextItems,
-  ].filter((item) => item.id !== options.replacement?.contextItemId);
-  const focusedContextItemId = contextItems.some(
-    (item) => item.id === currentState.workspace.focusedContextItemId,
-  )
-    ? currentState.workspace.focusedContextItemId
-    : null;
+  const { contextItems, focusedContextItemId } = assembleLlmContextInput({
+    automaticContextItems: currentState.workspace.automaticContextItems,
+    contextItems: currentState.workspace.contextItems,
+    excludedContextItemId: options.replacement?.contextItemId,
+    focusedContextItemId: currentState.workspace.focusedContextItemId,
+  });
   const requestId = currentState.actions.compose.startLlmRequest({
     question,
+    rejectComposer: options.rejectComposer,
     replacement: options.replacement,
   });
   if (requestId === null) {

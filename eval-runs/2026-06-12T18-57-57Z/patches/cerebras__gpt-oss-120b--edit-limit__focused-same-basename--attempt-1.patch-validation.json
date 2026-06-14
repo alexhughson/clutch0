@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customer/settings.ts\n===================================================================\n--- src/customer/settings.ts\n+++ src/customer/settings.ts\n@@ -1,4 +1,4 @@\n export const defaults = {\n-  retries: 2,\n+  retries: 3,\n   timeoutMs: 5000,\n };",
+  "proposal": {
+    "summary": "Set retries to 3 in src/customer/settings.ts defaults",
+    "edits": [
+      {
+        "path": "src/customer/settings.ts",
+        "oldText": "export const defaults = {\n  retries: 2,\n  timeoutMs: 5000,\n};\n",
+        "newText": "export const defaults = {\n  retries: 3,\n  timeoutMs: 5000,\n};\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

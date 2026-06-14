@@ -7,9 +7,32 @@ import {
   createSavedDiffContextItem,
   createSavedLlmResponseContextItem,
   createUserTextContextItem,
+  getFileContextItemId,
   PiAgentContextItem,
 } from "../context/contextItems";
-import { buildLlmContext, MAX_FILE_CONTEXT_CHARACTERS } from "./context";
+import { createAutomaticContextItems } from "../context/automaticContextItems";
+import {
+  assembleLlmContextInput,
+  buildLlmContext,
+  MAX_FILE_CONTEXT_CHARACTERS,
+} from "./context";
+
+test("assembles automatic file context with selected context", () => {
+  const selected = createFileContextItem("src/App.tsx");
+  const assembled = assembleLlmContextInput({
+    automaticContextItems: createAutomaticContextItems(),
+    contextItems: [selected],
+    focusedContextItemId: getFileContextItemId("AGENTS.md"),
+  });
+
+  expect(assembled.contextItems.map((item) => item.id)).toEqual([
+    getFileContextItemId("AGENTS.md"),
+    selected.id,
+  ]);
+  expect(assembled.focusedContextItemId).toBe(
+    getFileContextItemId("AGENTS.md"),
+  );
+});
 
 test("builds LLM context from selected file contents on disk", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
@@ -47,7 +70,7 @@ test("marks focused context item for the LLM", async () => {
   });
 
   expect(getUserContent(context)).toContain(
-    "Focused context item:\n@example.ts",
+    "Focused context item (edit target unless the request says otherwise):\n@example.ts",
   );
   expect(getUserContent(context)).toContain(
     '<file path="example.ts" focused="true">',
@@ -137,7 +160,7 @@ test("builds LLM context from user text context items", async () => {
   });
 
   expect(getUserContent(context)).toContain(
-    "Focused context item:\nUser text:",
+    "Focused context item (edit target unless the request says otherwise):\nUser text:",
   );
   expect(getUserContent(context)).toContain("<user_text");
   expect(getUserContent(context)).toContain('focused="true"');

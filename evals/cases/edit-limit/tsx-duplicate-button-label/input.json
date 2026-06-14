@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Change only the secondary action button label to \"Keep editing\". Leave the primary action label unchanged.",
+  "workspace": {
+    "files": {
+      "src/actions.tsx": "export function Actions() {\n  return (\n    <footer>\n      <button data-kind=\"primary\">Continue</button>\n      <button data-kind=\"secondary\">Continue</button>\n    </footer>\n  );\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/actions.tsx", "focused": true }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/plural.ts\n===================================================================\n--- src/plural.ts\n+++ src/plural.ts\n@@ -1,3 +1,3 @@\n export function resultLabel(count: number) {\n-  return `${count} results`;\n+  return `${count} ${count === 1 ? 'result' : 'results'}`;\n }",
+  "proposal": {
+    "summary": "Pluralize result label correctly for singular count",
+    "edits": [
+      {
+        "path": "src/plural.ts",
+        "oldText": "export function resultLabel(count: number) {\n  return `${count} results`;\n}",
+        "newText": "export function resultLabel(count: number) {\n  return `${count} ${count === 1 ? 'result' : 'results'}`;\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

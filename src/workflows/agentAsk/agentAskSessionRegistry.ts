@@ -1,6 +1,6 @@
 import {
-  createAgentSession,
   type AgentSession,
+  type ResourceLoader,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import {
@@ -8,12 +8,14 @@ import {
   formatPiAgentOutputUpdate,
 } from "../../lib/agentOutput/piAgentOutputAdapter";
 import { buildAgentPromptWithContext } from "../../lib/llm/agentContext";
+import { createConfiguredPiAgentSession } from "../../lib/llm/piAgentSession";
 import { useAppStore } from "../../store/appStore";
 import type { AgentAskMode, ContextItem } from "../../types";
 import {
   activateAgentAskTools,
   createAgentAskResourceLoader,
 } from "./agentAskResources";
+import { buildAgentSkillKickoffPrompt } from "./agentSkillKickoff";
 import {
   createAgentSandbox,
   getAgentSandboxDiff,
@@ -36,6 +38,7 @@ export async function startAgentAskSession({
   mode = "ask",
   prompt,
   root = process.cwd(),
+  skillName,
 }: {
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
@@ -43,16 +46,11 @@ export async function startAgentAskSession({
   mode?: AgentAskMode;
   prompt: string;
   root?: string;
+  skillName?: string;
 }) {
   let sandbox: AgentSandbox | undefined;
 
   try {
-    const initialPrompt = await buildAgentPromptWithContext({
-      contextItems,
-      focusedContextItemId,
-      prompt,
-      root,
-    });
     sandbox = mode === "edit" ? await createAgentSandbox({ root }) : undefined;
     const sessionRoot = sandbox?.path ?? root;
     if (sandbox !== undefined) {
@@ -70,7 +68,15 @@ export async function startAgentAskSession({
     const resourceLoader = await createAgentAskResourceLoader({
       root: sessionRoot,
     });
-    const { session } = await createAgentSession({
+    const initialPrompt = await buildInitialAgentPrompt({
+      contextItems,
+      focusedContextItemId,
+      prompt,
+      resourceLoader,
+      root: sessionRoot,
+      skillName,
+    });
+    const { session } = await createConfiguredPiAgentSession({
       cwd: sessionRoot,
       noTools: "builtin",
       resourceLoader,
@@ -94,9 +100,11 @@ export async function startAgentAskSession({
         block: createAgentToolBlock({
           phase: "start",
           summary:
-            mode === "edit"
-              ? "agent edit sandbox session"
-              : "agent ask session",
+            skillName !== undefined
+              ? `agent skill ${skillName}`
+              : mode === "edit"
+                ? "agent edit sandbox session"
+                : "agent ask session",
           toolName: "pi",
         }),
         kind: "append-block",
@@ -112,6 +120,39 @@ export async function startAgentAskSession({
       itemId,
     });
   }
+}
+
+async function buildInitialAgentPrompt({
+  contextItems,
+  focusedContextItemId,
+  prompt,
+  resourceLoader,
+  root,
+  skillName,
+}: {
+  contextItems: readonly ContextItem[];
+  focusedContextItemId: string | null;
+  prompt: string;
+  resourceLoader: ResourceLoader;
+  root: string;
+  skillName?: string;
+}) {
+  const userMessage = await buildAgentPromptWithContext({
+    contextItems,
+    focusedContextItemId,
+    prompt,
+    root,
+  });
+
+  if (skillName === undefined) {
+    return userMessage;
+  }
+
+  return await buildAgentSkillKickoffPrompt({
+    resourceLoader,
+    skillName,
+    userMessage,
+  });
 }
 
 export async function sendAgentAskMessage({

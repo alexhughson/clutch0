@@ -1,0 +1,17 @@
+Index: src/status.ts
+===================================================================
+--- src/status.ts
++++ src/status.ts
+@@ -1,5 +1,8 @@
+-export function statusLabel(status: "open" | "closed") {
+-  if (status === "open") return "Open";
+-  if (status === "closed") return "Closed";
+-  return "Closed";
++const statusLabels = {
++  open: "Open",
++  closed: "Closed",
++} as const;
++
++export function statusLabel(status: keyof typeof statusLabels) {
++  return statusLabels[status];
+ }

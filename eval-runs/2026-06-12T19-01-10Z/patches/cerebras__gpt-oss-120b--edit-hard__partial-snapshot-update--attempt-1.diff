@@ -1,0 +1,25 @@
+Index: src/invoiceTitle.ts
+===================================================================
+--- src/invoiceTitle.ts
++++ src/invoiceTitle.ts
+@@ -1,6 +1,6 @@
+ export function invoiceTitle(status: "pending" | "paid") {
+   if (status === "pending") {
+-    return "Pending payment";
++    return "Awaiting payment";
+   }
+   return "Paid invoice";
+ }
+Index: src/invoiceTitle.test.ts
+===================================================================
+--- src/invoiceTitle.test.ts
++++ src/invoiceTitle.test.ts
+@@ -3,7 +3,7 @@
+ test("invoice titles", () => {
+   expect([invoiceTitle("pending"), invoiceTitle("paid")]).toMatchInlineSnapshot(`
+     [
+-      "Pending payment",
++      "Awaiting payment",
+       "Paid invoice",
+     ]
+   `);

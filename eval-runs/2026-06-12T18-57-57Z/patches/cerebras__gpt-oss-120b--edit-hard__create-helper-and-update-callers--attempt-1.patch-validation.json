@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/userMenu.ts\n===================================================================\n--- src/userMenu.ts\n+++ src/userMenu.ts\n@@ -1,4 +1,5 @@\n+import { formatName } from \"./formatName\";\n+\n export function userMenuName(user: { name?: string; email: string }) {\n-  const name = user.name?.trim();\n-  return name && name.length > 0 ? name : user.email;\n+  return formatName(user);\n }",
+  "proposal": {
+    "summary": "Add shared formatName helper and update userCardName and userMenuName to use it",
+    "edits": [
+      {
+        "path": "src/userMenu.ts",
+        "oldText": "export function userMenuName(user: { name?: string; email: string }) {\n  const name = user.name?.trim();\n  return name && name.length > 0 ? name : user.email;\n}",
+        "newText": "import { formatName } from \"./formatName\";\n\nexport function userMenuName(user: { name?: string; email: string }) {\n  return formatName(user);\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

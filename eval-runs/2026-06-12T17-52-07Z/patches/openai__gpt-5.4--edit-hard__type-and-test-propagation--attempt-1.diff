@@ -1,0 +1,28 @@
+Index: src/discount.ts
+===================================================================
+--- src/discount.ts
++++ src/discount.ts
+@@ -1,4 +1,4 @@
+-export type DiscountKind = "none" | "percent";
++export type DiscountKind = "none" | "percent" | "fixed";
+ 
+ export function describeDiscount(kind: DiscountKind) {
+   switch (kind) {
+@@ -6,5 +6,7 @@
+       return "No discount";
+     case "percent":
+       return "Percentage";
++    case "fixed":
++      return "Fixed amount";
+   }
+ }
+Index: src/discount.test.ts
+===================================================================
+--- src/discount.test.ts
++++ src/discount.test.ts
+@@ -3,4 +3,5 @@
+ test("describes discounts", () => {
+   expect(describeDiscount("none")).toBe("No discount");
+   expect(describeDiscount("percent")).toBe("Percentage");
++  expect(describeDiscount("fixed")).toBe("Fixed amount");
+ });

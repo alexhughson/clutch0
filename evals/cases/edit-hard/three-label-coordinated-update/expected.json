@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/uiLabels.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should update all three requested labels: loading, empty, and error. It should leave retry unchanged and avoid unrelated rewrites."
+  }
+}

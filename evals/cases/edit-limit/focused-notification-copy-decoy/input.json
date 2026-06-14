@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Change the saved notification text to \"Saved successfully\".",
+  "workspace": {
+    "files": {
+      "src/customerNotification.ts": "export function savedNotification() {\n  return \"Saved\";\n}\n",
+      "src/adminNotification.ts": "export function savedNotification() {\n  return \"Saved\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerNotification.ts", "focused": true },
+    { "kind": "file", "path": "src/adminNotification.ts" }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerIds.ts"],
+    "allowedPaths": ["src/customerIds.ts"],
+    "forbiddenPaths": ["src/adminIds.ts"],
+    "diffIncludes": ["+    return [];"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerIds.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerIds.ts file so empty input returns an empty array. adminIds.ts must remain unchanged."
+  }
+}

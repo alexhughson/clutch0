@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerPrice.ts"],
+    "allowedPaths": ["src/customerPrice.ts"],
+    "forbiddenPaths": ["src/adminPrice.ts"],
+    "diffIncludes": ["+    return \"Free\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerPrice.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerPrice.ts file so zero prices render as \"Free\" while non-zero prices still render as cents. adminPrice.ts must remain unchanged."
+  }
+}

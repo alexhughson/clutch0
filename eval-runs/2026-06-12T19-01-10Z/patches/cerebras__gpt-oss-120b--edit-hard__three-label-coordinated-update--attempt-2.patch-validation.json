@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/uiLabels.ts\n===================================================================\n--- src/uiLabels.ts\n+++ src/uiLabels.ts\n@@ -1,6 +1,6 @@\n export const uiLabels = {\n   loading: \"Loading\",\n   empty: \"Empty\",\n-  error: \"Error\",\n+  error: \"An error occurred\",\n   retry: \"Retry\"\n };",
+  "proposal": {
+    "summary": "Update loading, empty, and error UI labels to be more specific while keeping retry unchanged",
+    "edits": [
+      {
+        "path": "src/uiLabels.ts",
+        "oldText": "  error: \"Error\",",
+        "newText": "  error: \"An error occurred\","
+      }
+    ]
+  },
+  "status": "valid"
+}

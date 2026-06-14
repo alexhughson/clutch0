@@ -1,0 +1,24 @@
+Index: src/customerCount.ts
+===================================================================
+--- src/customerCount.ts
++++ src/customerCount.ts
+@@ -1,6 +1,6 @@
+ export function countLabel(count: number) {
+   if (count === 0) {
+-    return "0 items";
++    return "None";
+   }
+   return `${count} items`;
+ }
+Index: src/adminCount.ts
+===================================================================
+--- src/adminCount.ts
++++ src/adminCount.ts
+@@ -1,6 +1,6 @@
+ export function countLabel(count: number) {
+   if (count === 0) {
+-    return "0 items";
++    return "None";
+   }
+   return `${count} items`;
+ }

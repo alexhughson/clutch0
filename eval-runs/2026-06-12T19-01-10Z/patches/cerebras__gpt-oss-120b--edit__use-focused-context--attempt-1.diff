@@ -1,0 +1,12 @@
+Index: src/parser.ts
+===================================================================
+--- src/parser.ts
++++ src/parser.ts
+@@ -1,3 +1,6 @@
+-export function parseCount(input: string) {
++export function parseCount(input: string): number | null {
++  if (input.trim() === "") {
++    return null;
++  }
+   return Number(input);
+ }

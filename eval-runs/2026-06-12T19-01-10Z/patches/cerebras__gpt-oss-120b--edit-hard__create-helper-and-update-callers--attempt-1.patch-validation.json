@@ -1,0 +1,24 @@
+{
+  "diffText": "===================================================================\n--- /dev/null\n+++ src/formatName.ts\n@@ -0,0 +1,4 @@\n+export function formatName(user: { name?: string; email: string }): string {\n+  const name = user.name?.trim();\n+  return name && name.length > 0 ? name : user.email;\n+}\nIndex: src/userCard.ts\n===================================================================\n--- src/userCard.ts\n+++ src/userCard.ts\n@@ -1,4 +1,5 @@\n+import { formatName } from \"./formatName\";\n+\n export function userCardName(user: { name?: string; email: string }) {\n-  const name = user.name?.trim();\n-  return name && name.length > 0 ? name : user.email;\n+  return formatName(user);\n }\nIndex: src/userMenu.ts\n===================================================================\n--- src/userMenu.ts\n+++ src/userMenu.ts\n@@ -1,4 +1,5 @@\n+import { formatName } from \"./formatName\";\n+\n export function userMenuName(user: { name?: string; email: string }) {\n-  const name = user.name?.trim();\n-  return name && name.length > 0 ? name : user.email;\n+  return formatName(user);\n }",
+  "proposal": {
+    "summary": "Add shared formatName helper and refactor userCardName and userMenuName to use it",
+    "edits": [
+      {
+        "path": "src/formatName.ts",
+        "oldText": "",
+        "newText": "export function formatName(user: { name?: string; email: string }): string {\n  const name = user.name?.trim();\n  return name && name.length > 0 ? name : user.email;\n}\n"
+      },
+      {
+        "path": "src/userCard.ts",
+        "oldText": "export function userCardName(user: { name?: string; email: string }) {\n  const name = user.name?.trim();\n  return name && name.length > 0 ? name : user.email;\n}",
+        "newText": "import { formatName } from \"./formatName\";\n\nexport function userCardName(user: { name?: string; email: string }) {\n  return formatName(user);\n}"
+      },
+      {
+        "path": "src/userMenu.ts",
+        "oldText": "export function userMenuName(user: { name?: string; email: string }) {\n  const name = user.name?.trim();\n  return name && name.length > 0 ? name : user.email;\n}",
+        "newText": "import { formatName } from \"./formatName\";\n\nexport function userMenuName(user: { name?: string; email: string }) {\n  return formatName(user);\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

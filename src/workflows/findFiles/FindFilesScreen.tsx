@@ -7,6 +7,7 @@ import {
   getFileContextItemId,
   hasContextItem,
 } from "../../lib/context/contextItems";
+import { assembleLlmContextInput } from "../../lib/llm/context";
 import { getVerticalNavigationDirection, isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import { runPiFileSearchAgent } from "./piFileSearchAgent";
@@ -25,12 +26,11 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
 
     let cancelled = false;
     const state = useAppStore.getState();
-    const contextItems = [...state.workspace.contextItems];
-    const focusedContextItemId = contextItems.some(
-      (item) => item.id === state.workspace.focusedContextItemId,
-    )
-      ? state.workspace.focusedContextItemId
-      : null;
+    const { contextItems, focusedContextItemId } = assembleLlmContextInput({
+      automaticContextItems: state.workspace.automaticContextItems,
+      contextItems: state.workspace.contextItems,
+      focusedContextItemId: state.workspace.focusedContextItemId,
+    });
     void runPiFileSearchAgent({
       contextItems,
       focusedContextItemId,

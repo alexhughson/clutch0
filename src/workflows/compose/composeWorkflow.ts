@@ -10,10 +10,8 @@ import {
   getFileContextItemId,
   hasContextItem,
 } from "../../lib/context/contextItems";
-import {
-  getAutomaticFileContextItems,
-  getVisibleContextItems,
-} from "../../lib/context/automaticContextItems";
+import { getVisibleContextItems } from "../../lib/context/automaticContextItems";
+import { assembleLlmContextInput } from "../../lib/llm/context";
 import type { FilePath } from "../../types";
 
 type SetAppState = (
@@ -63,8 +61,8 @@ export function createComposeActions({
           composer,
         },
       })),
-    startLlmRequest: ({ question, replacement }) =>
-      startLlmRequest({ get, question, replacement, set }),
+    startLlmRequest: ({ question, rejectComposer, replacement }) =>
+      startLlmRequest({ get, question, rejectComposer, replacement, set }),
   };
 }
 
@@ -127,32 +125,29 @@ function acceptFileSelection(
 function startLlmRequest({
   get,
   question,
+  rejectComposer,
   replacement,
   set,
 }: {
   get: GetAppState;
   question: string;
+  rejectComposer?: ComposerState;
   replacement?: ContextItemReplacementTarget;
   set: SetAppState;
 }): number | null {
   const state = get();
   const requestId = state.nextLlmRequestId;
-  const contextItems = [
-    ...getAutomaticFileContextItems({
-      automaticContextItems: state.workspace.automaticContextItems,
-      contextItems: state.workspace.contextItems,
-    }),
-    ...state.workspace.contextItems,
-  ].filter((item) => item.id !== replacement?.contextItemId);
-  const focusedContextItemId = contextItems.some(
-    (item) => item.id === state.workspace.focusedContextItemId,
-  )
-    ? state.workspace.focusedContextItemId
-    : null;
+  const { contextItems, focusedContextItemId } = assembleLlmContextInput({
+    automaticContextItems: state.workspace.automaticContextItems,
+    contextItems: state.workspace.contextItems,
+    excludedContextItemId: replacement?.contextItemId,
+    focusedContextItemId: state.workspace.focusedContextItemId,
+  });
 
   set({
     activeTask: {
       kind: "response",
+      ...(rejectComposer === undefined ? {} : { rejectComposer }),
       request: {
         contextItems,
         focusedContextItemId,

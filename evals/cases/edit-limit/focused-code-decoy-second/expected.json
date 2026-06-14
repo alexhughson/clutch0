@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/mobileTheme.ts"],
+    "allowedPaths": ["src/mobileTheme.ts"],
+    "forbiddenPaths": ["src/desktopTheme.ts"],
+    "diffIncludes": ["+    radius: 10,"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/mobileTheme.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused mobileTheme.ts file, increasing button.radius to 10. desktopTheme.ts must remain unchanged."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/ids.ts\n===================================================================\n--- src/ids.ts\n+++ src/ids.ts\n@@ -7,7 +7,7 @@\n \n export function parseInvoiceId(value: string) {\n   if (value.trim().length === 0) {\n-    throw new Error(\"Missing id\");\n+    throw new Error(\"Missing invoice id\");\n   }\n   return value.trim();\n }",
+  "proposal": {
+    "summary": "Change parseInvoiceId missing-id error message to \"Missing invoice id\"",
+    "edits": [
+      {
+        "path": "src/ids.ts",
+        "oldText": "export function parseInvoiceId(value: string) {\n  if (value.trim().length === 0) {\n    throw new Error(\"Missing id\");\n  }\n  return value.trim();\n}",
+        "newText": "export function parseInvoiceId(value: string) {\n  if (value.trim().length === 0) {\n    throw new Error(\"Missing invoice id\");\n  }\n  return value.trim();\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

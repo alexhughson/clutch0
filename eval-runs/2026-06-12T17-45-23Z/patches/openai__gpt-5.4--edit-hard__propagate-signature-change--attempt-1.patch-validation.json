@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/retry.ts\n===================================================================\n--- src/retry.ts\n+++ src/retry.ts\n@@ -1,3 +1,3 @@\n-export function shouldRetry(status: number) {\n-  return status === 429 || status >= 500;\n+export function shouldRetry(method: \"GET\" | \"POST\" | \"HEAD\", status: number) {\n+  return status >= 500 || (status === 429 && (method === \"GET\" || method === \"HEAD\"));\n }\nIndex: src/client.ts\n===================================================================\n--- src/client.ts\n+++ src/client.ts\n@@ -1,7 +1,7 @@\n import { shouldRetry } from \"./retry\";\n \n-export async function request(method: \"GET\" | \"POST\", status: number) {\n-  if (shouldRetry(status)) {\n+export async function request(method: \"GET\" | \"POST\" | \"HEAD\", status: number) {\n+  if (shouldRetry(method, status)) {\n     return \"retry\";\n   }\n   return `${method}:done`;",
+  "proposal": {
+    "summary": "Update shouldRetry to consider HTTP method so 429 retries only for GET/HEAD, and adjust request caller to pass method and support HEAD.",
+    "edits": [
+      {
+        "path": "src/retry.ts",
+        "oldText": "export function shouldRetry(status: number) {\n  return status === 429 || status >= 500;\n}\n",
+        "newText": "export function shouldRetry(method: \"GET\" | \"POST\" | \"HEAD\", status: number) {\n  return status >= 500 || (status === 429 && (method === \"GET\" || method === \"HEAD\"));\n}\n"
+      },
+      {
+        "path": "src/client.ts",
+        "oldText": "import { shouldRetry } from \"./retry\";\n\nexport async function request(method: \"GET\" | \"POST\", status: number) {\n  if (shouldRetry(status)) {\n    return \"retry\";\n  }\n  return `${method}:done`;\n}\n",
+        "newText": "import { shouldRetry } from \"./retry\";\n\nexport async function request(method: \"GET\" | \"POST\" | \"HEAD\", status: number) {\n  if (shouldRetry(method, status)) {\n    return \"retry\";\n  }\n  return `${method}:done`;\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

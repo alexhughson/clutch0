@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/string/capitalize.ts", "oldText": "" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should create the requested new file with a reasonable exported capitalize function and should use empty oldText only for that new file."
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText did not match the current file content.",
+      "path": "src/customerStatus.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update unknown status rendering to display \"Not available\" instead of \"Unknown\" in customerStatus.ts",
+    "edits": [
+      {
+        "path": "src/customerStatus.ts",
+        "oldText": "    return \"Unknown\";",
+        "newText": "    return \"Not available\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

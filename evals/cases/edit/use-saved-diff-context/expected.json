@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/copy.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should use the saved diff as context and update the remaining cancel label from checkout to purchase without reverting prior terminology."
+  }
+}

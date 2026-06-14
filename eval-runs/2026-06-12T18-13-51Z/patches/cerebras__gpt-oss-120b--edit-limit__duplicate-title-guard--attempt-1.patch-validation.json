@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/normalize.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Change normalizeTitle blank fallback to \"Untitled\"",
+    "edits": [
+      {
+        "path": "src/normalize.ts",
+        "oldText": "    return \"Unknown\";",
+        "newText": "    return \"Untitled\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

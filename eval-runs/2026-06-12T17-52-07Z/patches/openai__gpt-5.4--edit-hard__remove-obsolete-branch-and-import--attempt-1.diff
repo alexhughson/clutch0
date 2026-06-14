@@ -1,0 +1,17 @@
+Index: src/providers.ts
+===================================================================
+--- src/providers.ts
++++ src/providers.ts
+@@ -1,11 +1,6 @@
+-import { normalizeLegacy } from "./legacy";
++export type Provider = "modern" | "beta";
+ 
+-export type Provider = "modern" | "beta" | "legacy";
+-
+ export function normalizeProvider(provider: Provider) {
+-  if (provider === "legacy") {
+-    return normalizeLegacy(provider);
+-  }
+   if (provider === "beta") {
+     return "beta";
+   }

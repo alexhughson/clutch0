@@ -81,7 +81,11 @@ export function ContextItemViewerScreen({
     if (event.name === "escape") {
       event.preventDefault();
       event.stopPropagation();
-      actions.navigation.dismissPane();
+      if (screen.rejectComposer === undefined) {
+        actions.navigation.dismissPane();
+      } else {
+        actions.navigation.rejectToEdit();
+      }
       return;
     }
 
@@ -121,7 +125,9 @@ export function ContextItemViewerScreen({
         canRunItemActions
           ? getBottomTitle(itemActions)
           : canAct
-            ? "Esc back"
+            ? screen.rejectComposer === undefined
+              ? "Esc back"
+              : "Esc edit prompt"
             : undefined
       }
       bottomTitleAlignment="right"

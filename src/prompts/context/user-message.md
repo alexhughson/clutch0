@@ -1,11 +1,13 @@
-Question:
+User request:
+<user_request>
 {{question}}
+</user_request>
 
-Focused context item:
+Focused context item (edit target unless the request says otherwise):
 {{focusedContextItem}}
 
 Selected context:
 {{selectedContext}}
 
-Automatic context:
+Automatic context (reference only):
 {{automaticContext}}

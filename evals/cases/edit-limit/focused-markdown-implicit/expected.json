@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["docs/customer-runbook.md"],
+    "allowedPaths": ["docs/customer-runbook.md"],
+    "forbiddenPaths": ["docs/admin-runbook.md"],
+    "diffIncludes": ["+Contact: customers@example.com"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "docs/customer-runbook.md" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customer runbook contact. It must leave the admin runbook contact unchanged."
+  }
+}

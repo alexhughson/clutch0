@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Create a shared src/formatName.ts helper and update both selected callers to use it instead of duplicating trim plus fallback logic.",
+  "workspace": {
+    "files": {
+      "src/userCard.ts": "export function userCardName(user: { name?: string; email: string }) {\n  const name = user.name?.trim();\n  return name && name.length > 0 ? name : user.email;\n}\n",
+      "src/userMenu.ts": "export function userMenuName(user: { name?: string; email: string }) {\n  const name = user.name?.trim();\n  return name && name.length > 0 ? name : user.email;\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/userCard.ts", "focused": true },
+    { "kind": "file", "path": "src/userMenu.ts" }
+  ]
+}

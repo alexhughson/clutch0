@@ -1,0 +1,8 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should update both loading and empty labels while leaving unrelated labels alone."
+  }
+}

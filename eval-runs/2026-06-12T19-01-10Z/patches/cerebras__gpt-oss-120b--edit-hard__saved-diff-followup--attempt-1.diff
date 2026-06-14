@@ -1,0 +1,13 @@
+Index: src/copy.ts
+===================================================================
+--- src/copy.ts
++++ src/copy.ts
+@@ -1,6 +1,6 @@
+ export const checkoutCopy = {
+   start: "Begin order",
+   finish: "Finish order",
+-  cancel: "Cancel purchase",
+-  receipt: "Purchase receipt",
++  cancel: "Cancel order",
++  receipt: "Order receipt",
+ };

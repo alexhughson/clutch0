@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/ids.ts"],
+    "allowedPaths": ["src/ids.ts"],
+    "diffIncludes": ["+    throw new Error(\"Missing invoice id\");"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/ids.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only parseInvoiceId's missing-id error message. parseAccountId must still throw \"Missing id\"."
+  }
+}

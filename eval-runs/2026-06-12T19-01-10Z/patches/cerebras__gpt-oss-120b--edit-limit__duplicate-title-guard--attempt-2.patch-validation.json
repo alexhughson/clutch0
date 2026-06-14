@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/normalize.ts\n===================================================================\n--- src/normalize.ts\n+++ src/normalize.ts\n@@ -7,7 +7,7 @@\n \n export function normalizeTitle(value: string) {\n   if (value.trim().length === 0) {\n-    return \"Unknown\";\n+    return \"Untitled\";\n   }\n   return value.trim();\n }",
+  "proposal": {
+    "summary": "Change normalizeTitle's blank fallback from \"Unknown\" to \"Untitled\" while leaving normalizeName unchanged",
+    "edits": [
+      {
+        "path": "src/normalize.ts",
+        "oldText": "export function normalizeTitle(value: string) {\n  if (value.trim().length === 0) {\n    return \"Unknown\";\n  }\n  return value.trim();\n}",
+        "newText": "export function normalizeTitle(value: string) {\n  if (value.trim().length === 0) {\n    return \"Untitled\";\n  }\n  return value.trim();\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

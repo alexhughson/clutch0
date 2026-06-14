@@ -1,0 +1,40 @@
+{
+  "errors": [
+    {
+      "editIndex": 4,
+      "message": "oldText did not match the current file content.",
+      "path": "src/orderSerializer.test.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Rename customerId field to accountId across model, serializer, view, and tests",
+    "edits": [
+      {
+        "path": "src/orderModel.ts",
+        "oldText": "  customerId: string;",
+        "newText": "  accountId: string;"
+      },
+      {
+        "path": "src/orderSerializer.ts",
+        "oldText": "    customerId: order.customerId,",
+        "newText": "    accountId: order.accountId,"
+      },
+      {
+        "path": "src/orderView.ts",
+        "oldText": "  return `Customer ${order.customerId}`;",
+        "newText": "  return `Customer ${order.accountId}`;"
+      },
+      {
+        "path": "src/orderSerializer.test.ts",
+        "oldText": "    customerId: \"cus_1\",",
+        "newText": "    accountId: \"cus_1\","
+      },
+      {
+        "path": "src/orderSerializer.test.ts",
+        "oldText": "    customerId: \"cus_1\",",
+        "newText": "    accountId: \"cus_1\","
+      }
+    ]
+  },
+  "status": "invalid"
+}

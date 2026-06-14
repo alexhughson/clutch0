@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused customer token file only, treat expired tokens as inactive.",
+  "workspace": {
+    "files": {
+      "src/customerToken.ts": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n",
+      "src/adminToken.ts": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerToken.ts", "focused": true },
+    { "kind": "file", "path": "src/adminToken.ts" }
+  ]
+}

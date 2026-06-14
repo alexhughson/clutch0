@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerDisplayName.ts\n===================================================================\n--- src/customerDisplayName.ts\n+++ src/customerDisplayName.ts\n@@ -1,6 +1,6 @@\n export function displayName(name: string) {\n   if (name.trim().length === 0) {\n-    return \"Unknown\";\n+    return \"Anonymous\";\n   }\n   return name.trim();\n }",
+  "proposal": {
+    "summary": "Change default display name from \"Unknown\" to \"Anonymous\" in src/customerDisplayName.ts",
+    "edits": [
+      {
+        "path": "src/customerDisplayName.ts",
+        "oldText": "export function displayName(name: string) {\n  if (name.trim().length === 0) {\n    return \"Unknown\";\n  }\n  return name.trim();\n}",
+        "newText": "export function displayName(name: string) {\n  if (name.trim().length === 0) {\n    return \"Anonymous\";\n  }\n  return name.trim();\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

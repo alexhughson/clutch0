@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerSort.ts\n===================================================================\n--- src/customerSort.ts\n+++ src/customerSort.ts\n@@ -1,3 +1,3 @@\n export function sortLabels(labels: string[]) {\n-  return labels.toReversed();\n+  return labels.slice().sort();\n }\nIndex: src/adminSort.ts\n===================================================================\n--- src/adminSort.ts\n+++ src/adminSort.ts\n@@ -1,3 +1,3 @@\n export function sortLabels(labels: string[]) {\n-  return labels.toReversed();\n+  return labels.slice().sort();\n }",
+  "proposal": {
+    "summary": "Sort labels in ascending order for both customer and admin sort functions",
+    "edits": [
+      {
+        "path": "src/customerSort.ts",
+        "oldText": "export function sortLabels(labels: string[]) {\n  return labels.toReversed();\n}",
+        "newText": "export function sortLabels(labels: string[]) {\n  return labels.slice().sort();\n}"
+      },
+      {
+        "path": "src/adminSort.ts",
+        "oldText": "export function sortLabels(labels: string[]) {\n  return labels.toReversed();\n}",
+        "newText": "export function sortLabels(labels: string[]) {\n  return labels.slice().sort();\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

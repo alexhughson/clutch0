@@ -1,0 +1,19 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["docs/release-notes.md"],
+    "allowedPaths": ["docs/release-notes.md"],
+    "forbiddenPaths": ["docs/migration-guide.md"],
+    "diffIncludes": ["+| Beta dashboard | Shipped | Platform |"],
+    "diffExcludes": ["+++ docs/migration-guide.md"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "docs/release-notes.md" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only docs/release-notes.md and change the Version 2.4.0 Beta dashboard status from Planned to Shipped. It must leave docs/migration-guide.md and the Version 2.3.0 table unchanged."
+  }
+}

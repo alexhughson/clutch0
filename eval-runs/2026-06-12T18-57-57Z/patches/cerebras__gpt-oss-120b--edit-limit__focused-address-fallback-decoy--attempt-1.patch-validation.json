@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerAddress.ts\n===================================================================\n--- src/customerAddress.ts\n+++ src/customerAddress.ts\n@@ -1,6 +1,6 @@\n export function addressLabel(address: string) {\n   if (address.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No address\";\n   }\n   return address.trim();\n }",
+  "proposal": {
+    "summary": "Update addressLabel to return \"No address\" when address is blank",
+    "edits": [
+      {
+        "path": "src/customerAddress.ts",
+        "oldText": "    return \"Missing\";",
+        "newText": "    return \"No address\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/title.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit the existing file with exact non-empty oldText and change only the dashboard title."
+  }
+}

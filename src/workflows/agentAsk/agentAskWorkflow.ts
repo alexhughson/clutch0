@@ -52,7 +52,8 @@ export function createAgentAskActions({
           summary,
         }),
       ),
-    start: ({ mode, prompt }) => startAgentAsk({ get, mode, prompt, set }),
+    start: ({ mode, prompt, rejectComposer }) =>
+      startAgentAsk({ get, mode, prompt, rejectComposer, set }),
     startMessage: ({ itemId }) =>
       set((state) =>
         replacePiAgentItem(state, itemId, (item) => item.withStatus("running")),
@@ -68,11 +69,13 @@ function startAgentAsk({
   get,
   mode,
   prompt,
+  rejectComposer,
   set,
 }: {
   get: GetAppState;
   mode: "ask" | "edit";
   prompt: string;
+  rejectComposer?: AppState["workspace"]["composer"];
   set: SetAppState;
 }): string | null {
   const state = get();
@@ -93,6 +96,7 @@ function startAgentAsk({
       applyStatus: "idle",
       itemId,
       kind: "context-item-viewer",
+      ...(rejectComposer === undefined ? {} : { rejectComposer }),
     },
     nextContextItemId: state.nextContextItemId + 1,
     workspace: ContextDeck.fromComposeScreen(state.workspace)

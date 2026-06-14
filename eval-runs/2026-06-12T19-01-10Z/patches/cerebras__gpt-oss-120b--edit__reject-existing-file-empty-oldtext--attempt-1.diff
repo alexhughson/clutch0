@@ -1,0 +1,7 @@
+Index: src/title.ts
+===================================================================
+--- src/title.ts
++++ src/title.ts
+@@ -1,1 +1,1 @@
+-export const title = "Old Dashboard";
++export const title = "New Dashboard";

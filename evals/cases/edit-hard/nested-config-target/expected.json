@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/config.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only production.api.timeoutMs from 5000 to 12000. Development and staging timeout values must remain 5000."
+  }
+}

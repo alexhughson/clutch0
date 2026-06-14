@@ -1,0 +1,10 @@
+{
+  "command": "edit",
+  "question": "Change the title from Old Dashboard to New Dashboard.",
+  "workspace": {
+    "files": {
+      "src/title.ts": "export const title = \"Old Dashboard\";\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/title.ts", "focused": true }]
+}

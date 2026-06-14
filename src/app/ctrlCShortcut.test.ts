@@ -79,6 +79,7 @@ test("does not close first-run config with ctrl+c", () => {
   expect(
     getCtrlCShortcutDecision({
       activeTask: {
+        agent: { model: "gpt-test", provider: "openai" },
         configuredProviders: [],
         kind: "config",
         mode: "first-run",

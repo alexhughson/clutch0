@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerPhone.ts"],
+    "allowedPaths": ["src/customerPhone.ts"],
+    "forbiddenPaths": ["src/adminPhone.ts"],
+    "diffIncludes": ["+    return \"No phone\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerPhone.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerPhone.ts file so blank phone values render as \"No phone\". adminPhone.ts must remain unchanged."
+  }
+}

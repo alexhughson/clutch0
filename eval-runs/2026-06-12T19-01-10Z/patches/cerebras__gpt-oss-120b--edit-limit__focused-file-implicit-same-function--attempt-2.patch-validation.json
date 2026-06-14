@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerStatus.ts\n===================================================================\n--- src/customerStatus.ts\n+++ src/customerStatus.ts\n@@ -2,5 +2,5 @@\n   if (status === \"active\") {\n     return \"Active\";\n   }\n-  return \"Unknown\";\n+  return \"Not available\";\n }\nIndex: src/adminStatus.ts\n===================================================================\n--- src/adminStatus.ts\n+++ src/adminStatus.ts\n@@ -2,5 +2,5 @@\n   if (status === \"active\") {\n     return \"Active\";\n   }\n-  return \"Unknown\";\n+  return \"Not available\";\n }",
+  "proposal": {
+    "summary": "Show unknown statuses as \"Not available\" in renderStatus functions",
+    "edits": [
+      {
+        "path": "src/customerStatus.ts",
+        "oldText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}",
+        "newText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Not available\";\n}"
+      },
+      {
+        "path": "src/adminStatus.ts",
+        "oldText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}",
+        "newText": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Not available\";\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

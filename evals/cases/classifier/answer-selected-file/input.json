@@ -1,0 +1,9 @@
+{
+  "question": "What does formatDisplayName return for a missing display name?",
+  "workspace": {
+    "files": {
+      "src/user.ts": "export function formatDisplayName(user: { name?: string; email: string }) {\n  return user.name ?? user.email;\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/user.ts", "focused": true }]
+}

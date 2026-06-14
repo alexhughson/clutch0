@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerPermissions.ts"],
+    "allowedPaths": ["src/customerPermissions.ts"],
+    "forbiddenPaths": ["src/adminPermissions.ts"],
+    "diffIncludes": ["manager"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerPermissions.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerPermissions.ts file so managers can archive. adminPermissions.ts must remain unchanged."
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/status.ts\n===================================================================\n--- src/status.ts\n+++ src/status.ts\n@@ -1,5 +1,8 @@\n-export function statusLabel(status: \"open\" | \"closed\") {\n-  if (status === \"open\") return \"Open\";\n-  if (status === \"closed\") return \"Closed\";\n-  return \"Closed\";\n+const statusLabels = {\n+  open: \"Open\",\n+  closed: \"Closed\",\n+} as const;\n+\n+export function statusLabel(status: keyof typeof statusLabels) {\n+  return statusLabels[status];\n }",
+  "proposal": {
+    "summary": "Refactor statusLabel to use a mapping object, removing duplicated label strings",
+    "edits": [
+      {
+        "path": "src/status.ts",
+        "oldText": "export function statusLabel(status: \"open\" | \"closed\") {\n  if (status === \"open\") return \"Open\";\n  if (status === \"closed\") return \"Closed\";\n  return \"Closed\";\n}\n",
+        "newText": "const statusLabels = {\n  open: \"Open\",\n  closed: \"Closed\",\n} as const;\n\nexport function statusLabel(status: keyof typeof statusLabels) {\n  return statusLabels[status];\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

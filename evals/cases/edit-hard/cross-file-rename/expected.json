@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/money.ts", "src/cart.ts"],
+    "allowedPaths": ["src/money.ts", "src/cart.ts"],
+    "diffIncludes": ["formatAmount"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/money.ts" }, { "path": "src/cart.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should rename the exported function, import, and call site from formatCents to formatAmount while keeping the money formatting behavior unchanged."
+  }
+}

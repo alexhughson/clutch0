@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerDate.ts\n===================================================================\n--- src/customerDate.ts\n+++ src/customerDate.ts\n@@ -1,6 +1,6 @@\n export function dateLabel(date: string | null) {\n   if (date === null) {\n-    return \"Unknown\";\n+    return \"No date\";\n   }\n   return date;\n }",
+  "proposal": {
+    "summary": "Update dateLabel to return \"No date\" when input is null in customerDate.ts",
+    "edits": [
+      {
+        "path": "src/customerDate.ts",
+        "oldText": "    return \"Unknown\";",
+        "newText": "    return \"No date\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

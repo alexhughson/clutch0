@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Add a Billing nav item after Account and before Security. Update the test to reflect the new order.",
+  "workspace": {
+    "files": {
+      "src/nav.ts": "export const navItems = [\n  { label: \"Home\", href: \"/\" },\n  { label: \"Account\", href: \"/account\" },\n  { label: \"Security\", href: \"/security\" },\n  { label: \"Support\", href: \"/support\" },\n];\n",
+      "src/nav.test.ts": "import { navItems } from \"./nav\";\n\ntest(\"nav order\", () => {\n  expect(navItems.map((item) => item.label)).toEqual([\n    \"Home\",\n    \"Account\",\n    \"Security\",\n    \"Support\",\n  ]);\n});\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/nav.ts", "focused": true },
+    { "kind": "file", "path": "src/nav.test.ts" }
+  ]
+}

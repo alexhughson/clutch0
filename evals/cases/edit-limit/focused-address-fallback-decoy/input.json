@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Use \"No address\" when the address is blank.",
+  "workspace": {
+    "files": {
+      "src/customerAddress.ts": "export function addressLabel(address: string) {\n  if (address.trim().length === 0) {\n    return \"Missing\";\n  }\n  return address.trim();\n}\n",
+      "src/adminAddress.ts": "export function addressLabel(address: string) {\n  if (address.trim().length === 0) {\n    return \"Missing\";\n  }\n  return address.trim();\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerAddress.ts", "focused": true },
+    { "kind": "file", "path": "src/adminAddress.ts" }
+  ]
+}

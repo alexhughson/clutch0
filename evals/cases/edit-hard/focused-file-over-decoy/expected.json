@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/screenTotals.ts"],
+    "allowedPaths": ["src/screenTotals.ts"],
+    "forbiddenPaths": ["src/emailTotals.ts"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/screenTotals.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused screenTotals file so displayTotal returns subtotal plus tax. It should not change the decoy emailTotals file."
+  }
+}

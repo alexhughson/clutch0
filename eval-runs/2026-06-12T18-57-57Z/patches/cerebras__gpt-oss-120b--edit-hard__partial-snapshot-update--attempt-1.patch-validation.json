@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/invoiceTitle.ts\n===================================================================\n--- src/invoiceTitle.ts\n+++ src/invoiceTitle.ts\n@@ -1,6 +1,6 @@\n export function invoiceTitle(status: \"pending\" | \"paid\") {\n   if (status === \"pending\") {\n-    return \"Pending payment\";\n+    return \"Awaiting payment\";\n   }\n   return \"Paid invoice\";\n }\nIndex: src/invoiceTitle.test.ts\n===================================================================\n--- src/invoiceTitle.test.ts\n+++ src/invoiceTitle.test.ts\n@@ -3,7 +3,7 @@\n test(\"invoice titles\", () => {\n   expect([invoiceTitle(\"pending\"), invoiceTitle(\"paid\")]).toMatchInlineSnapshot(`\n     [\n-      \"Pending payment\",\n+      \"Awaiting payment\",\n       \"Paid invoice\",\n     ]\n   `);",
+  "proposal": {
+    "summary": "Update pending invoice title to 'Awaiting payment' and adjust test inline snapshot accordingly.",
+    "edits": [
+      {
+        "path": "src/invoiceTitle.ts",
+        "oldText": "    return \"Pending payment\";",
+        "newText": "    return \"Awaiting payment\";"
+      },
+      {
+        "path": "src/invoiceTitle.test.ts",
+        "oldText": "      \"Pending payment\",",
+        "newText": "      \"Awaiting payment\","
+      }
+    ]
+  },
+  "status": "valid"
+}

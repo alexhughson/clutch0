@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerEmail.ts"],
+    "allowedPaths": ["src/customerEmail.ts"],
+    "forbiddenPaths": ["src/adminEmail.ts"],
+    "diffIncludes": ["+    return \"No email\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerEmail.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerEmail.ts file so blank emails render as \"No email\". adminEmail.ts must remain unchanged."
+  }
+}

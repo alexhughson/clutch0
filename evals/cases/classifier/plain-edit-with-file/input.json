@@ -1,0 +1,9 @@
+{
+  "question": "Fix countReady so it counts ready items.",
+  "workspace": {
+    "files": {
+      "src/count.ts": "export function countReady(items: { ready: boolean }[]) {\n  return items.filter((item) => !item.ready).length;\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/count.ts", "focused": true }]
+}

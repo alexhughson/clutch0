@@ -1,0 +1,24 @@
+Index: src/customerListCopy.ts
+===================================================================
+--- src/customerListCopy.ts
++++ src/customerListCopy.ts
+@@ -1,6 +1,6 @@
+ export function listTitle(items: string[]) {
+   if (items.length === 0) {
+-    return "Empty";
++    return "No saved items";
+   }
+   return "Saved items";
+ }
+Index: src/adminListCopy.ts
+===================================================================
+--- src/adminListCopy.ts
++++ src/adminListCopy.ts
+@@ -1,6 +1,6 @@
+ export function listTitle(items: string[]) {
+   if (items.length === 0) {
+-    return "Empty";
++    return "No saved items";
+   }
+   return "Saved items";
+ }

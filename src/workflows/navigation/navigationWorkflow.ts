@@ -15,7 +15,7 @@ export function createNavigationActions({
   return {
     acceptAndClose: () => set(acceptAndClose),
     dismissPane: () => set(closePanePreservingComposer),
-    rejectToEdit: () => set(closePanePreservingComposer),
+    rejectToEdit: () => set(rejectToEdit),
   };
 }
 
@@ -34,4 +34,22 @@ function acceptAndClose(state: AppState): Partial<AppState> | AppState {
 
 function closePanePreservingComposer(): Partial<AppState> {
   return { activeTask: null };
+}
+
+function rejectToEdit(state: AppState): Partial<AppState> {
+  const rejectComposer =
+    state.activeTask !== null && "rejectComposer" in state.activeTask
+      ? state.activeTask.rejectComposer
+      : undefined;
+  if (rejectComposer === undefined) {
+    return { activeTask: null };
+  }
+
+  return {
+    activeTask: null,
+    workspace: {
+      ...state.workspace,
+      composer: rejectComposer,
+    },
+  };
 }

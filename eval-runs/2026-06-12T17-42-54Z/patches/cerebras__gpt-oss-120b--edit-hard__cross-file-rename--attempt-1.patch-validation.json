@@ -1,0 +1,24 @@
+{
+  "diffText": "Index: src/money.ts\n===================================================================\n--- src/money.ts\n+++ src/money.ts\n@@ -1,3 +1,3 @@\n-export function formatCents(cents: number) {\n+export function formatUsd(cents: number) {\n   return `$${(cents / 100).toFixed(2)}`;\n }\nIndex: src/cart.ts\n===================================================================\n--- src/cart.ts\n+++ src/cart.ts\n@@ -1,5 +1,5 @@\n-import { formatCents } from \"./money\";\n+import { formatUsd } from \"./money\";\n \n export function renderCartTotal(totalCents: number) {\n-  return `Total: ${formatCents(totalCents)}`;\n+  return `Total: ${formatUsd(totalCents)}`;\n }",
+  "proposal": {
+    "summary": "Rename formatCents to formatUsd in money.ts and cart.ts, updating imports and usage",
+    "edits": [
+      {
+        "path": "src/money.ts",
+        "oldText": "export function formatCents(cents: number) {",
+        "newText": "export function formatUsd(cents: number) {"
+      },
+      {
+        "path": "src/cart.ts",
+        "oldText": "import { formatCents } from \"./money\";",
+        "newText": "import { formatUsd } from \"./money\";"
+      },
+      {
+        "path": "src/cart.ts",
+        "oldText": "formatCents(totalCents)",
+        "newText": "formatUsd(totalCents)"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerPermissions.ts\n===================================================================\n--- src/customerPermissions.ts\n+++ src/customerPermissions.ts\n@@ -1,3 +1,3 @@\n export function canArchive(role: \"agent\" | \"manager\") {\n-  return role === \"agent\";\n+  return role === \"agent\" || role === \"manager\";\n }",
+  "proposal": {
+    "summary": "Allow managers to archive in customerPermissions.canArchive",
+    "edits": [
+      {
+        "path": "src/customerPermissions.ts",
+        "oldText": "  return role === \"agent\";",
+        "newText": "  return role === \"agent\" || role === \"manager\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

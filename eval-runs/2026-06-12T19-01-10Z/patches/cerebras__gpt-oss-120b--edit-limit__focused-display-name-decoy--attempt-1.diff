@@ -1,0 +1,24 @@
+Index: src/customerDisplayName.ts
+===================================================================
+--- src/customerDisplayName.ts
++++ src/customerDisplayName.ts
+@@ -1,6 +1,6 @@
+ export function displayName(name: string) {
+   if (name.trim().length === 0) {
+-    return "Unknown";
++    return "Anonymous";
+   }
+   return name.trim();
+ }
+Index: src/adminDisplayName.ts
+===================================================================
+--- src/adminDisplayName.ts
++++ src/adminDisplayName.ts
+@@ -1,6 +1,6 @@
+ export function displayName(name: string) {
+   if (name.trim().length === 0) {
+-    return "Unknown";
++    return "Anonymous";
+   }
+   return name.trim();
+ }

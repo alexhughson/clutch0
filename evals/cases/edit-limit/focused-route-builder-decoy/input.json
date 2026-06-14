@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused customer route file only, prefix the dashboard route with /app.",
+  "workspace": {
+    "files": {
+      "src/customerRoutes.ts": "export function dashboardRoute(slug: string) {\n  return `/dashboard/${slug}`;\n}\n",
+      "src/adminRoutes.ts": "export function dashboardRoute(slug: string) {\n  return `/dashboard/${slug}`;\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerRoutes.ts", "focused": true },
+    { "kind": "file", "path": "src/adminRoutes.ts" }
+  ]
+}

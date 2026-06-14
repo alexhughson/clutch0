@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Update the loading and empty-state labels to be clearer.",
+  "workspace": {
+    "files": {
+      "src/messages.ts": "export const labels = {\n  loading: \"Wait\",\n  empty: \"Nothing\",\n  retry: \"Try again\"\n};\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/messages.ts", "focused": true }
+  ]
+}

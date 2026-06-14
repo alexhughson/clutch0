@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Change the timeout message in authorizePayment to \"Payment authorization timed out\". Leave capturePayment unchanged.",
+  "workspace": {
+    "files": {
+      "src/paymentErrors.ts": "export function authorizePaymentError(code: \"timeout\" | \"declined\") {\n  if (code === \"timeout\") {\n    return \"Payment timed out\";\n  }\n  return \"Payment declined\";\n}\n\nexport function capturePaymentError(code: \"timeout\" | \"failed\") {\n  if (code === \"timeout\") {\n    return \"Payment timed out\";\n  }\n  return \"Payment capture failed\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/paymentErrors.ts", "focused": true }
+  ]
+}

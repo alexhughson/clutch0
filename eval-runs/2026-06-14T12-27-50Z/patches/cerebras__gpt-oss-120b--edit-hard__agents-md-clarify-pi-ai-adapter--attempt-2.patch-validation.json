@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: AGENTS.md\n===================================================================\n--- AGENTS.md\n+++ AGENTS.md\n@@ -40,7 +40,7 @@\n Context building: `src/lib/llm/context.ts`  \n Streaming/model/prompt wiring: `src/lib/llm/streamResponse.ts`, `src/lib/llm/model.ts`, `src/prompts/`\n \n-All model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.\n+All model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. The `pi-ai` package provides the LLM model adapter layer. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.\n \n LLM workflow tools are isolated controllers registered in `src/workflows/llmTools/toolRegistry.ts`.",
+  "proposal": {
+    "summary": "Add clarification that pi-ai is the LLM model adapter layer in AGENTS.md",
+    "edits": [
+      {
+        "path": "AGENTS.md",
+        "oldText": "All model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.",
+        "newText": "All model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. The `pi-ai` package provides the LLM model adapter layer. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions."
+      }
+    ]
+  },
+  "status": "valid"
+}

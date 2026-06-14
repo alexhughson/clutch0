@@ -2,6 +2,7 @@ import {
   parseLlmSlashCommandInvocation,
   type LlmSlashCommandInvocation,
 } from "../../workflows/llmTools/toolRegistry";
+import { parseAgentSkillSlashCommandName } from "../../workflows/agentAsk/agentSkillCommand";
 
 export type SubmissionIntent =
   | {
@@ -11,6 +12,11 @@ export type SubmissionIntent =
   | {
       kind: "agent-edit";
       prompt: string;
+    }
+  | {
+      kind: "agent-skill";
+      prompt: string;
+      skillName: string;
     }
   | {
       kind: "config";
@@ -68,7 +74,11 @@ export function getSubmissionIntent(message: string): SubmissionIntent | null {
   }
 
   if (invocation?.command.taskKind === "agent-skill") {
-    return { kind: "agent-ask", prompt: question };
+    return {
+      kind: "agent-skill",
+      prompt: requestQuestion,
+      skillName: parseAgentSkillSlashCommandName(invocation.command.name),
+    };
   }
 
   if (invocation?.command.taskKind === "shell-command") {

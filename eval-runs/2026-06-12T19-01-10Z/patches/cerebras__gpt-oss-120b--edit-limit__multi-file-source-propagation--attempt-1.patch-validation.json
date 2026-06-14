@@ -1,0 +1,40 @@
+{
+  "errors": [
+    {
+      "editIndex": 4,
+      "message": "oldText did not match the current file content.",
+      "path": "src/events.test.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Make recordEvent require a source argument and propagate source through callers and test",
+    "edits": [
+      {
+        "path": "src/events.ts",
+        "oldText": "export function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}",
+        "newText": "export function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}"
+      },
+      {
+        "path": "src/orders.ts",
+        "oldText": "export function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}",
+        "newText": "export function recordOrderCreated() {\n  return recordEvent(\"order.created\", \"order\");\n}"
+      },
+      {
+        "path": "src/refunds.ts",
+        "oldText": "export function recordRefundCreated() {\n  return recordEvent(\"refund.created\");\n}",
+        "newText": "export function recordRefundCreated() {\n  return recordEvent(\"refund.created\", \"refund\");\n}"
+      },
+      {
+        "path": "src/support.ts",
+        "oldText": "export function recordSupportTicket() {\n  return recordEvent(\"support.ticket\");\n}",
+        "newText": "export function recordSupportTicket() {\n  return recordEvent(\"support.ticket\", \"support\");\n}"
+      },
+      {
+        "path": "src/events.test.ts",
+        "oldText": "    expect(recordEvent(\"support.ticket\")).toEqual({\n      name: \"support.ticket\",\n      source: \"unknown\",\n    });",
+        "newText": "    expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n      name: \"support.ticket\",\n      source: \"support\",\n    });"
+      }
+    ]
+  },
+  "status": "invalid"
+}

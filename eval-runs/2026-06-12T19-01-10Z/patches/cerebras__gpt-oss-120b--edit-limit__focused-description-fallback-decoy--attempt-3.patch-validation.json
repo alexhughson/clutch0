@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerDescription.ts\n===================================================================\n--- src/customerDescription.ts\n+++ src/customerDescription.ts\n@@ -1,6 +1,6 @@\n export function descriptionLabel(description: string) {\n   if (description.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No description\";\n   }\n   return description.trim();\n }",
+  "proposal": {
+    "summary": "Return \"No description\" for blank descriptions in customerDescription.ts",
+    "edits": [
+      {
+        "path": "src/customerDescription.ts",
+        "oldText": "    return \"Missing\";",
+        "newText": "    return \"No description\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

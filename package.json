@@ -10,6 +10,9 @@
     "README.md"
   ],
   "scripts": {
+    "eval:check": "bun run evals/check.ts",
+    "eval:llm": "bun run evals/run.ts --target cerebras:gpt-oss-120b --target openai:gpt-5.4 --judge openai:gpt-5.4-mini",
+    "eval:render": "bun run evals/render.ts",
     "start": "bun run src/index.tsx",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
@@ -17,8 +20,9 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.78.0",
-    "@earendil-works/pi-coding-agent": "^0.78.0",
+    "@cursor/sdk": "^1.0.18",
+    "@earendil-works/pi-ai": "^0.79.1",
+    "@earendil-works/pi-coding-agent": "^0.79.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",

@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/normalize.ts"],
+    "allowedPaths": ["src/normalize.ts"],
+    "diffIncludes": ["+    return \"Untitled\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/normalize.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only normalizeTitle's blank fallback to \"Untitled\". normalizeName must still return \"Unknown\" for blank values."
+  }
+}

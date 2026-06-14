@@ -1,0 +1,24 @@
+Index: src/customerBadge.ts
+===================================================================
+--- src/customerBadge.ts
++++ src/customerBadge.ts
+@@ -1,6 +1,6 @@
+ export function badgeText(status: "active" | "paused") {
+   if (status === "paused") {
+-    return "Paused";
++    return "On hold";
+   }
+   return "Active";
+ }
+Index: src/adminBadge.ts
+===================================================================
+--- src/adminBadge.ts
++++ src/adminBadge.ts
+@@ -1,6 +1,6 @@
+ export function badgeText(status: "active" | "paused") {
+   if (status === "paused") {
+-    return "Paused";
++    return "On hold";
+   }
+   return "Active";
+ }

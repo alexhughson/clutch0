@@ -1,0 +1,6 @@
+{
+  "classification": "add_context_files",
+  "toolArguments": {
+    "paths": ["src/auth.ts", "src/server.ts"]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerCurrency.ts"],
+    "allowedPaths": ["src/customerCurrency.ts"],
+    "forbiddenPaths": ["src/adminCurrency.ts"],
+    "diffIncludes": ["+  return \"USD\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerCurrency.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerCurrency.ts file so defaultCurrency returns USD. adminCurrency.ts must remain unchanged."
+  }
+}

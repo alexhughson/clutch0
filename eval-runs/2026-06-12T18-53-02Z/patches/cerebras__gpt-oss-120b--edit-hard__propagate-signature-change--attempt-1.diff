@@ -1,0 +1,29 @@
+Index: src/retry.ts
+===================================================================
+--- src/retry.ts
++++ src/retry.ts
+@@ -1,3 +1,8 @@
+-export function shouldRetry(status: number) {
+-  return status === 429 || status >= 500;
++export function shouldRetry(status: number, method: string) {
++  // Retry on 429 only for safe methods GET and HEAD
++  if (status === 429) {
++    return method === "GET" || method === "HEAD";
++  }
++  // Retry on all 5xx statuses for any method
++  return status >= 500;
+ }
+Index: src/client.ts
+===================================================================
+--- src/client.ts
++++ src/client.ts
+@@ -1,7 +1,7 @@
+ import { shouldRetry } from "./retry";
+ 
+-export async function request(method: "GET" | "POST", status: number) {
+-  if (shouldRetry(status)) {
++export async function request(method: "GET" | "POST" | "HEAD", status: number) {
++  if (shouldRetry(status, method)) {
+     return "retry";
+   }
+   return `${method}:done`;

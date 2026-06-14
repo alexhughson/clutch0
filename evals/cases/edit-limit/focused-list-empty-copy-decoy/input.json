@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Use \"No saved items\" when there are no items.",
+  "workspace": {
+    "files": {
+      "src/customerListCopy.ts": "export function listTitle(items: string[]) {\n  if (items.length === 0) {\n    return \"Empty\";\n  }\n  return \"Saved items\";\n}\n",
+      "src/adminListCopy.ts": "export function listTitle(items: string[]) {\n  if (items.length === 0) {\n    return \"Empty\";\n  }\n  return \"Saved items\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerListCopy.ts", "focused": true },
+    { "kind": "file", "path": "src/adminListCopy.ts" }
+  ]
+}

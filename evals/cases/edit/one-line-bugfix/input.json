@@ -1,0 +1,10 @@
+{
+  "command": "edit",
+  "question": "Fix isEven so it returns true for even numbers.",
+  "workspace": {
+    "files": {
+      "src/math.ts": "export function isEven(value: number) {\n  return value % 2 === 1;\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/math.ts", "focused": true }]
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerEmail.ts\n===================================================================\n--- src/customerEmail.ts\n+++ src/customerEmail.ts\n@@ -1,6 +1,6 @@\n export function emailLabel(email: string) {\n   if (email.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No email\";\n   }\n   return email.trim();\n }",
+  "proposal": {
+    "summary": "Replace placeholder string \"Missing\" with \"No email\" for blank email cases in customerEmail.ts",
+    "edits": [
+      {
+        "path": "src/customerEmail.ts",
+        "oldText": "    return \"Missing\";",
+        "newText": "    return \"No email\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

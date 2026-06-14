@@ -1,0 +1,32 @@
+{
+  "command": "edit",
+  "question": "Make it clear that pi-ai is the LLM model adapter layer.",
+  "workspace": {
+    "git": {
+      "baseFiles": {
+        "AGENTS.md": "# Clutch\n\nOpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.\n\n## Core map\n\n- App shell: `src/index.tsx`, `src/App.tsx`\n- State shape/actions: `src/app/appTypes.ts`, `src/app/appActions.ts`\n- Store wiring only: `src/store/appStore.ts`\n- Active task rendering: `src/app/taskRegistry.tsx` using an exhaustive `switch`\n- Persistent workspace: composer text + context items + focused context item\n- Context deck rules: `src/app/contextDeck.ts`\n\n## Robustness rules\n\n- Prefer explicit invariants over defensive no-ops. If a caller violates a contract, throw.\n- Only ignore stale async completions when navigation/races make them expected; make that intent obvious.\n- Do not silently coerce malformed LLM/tool arguments into defaults.\n- Optional project context may be absent (`AGENTS.md`, git diff); unexpected filesystem/config errors should surface.\n- Avoid helper functions that only rename/null-convert data. Names should explain the caller-facing purpose.\n\n## Context items\n\nContext items are the main OO abstraction. See `src/types.ts` and implementations in `src/lib/context/contextItems.ts`.\n\nA context item owns how it is listed, opened, summarized, formatted for the LLM, viewed in detail, and what actions it exposes. UI code should ask the item instead of switching on item types.\n\nUI list: `src/components/ContextItemsList.tsx`  \nSummaries: `src/workflows/contextSummaries/contextSummariesWorkflow.ts`\n\n## Composer\n\nComposer UI/controller/model live in `src/components/MessageComposer/`.\n\n`@file` selection adds `FileContextItem`s. Keyboard shortcuts either navigate suggestions or run the focused context item's actions.\n\n## LLM requests and tools\n\nRequest start/effects: `src/workflows/llmRequest/startLlmRequest.ts`  \nContext building: `src/lib/llm/context.ts`  \nStreaming/model/prompt wiring: `src/lib/llm/streamResponse.ts`, `src/lib/llm/model.ts`, `src/prompts/`\n\nAll model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.\n\nLLM workflow tools are isolated controllers registered in `src/workflows/llmTools/toolRegistry.ts`.\n\nEach workflow tool module owns:\n\n- its tool definition\n- slash command metadata, if any\n- strict tool-call argument parsing\n- routing into its domain result\n- handling its domain result\n\nThe registry validates duplicate/missing tool names and fails on unregistered or disallowed tool calls.\n\nCurrent tool workflows:\n\n- patch proposal/review: `src/workflows/llmTools/patchWorkflowTool.ts`, `src/lib/patch/`, `src/components/LlmResponseScreen.tsx`\n- relevant file search: `src/workflows/findFiles/`\n- shell command: `src/workflows/llmTools/shellCommandWorkflowTool.ts`, `src/workflows/shellCommand/`\n- create file: `src/workflows/createFile/`\n- show context: `src/workflows/showContext/`\n\n## Workflow pattern\n\nKeep UI thin. Put state transitions in workflow action modules under `src/workflows/*`. Put pure/domain helpers in `src/lib/*` or `src/app/*`. Add new modal flows as an `AppTask` variant plus an exhaustive task renderer branch.\n",
+        "src/lib/llm/model.ts": "export type LlmModel = { id: string; provider: string };\n"
+      },
+      "generatedBaseFiles": [
+        {
+          "count": 1000,
+          "indexPad": 4,
+          "pathTemplate": "synthetic/project/packages/very-long-generated-eval-run-output-path-{index}/nested/rendered/prompts/eval-runs/2026-06-14T12-00-00Z/cerebras__gpt-oss-120b--agents-md-clarify-{index}.prompt.md",
+          "content": {
+            "prefix": "# synthetic rendered eval artifact\n\n",
+            "repeat": "context line that resembles rendered prompt output\n",
+            "count": 4
+          }
+        }
+      ],
+      "changedFiles": {
+        "src/lib/llm/model.ts": {
+          "prefix": "export type LlmModel = { id: string; provider: string; label: string };\n",
+          "repeat": "// changed synthetic diff line for model adapter context\n",
+          "count": 2400
+        }
+      }
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "AGENTS.md", "focused": true }]
+}

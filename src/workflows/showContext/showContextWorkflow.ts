@@ -21,17 +21,20 @@ export function createShowContextActions({
       set((state) => failShowContext(state, requestId, errorMessage)),
     finish: ({ content, requestId }) =>
       set((state) => finishShowContext(state, requestId, content)),
-    start: ({ question }) => startShowContext({ get, question, set }),
+    start: ({ question, rejectComposer }) =>
+      startShowContext({ get, question, rejectComposer, set }),
   };
 }
 
 function startShowContext({
   get,
   question,
+  rejectComposer,
   set,
 }: {
   get: GetAppState;
   question: string;
+  rejectComposer?: AppState["workspace"]["composer"];
   set: SetAppState;
 }): number | null {
   const state = get();
@@ -45,6 +48,7 @@ function startShowContext({
       id: requestId,
       kind: "show-context",
       question,
+      ...(rejectComposer === undefined ? {} : { rejectComposer }),
       status: "loading",
     },
     nextLlmRequestId: requestId + 1,

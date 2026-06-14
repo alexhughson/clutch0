@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/errors.ts"],
+    "allowedPaths": ["src/errors.ts"],
+    "diffIncludes": ["+    return \"Payment timed out\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/errors.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only the timeout message inside paymentError. It must leave shippingError's timeout message as \"Request timed out\" and use a unique exact replacement."
+  }
+}

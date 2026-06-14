@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/config.ts\n===================================================================\n--- src/config.ts\n+++ src/config.ts\n@@ -13,7 +13,7 @@\n   },\n   production: {\n     api: {\n-      timeoutMs: 5000,\n+      timeoutMs: 12000,\n       retries: 3,\n     },\n   },",
+  "proposal": {
+    "summary": "Increase only the production API timeout from 5000 to 12000 in src/config.ts.",
+    "edits": [
+      {
+        "path": "src/config.ts",
+        "oldText": "  production: {\n    api: {\n      timeoutMs: 5000,\n      retries: 3,\n    },\n  },",
+        "newText": "  production: {\n    api: {\n      timeoutMs: 12000,\n      retries: 3,\n    },\n  },"
+      }
+    ]
+  },
+  "status": "valid"
+}

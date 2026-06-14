@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/validators.ts\n===================================================================\n--- src/validators.ts\n+++ src/validators.ts\n@@ -10,7 +10,7 @@\n \n export function validateCoupon(code: string) {\n   if (code.trim().length === 0) {\n-    return { ok: false, reason: \"Invalid\" };\n+    return { ok: false, reason: \"Missing coupon code\" };\n   }\n   if (code.length < 8) {\n     return { ok: false, reason: \"Invalid\" };",
+  "proposal": {
+    "summary": "Update validateCoupon to return specific reason for missing coupon code",
+    "edits": [
+      {
+        "path": "src/validators.ts",
+        "oldText": "  if (code.trim().length === 0) {\n    return { ok: false, reason: \"Invalid\" };\n  }",
+        "newText": "  if (code.trim().length === 0) {\n    return { ok: false, reason: \"Missing coupon code\" };\n  }"
+      }
+    ]
+  },
+  "status": "valid"
+}

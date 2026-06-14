@@ -1,0 +1,15 @@
+{
+  "question": "Explain renderInvoiceTotal near the bottom of the selected file.",
+  "workspace": {
+    "files": {
+      "src/largeInvoice.ts": {
+        "repeat": "export const filler = 1;\n",
+        "count": 4000,
+        "suffix": "\nexport function renderInvoiceTotal(total: number) {\n  return `$${total.toFixed(2)}`;\n}\n"
+      }
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/largeInvoice.ts", "focused": true }
+  ]
+}

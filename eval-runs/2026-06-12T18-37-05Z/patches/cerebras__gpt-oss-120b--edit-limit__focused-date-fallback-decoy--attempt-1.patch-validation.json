@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerDate.ts\n===================================================================\n--- src/customerDate.ts\n+++ src/customerDate.ts\n@@ -1,6 +1,6 @@\n export function dateLabel(date: string | null) {\n   if (date === null) {\n-    return \"Unknown\";\n+    return \"No date\";\n   }\n   return date;\n }\nIndex: src/adminDate.ts\n===================================================================\n--- src/adminDate.ts\n+++ src/adminDate.ts\n@@ -1,6 +1,6 @@\n export function dateLabel(date: string | null) {\n   if (date === null) {\n-    return \"Unknown\";\n+    return \"No date\";\n   }\n   return date;\n }",
+  "proposal": {
+    "summary": "Return \"No date\" instead of \"Unknown\" when date is null",
+    "edits": [
+      {
+        "path": "src/customerDate.ts",
+        "oldText": "export function dateLabel(date: string | null) {\n  if (date === null) {\n    return \"Unknown\";\n  }\n  return date;\n}",
+        "newText": "export function dateLabel(date: string | null) {\n  if (date === null) {\n    return \"No date\";\n  }\n  return date;\n}"
+      },
+      {
+        "path": "src/adminDate.ts",
+        "oldText": "export function dateLabel(date: string | null) {\n  if (date === null) {\n    return \"Unknown\";\n  }\n  return date;\n}",
+        "newText": "export function dateLabel(date: string | null) {\n  if (date === null) {\n    return \"No date\";\n  }\n  return date;\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

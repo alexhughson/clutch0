@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Update only the focused release notes: in version 2.4.0, change the Beta dashboard status from Planned to Shipped. Do not edit the migration guide.",
+  "workspace": {
+    "files": {
+      "docs/migration-guide.md": "# Migration Guide\n\n## Version 2.4.0\n\n| Area | Status | Owner |\n| --- | --- | --- |\n| Beta dashboard | Planned | Platform |\n| Audit export | Planned | Data |\n\nKeep this guide stable until the rollout notes land.\n",
+      "docs/release-notes.md": "# Release Notes\n\n## Version 2.4.0\n\n| Area | Status | Owner |\n| --- | --- | --- |\n| Beta dashboard | Planned | Platform |\n| Audit export | Planned | Data |\n\n## Version 2.3.0\n\n| Area | Status | Owner |\n| --- | --- | --- |\n| Beta dashboard | Shipped | Platform |\n| Audit export | Shipped | Data |\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "docs/migration-guide.md" },
+    { "kind": "file", "path": "docs/release-notes.md", "focused": true }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "diffText": "Index: src/events.ts\n===================================================================\n--- src/events.ts\n+++ src/events.ts\n@@ -1,5 +1,5 @@\n export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n \n-export function recordEvent(name: EventName) {\n-  return { name, source: \"unknown\" };\n+export function recordEvent(name: EventName, source: string) {\n+  return { name, source };\n }\nIndex: src/orders.ts\n===================================================================\n--- src/orders.ts\n+++ src/orders.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordOrderCreated() {\n-  return recordEvent(\"order.created\");\n+  return recordEvent(\"order.created\", \"orders\");\n }\nIndex: src/refunds.ts\n===================================================================\n--- src/refunds.ts\n+++ src/refunds.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordRefundCreated() {\n-  return recordEvent(\"refund.created\");\n+  return recordEvent(\"refund.created\", \"refunds\");\n }\nIndex: src/support.ts\n===================================================================\n--- src/support.ts\n+++ src/support.ts\n@@ -1,5 +1,5 @@\n import { recordEvent } from \"./events\";\n \n export function recordSupportTicket() {\n-  return recordEvent(\"support.ticket\");\n+  return recordEvent(\"support.ticket\", \"support\");\n }\nIndex: src/events.test.ts\n===================================================================\n--- src/events.test.ts\n+++ src/events.test.ts\n@@ -1,8 +1,8 @@\n import { recordEvent } from \"./events\";\n \n test(\"records event payload\", () => {\n-  expect(recordEvent(\"support.ticket\")).toEqual({\n+  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n     name: \"support.ticket\",\n-    source: \"unknown\",\n+    source: \"support\",\n   });\n });",
+  "proposal": {
+    "summary": "Require a source argument for recordEvent, update all selected callers to pass explicit sources, and assert the source is preserved in the test.",
+    "edits": [
+      {
+        "path": "src/events.ts",
+        "oldText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName) {\n  return { name, source: \"unknown\" };\n}\n",
+        "newText": "export type EventName = \"order.created\" | \"refund.created\" | \"support.ticket\";\n\nexport function recordEvent(name: EventName, source: string) {\n  return { name, source };\n}\n"
+      },
+      {
+        "path": "src/orders.ts",
+        "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\");\n}\n",
+        "newText": "import { recordEvent } from \"./events\";\n\nexport function recordOrderCreated() {\n  return recordEvent(\"order.created\", \"orders\");\n}\n"
+      },
+      {
+        "path": "src/refunds.ts",
+        "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\");\n}\n",
+        "newText": "import { recordEvent } from \"./events\";\n\nexport function recordRefundCreated() {\n  return recordEvent(\"refund.created\", \"refunds\");\n}\n"
+      },
+      {
+        "path": "src/support.ts",
+        "oldText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\");\n}\n",
+        "newText": "import { recordEvent } from \"./events\";\n\nexport function recordSupportTicket() {\n  return recordEvent(\"support.ticket\", \"support\");\n}\n"
+      },
+      {
+        "path": "src/events.test.ts",
+        "oldText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\")).toEqual({\n    name: \"support.ticket\",\n    source: \"unknown\",\n  });\n});\n",
+        "newText": "import { recordEvent } from \"./events\";\n\ntest(\"records event payload\", () => {\n  expect(recordEvent(\"support.ticket\", \"support\")).toEqual({\n    name: \"support.ticket\",\n    source: \"support\",\n  });\n});\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

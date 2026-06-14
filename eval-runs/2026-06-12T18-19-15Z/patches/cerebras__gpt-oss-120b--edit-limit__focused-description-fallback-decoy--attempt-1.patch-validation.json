@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerDescription.ts\n===================================================================\n--- src/customerDescription.ts\n+++ src/customerDescription.ts\n@@ -1,6 +1,6 @@\n export function descriptionLabel(description: string) {\n   if (description.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No description\";\n   }\n   return description.trim();\n }\nIndex: src/adminDescription.ts\n===================================================================\n--- src/adminDescription.ts\n+++ src/adminDescription.ts\n@@ -1,6 +1,6 @@\n export function descriptionLabel(description: string) {\n   if (description.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No description\";\n   }\n   return description.trim();\n }",
+  "proposal": {
+    "summary": "Replace placeholder text 'Missing' with 'No description' for empty descriptions",
+    "edits": [
+      {
+        "path": "src/customerDescription.ts",
+        "oldText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}",
+        "newText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"No description\";\n  }\n  return description.trim();\n}"
+      },
+      {
+        "path": "src/adminDescription.ts",
+        "oldText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}",
+        "newText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"No description\";\n  }\n  return description.trim();\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

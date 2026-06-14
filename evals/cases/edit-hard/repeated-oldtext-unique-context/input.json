@@ -1,0 +1,10 @@
+{
+  "command": "edit",
+  "question": "Change only the unknown role fallback to \"Guest\". Do not change the unknown status fallback.",
+  "workspace": {
+    "files": {
+      "src/labels.ts": "export function roleLabel(role: \"admin\" | \"member\" | \"unknown\") {\n  switch (role) {\n    case \"admin\":\n      return \"Admin\";\n    case \"member\":\n      return \"Member\";\n    default:\n      return \"Unknown\";\n  }\n}\n\nexport function statusLabel(status: \"active\" | \"inactive\" | \"unknown\") {\n  switch (status) {\n    case \"active\":\n      return \"Active\";\n    case \"inactive\":\n      return \"Inactive\";\n    default:\n      return \"Unknown\";\n  }\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/labels.ts", "focused": true }]
+}

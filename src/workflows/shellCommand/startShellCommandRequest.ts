@@ -2,6 +2,7 @@ import {
   LlmCompletionError,
   streamLlmInteraction,
 } from "../../lib/llm/streamResponse";
+import type { ComposerState } from "../../app/appTypes";
 import { runShellCommand } from "../../lib/shell/shellCommand";
 import { useAppStore } from "../../store/appStore";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "../llmTools/shellCommandWorkflowTool";
@@ -9,10 +10,13 @@ import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
 
 export function startShellCommandRequest(
   prompt: string,
-  options: { commandDirective: string },
+  options: { commandDirective: string; rejectComposer?: ComposerState },
 ) {
   const currentState = useAppStore.getState();
-  const requestId = currentState.actions.shellCommand.start({ prompt });
+  const requestId = currentState.actions.shellCommand.start({
+    prompt,
+    rejectComposer: options.rejectComposer,
+  });
   if (requestId === null) {
     return;
   }

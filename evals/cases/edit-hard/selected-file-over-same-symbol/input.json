@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused customer summary file only, include the item count in buildSummary. Do not edit the admin summary.",
+  "workspace": {
+    "files": {
+      "src/adminSummary.ts": "export function buildSummary(items: string[]) {\n  return `Items: ${items.join(\", \")}`;\n}\n",
+      "src/customerSummary.ts": "export function buildSummary(items: string[]) {\n  return `Items: ${items.join(\", \")}`;\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/adminSummary.ts" },
+    { "kind": "file", "path": "src/customerSummary.ts", "focused": true }
+  ]
+}

@@ -1,0 +1,11 @@
+Index: AGENTS.md
+===================================================================
+--- AGENTS.md
++++ AGENTS.md
+@@ -5,6 +5,7 @@
+ - Clutch is an OpenTUI app.
+ - LLM requests flow through workflow modules.
+ - Keep prompts under src/prompts.
++- pi-ai is the LLM model adapter layer.
+ 
+ ## Dependencies

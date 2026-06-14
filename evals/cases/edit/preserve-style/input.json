@@ -1,0 +1,10 @@
+{
+  "command": "edit",
+  "question": "Add support for the guest role label.",
+  "workspace": {
+    "files": {
+      "src/roles.ts": "export const ROLE_LABELS: Record<string, string> = {\n  admin: 'Admin',\n  member: 'Member',\n};\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/roles.ts", "focused": true }]
+}

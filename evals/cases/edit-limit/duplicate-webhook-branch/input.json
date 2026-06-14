@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Change only the webhook queued message to \"Webhook queued\". Leave the email queued message unchanged.",
+  "workspace": {
+    "files": {
+      "src/messages.ts": "export function webhookMessage(state: \"queued\" | \"sent\") {\n  if (state === \"queued\") {\n    return \"Queued\";\n  }\n  return \"Sent\";\n}\n\nexport function emailMessage(state: \"queued\" | \"sent\") {\n  if (state === \"queued\") {\n    return \"Queued\";\n  }\n  return \"Sent\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/messages.ts", "focused": true }
+  ]
+}

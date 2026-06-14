@@ -1,0 +1,6 @@
+{
+  "classification": "create_file",
+  "toolArguments": {
+    "path": "src/constants.ts"
+  }
+}

@@ -1,18 +1,19 @@
 import {
   stream,
+  streamSimple,
   type AssistantMessage,
   type TextContent,
   type ToolCall,
 } from "@earendil-works/pi-ai";
 import type { ContextItem } from "../../types";
-import { buildLlmContext } from "./context";
-import { resolveConfiguredLlmModel } from "../config/clutchConfig";
-import { patchAwareSystemPrompt, renderPrompt } from "./prompts";
-import { maxOutputTokensForModel } from "./requestOptions";
+import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
+import { buildLlmInteractionContext } from "./interactionContext";
 import {
-  getLlmWorkflowTools,
-  routeLlmWorkflowToolCalls,
-} from "../../workflows/llmTools/toolRegistry";
+  configuredLlmRequestOptions,
+  usesProviderSpecificRequestOptions,
+} from "./requestOptions";
+import { isCursorAgentModel, streamCursorCompletion } from "./cursorCompletion";
+import { routeLlmWorkflowToolCalls } from "../../workflows/llmTools/toolRegistry";
 import type { LlmWorkflowToolResult } from "../../workflows/llmTools/types";
 
 export type StreamLlmResponseOptions = {
@@ -57,20 +58,57 @@ export async function streamLlmInteraction({
   signal,
   onDelta,
 }: StreamLlmResponseOptions): Promise<StreamLlmInteractionResult> {
-  const { context } = await buildLlmContext({
-    question: formatQuestionForCommand({ commandDirective, question }),
+  const { context } = await buildLlmInteractionContext({
+    allowedToolNames,
+    commandDirective,
+    question,
     contextItems,
     focusedContextItemId,
     root,
-    systemPrompt: patchAwareSystemPrompt,
-    tools: getLlmWorkflowTools({ allowedToolNames }),
   });
-  const { apiKey, model } = resolveConfiguredLlmModel("primary");
-  const eventStream = stream(model, context, {
-    apiKey,
-    maxTokens: maxOutputTokensForModel(model),
+  const request = await resolveConfiguredLlmRequest("primary");
+  if (isCursorAgentModel(request.model)) {
+    if (request.serviceTier !== "default") {
+      throw new Error(
+        "Cursor Composer completions do not support Clutch service tiers. Use the default service tier.",
+      );
+    }
+
+    const cursorResult = await streamCursorCompletion({
+      apiKey: request.apiKey,
+      context,
+      model: request.model,
+      onDelta,
+      root,
+      signal,
+    });
+    if (cursorResult.kind === "toolCalls") {
+      const workflowResult = await routeLlmWorkflowToolCalls({
+        allowedToolNames,
+        root,
+        toolCalls: cursorResult.toolCalls,
+      });
+      if (workflowResult !== null) {
+        return {
+          ...workflowResult,
+          responseText: cursorResult.responseText,
+        };
+      }
+    }
+
+    return {
+      kind: "text",
+      responseText: cursorResult.responseText,
+    };
+  }
+
+  const requestOptions = configuredLlmRequestOptions({
+    ...request,
     signal,
   });
+  const eventStream = usesProviderSpecificRequestOptions(request)
+    ? stream(request.model, context, requestOptions)
+    : streamSimple(request.model, context, requestOptions);
   let streamedText = "";
 
   let finalMessage: AssistantMessage;
@@ -124,23 +162,6 @@ export async function streamLlmInteraction({
     kind: "text",
     responseText,
   };
-}
-
-function formatQuestionForCommand({
-  commandDirective,
-  question,
-}: {
-  commandDirective?: string;
-  question: string;
-}): string {
-  if (commandDirective === undefined) {
-    return question;
-  }
-
-  return renderPrompt("context/command-user-message.md", {
-    commandDirective,
-    question,
-  });
 }
 
 function formatCompletionFailureOutput({

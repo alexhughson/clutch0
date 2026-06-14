@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerSummaryLimit.ts\n===================================================================\n--- src/customerSummaryLimit.ts\n+++ src/customerSummaryLimit.ts\n@@ -1,3 +1,3 @@\n export function summaryLimit() {\n-  return 200;\n+  return 120;\n }\nIndex: src/adminSummaryLimit.ts\n===================================================================\n--- src/adminSummaryLimit.ts\n+++ src/adminSummaryLimit.ts\n@@ -1,3 +1,3 @@\n export function summaryLimit() {\n-  return 200;\n+  return 120;\n }",
+  "proposal": {
+    "summary": "Change summary limit to 120 characters",
+    "edits": [
+      {
+        "path": "src/customerSummaryLimit.ts",
+        "oldText": "export function summaryLimit() {\n  return 200;\n}\n",
+        "newText": "export function summaryLimit() {\n  return 120;\n}\n"
+      },
+      {
+        "path": "src/adminSummaryLimit.ts",
+        "oldText": "export function summaryLimit() {\n  return 200;\n}\n",
+        "newText": "export function summaryLimit() {\n  return 120;\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

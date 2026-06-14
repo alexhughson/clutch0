@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/labels.ts\n===================================================================\n--- src/labels.ts\n+++ src/labels.ts\n@@ -5,7 +5,7 @@\n     case \"member\":\n       return \"Member\";\n     default:\n-      return \"Unknown\";\n+      return \"Guest\";\n   }\n }",
+  "proposal": {
+    "summary": "Change the role fallback label from \"Unknown\" to \"Guest\" without altering status fallback behavior.",
+    "edits": [
+      {
+        "path": "src/labels.ts",
+        "oldText": "export function roleLabel(role: \"admin\" | \"member\" | \"unknown\") {\n  switch (role) {\n    case \"admin\":\n      return \"Admin\";\n    case \"member\":\n      return \"Member\";\n    default:\n      return \"Unknown\";\n  }\n}\n",
+        "newText": "export function roleLabel(role: \"admin\" | \"member\" | \"unknown\") {\n  switch (role) {\n    case \"admin\":\n      return \"Admin\";\n    case \"member\":\n      return \"Member\";\n    default:\n      return \"Guest\";\n  }\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

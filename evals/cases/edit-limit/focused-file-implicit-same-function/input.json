@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Show unknown statuses as \"Not available\".",
+  "workspace": {
+    "files": {
+      "src/adminStatus.ts": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}\n",
+      "src/customerStatus.ts": "export function renderStatus(status: \"active\" | \"unknown\") {\n  if (status === \"active\") {\n    return \"Active\";\n  }\n  return \"Unknown\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerStatus.ts", "focused": true },
+    { "kind": "file", "path": "src/adminStatus.ts" }
+  ]
+}

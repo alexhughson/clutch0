@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "In Webhook Delivery only, change the retry delay from 5 minutes to 2 minutes. Leave Email Delivery at 5 minutes.",
+  "workspace": {
+    "files": {
+      "docs/delivery.md": "# Delivery Settings\n\n## Webhook Delivery\n\n### Retry policy\n\n- Retry delay: 5 minutes\n- Retry attempts: 3\n- Dead letter queue: enabled\n\n## Email Delivery\n\n### Retry policy\n\n- Retry delay: 5 minutes\n- Retry attempts: 3\n- Dead letter queue: enabled\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "docs/delivery.md", "focused": true }
+  ]
+}

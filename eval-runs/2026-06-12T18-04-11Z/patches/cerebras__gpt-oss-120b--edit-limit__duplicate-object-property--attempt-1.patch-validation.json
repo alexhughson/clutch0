@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/copy.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update checkoutCopy.emptyTitle to 'No items in cart'",
+    "edits": [
+      {
+        "path": "src/copy.ts",
+        "oldText": "  emptyTitle: \"Nothing here\",",
+        "newText": "  emptyTitle: \"No items in cart\","
+      }
+    ]
+  },
+  "status": "invalid"
+}

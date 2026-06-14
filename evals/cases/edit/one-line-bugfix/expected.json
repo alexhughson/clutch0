@@ -1,0 +1,8 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only the parity comparison so isEven returns true for even values and false for odd values."
+  }
+}

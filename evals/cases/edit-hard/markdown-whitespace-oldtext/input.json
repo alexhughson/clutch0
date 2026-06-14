@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Under Runtime Settings only, change the nested timeout from 30 seconds to 45 seconds. Leave the Quick Start timeout unchanged.",
+  "workspace": {
+    "files": {
+      "docs/runtime.md": "# Runtime\n\n## Quick Start\n\n- defaults:\n  - timeout: 30 seconds\n  - retries: 2\n\n## Runtime Settings\n\n- defaults:\n  - timeout: 30 seconds\n  - retries: 2\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "docs/runtime.md", "focused": true }
+  ]
+}

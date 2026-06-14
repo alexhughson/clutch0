@@ -1,0 +1,8 @@
+{
+  "question": "Create a new file src/constants.ts exporting DEFAULT_PAGE_SIZE set to 25.",
+  "workspace": {
+    "files": {
+      "src/index.ts": "export {};\n"
+    }
+  }
+}

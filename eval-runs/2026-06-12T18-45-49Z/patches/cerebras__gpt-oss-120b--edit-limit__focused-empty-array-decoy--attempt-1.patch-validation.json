@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerIds.ts\n===================================================================\n--- src/customerIds.ts\n+++ src/customerIds.ts\n@@ -1,6 +1,6 @@\n export function normalizeIds(ids: string[]) {\n   if (ids.length === 0) {\n-    return [\"missing\"];\n+    return [];\n   }\n   return ids;\n }\nIndex: src/adminIds.ts\n===================================================================\n--- src/adminIds.ts\n+++ src/adminIds.ts\n@@ -1,6 +1,6 @@\n export function normalizeIds(ids: string[]) {\n   if (ids.length === 0) {\n-    return [\"missing\"];\n+    return [];\n   }\n   return ids;\n }",
+  "proposal": {
+    "summary": "Return an empty array when no ids are provided in normalizeIds functions",
+    "edits": [
+      {
+        "path": "src/customerIds.ts",
+        "oldText": "export function normalizeIds(ids: string[]) {\n  if (ids.length === 0) {\n    return [\"missing\"];\n  }\n  return ids;\n}",
+        "newText": "export function normalizeIds(ids: string[]) {\n  if (ids.length === 0) {\n    return [];\n  }\n  return ids;\n}"
+      },
+      {
+        "path": "src/adminIds.ts",
+        "oldText": "export function normalizeIds(ids: string[]) {\n  if (ids.length === 0) {\n    return [\"missing\"];\n  }\n  return ids;\n}",
+        "newText": "export function normalizeIds(ids: string[]) {\n  if (ids.length === 0) {\n    return [];\n  }\n  return ids;\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

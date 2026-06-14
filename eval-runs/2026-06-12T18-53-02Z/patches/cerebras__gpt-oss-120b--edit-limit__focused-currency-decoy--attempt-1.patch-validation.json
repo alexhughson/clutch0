@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerCurrency.ts\n===================================================================\n--- src/customerCurrency.ts\n+++ src/customerCurrency.ts\n@@ -1,3 +1,3 @@\n export function defaultCurrency() {\n-  return \"EUR\";\n+  return \"USD\";\n }",
+  "proposal": {
+    "summary": "Change default currency to USD in customerCurrency.ts",
+    "edits": [
+      {
+        "path": "src/customerCurrency.ts",
+        "oldText": "  return \"EUR\";\n",
+        "newText": "  return \"USD\";\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

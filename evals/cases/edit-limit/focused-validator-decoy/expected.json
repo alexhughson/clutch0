@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerValidator.ts"],
+    "allowedPaths": ["src/customerValidator.ts"],
+    "forbiddenPaths": ["src/adminValidator.ts"],
+    "diffIncludes": ["trim"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerValidator.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerValidator.ts file so whitespace-only values are invalid. adminValidator.ts must remain unchanged."
+  }
+}

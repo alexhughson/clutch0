@@ -7,6 +7,7 @@ import {
 import { invariant } from "../../lib/invariant";
 import type { AgentAskMode } from "../../types";
 import type { LlmSlashCommand } from "../llmTools/types";
+import { formatAgentSkillSlashCommandName } from "./agentSkillCommand";
 
 const AGENT_ASK_READ_ONLY_BUILTIN_TOOLS = [
   "read",
@@ -52,7 +53,7 @@ export async function loadAgentAskSkillSlashCommands({
   return resourceLoader.getSkills().skills.map((skill) => ({
     allowedToolNames: [],
     description: skill.description,
-    name: `skill:${skill.name}`,
+    name: formatAgentSkillSlashCommandName(skill.name),
     promptDirective: "",
     taskKind: "agent-skill" as const,
     title: `Skill: ${skill.name}`,

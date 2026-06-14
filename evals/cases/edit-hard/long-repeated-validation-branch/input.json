@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "In validateCoupon only, change the missing code error reason to \"Missing coupon code\". Leave every other \"Invalid\" reason unchanged.",
+  "workspace": {
+    "files": {
+      "src/validators.ts": "export function validateEmail(value: string) {\n  if (value.trim().length === 0) {\n    return { ok: false, reason: \"Invalid\" };\n  }\n  if (!value.includes(\"@\")) {\n    return { ok: false, reason: \"Invalid\" };\n  }\n  return { ok: true };\n}\n\nexport function validateCoupon(code: string) {\n  if (code.trim().length === 0) {\n    return { ok: false, reason: \"Invalid\" };\n  }\n  if (code.length < 8) {\n    return { ok: false, reason: \"Invalid\" };\n  }\n  return { ok: true };\n}\n\nexport function validateAddress(value: string) {\n  if (value.trim().length === 0) {\n    return { ok: false, reason: \"Invalid\" };\n  }\n  return { ok: true };\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/validators.ts", "focused": true }
+  ]
+}

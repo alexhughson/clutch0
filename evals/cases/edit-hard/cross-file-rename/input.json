@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Rename formatCents to formatAmount everywhere in these selected files. Keep behavior unchanged.",
+  "workspace": {
+    "files": {
+      "src/money.ts": "export function formatCents(cents: number) {\n  return (cents / 100).toFixed(2);\n}\n",
+      "src/cart.ts": "import { formatCents } from \"./money\";\n\nexport function renderCartTotal(totalCents: number) {\n  return `Total: ${formatCents(totalCents)}`;\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/money.ts" },
+    { "kind": "file", "path": "src/cart.ts", "focused": true }
+  ]
+}

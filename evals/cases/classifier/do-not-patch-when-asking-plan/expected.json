@@ -1,0 +1,4 @@
+{
+  "classification": "text",
+  "forbiddenClassifications": ["propose_patch"]
+}

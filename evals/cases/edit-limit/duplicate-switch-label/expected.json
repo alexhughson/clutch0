@@ -1,0 +1,17 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/statusLabels.ts"],
+    "allowedPaths": ["src/statusLabels.ts"],
+    "diffIncludes": ["+      return \"Awaiting payment\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/statusLabels.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only paymentStatusLabel's pending case. shippingStatusLabel's pending case must still return \"Pending\"."
+  }
+}

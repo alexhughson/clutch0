@@ -1,4 +1,4 @@
 {{commandDirective}}
 
-User request:
+Original request:
 {{question}}

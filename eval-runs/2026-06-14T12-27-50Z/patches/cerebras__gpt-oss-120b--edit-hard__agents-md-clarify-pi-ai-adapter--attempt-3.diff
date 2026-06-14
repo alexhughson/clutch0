@@ -1,0 +1,13 @@
+Index: AGENTS.md
+===================================================================
+--- AGENTS.md
++++ AGENTS.md
+@@ -42,6 +42,8 @@
+ 
+ All model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.
+ 
++The `pi-ai` package provides the LLM model adapter layer, handling model selection and labeling.
++
+ LLM workflow tools are isolated controllers registered in `src/workflows/llmTools/toolRegistry.ts`.
+ 
+ Each workflow tool module owns:

@@ -1,0 +1,8 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should narrowly fix pageCount, likely using Math.ceil, and should not rewrite unrelated functions or restructure the file."
+  }
+}

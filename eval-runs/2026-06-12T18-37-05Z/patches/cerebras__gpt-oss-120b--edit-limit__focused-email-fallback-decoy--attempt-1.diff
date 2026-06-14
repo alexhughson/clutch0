@@ -1,0 +1,24 @@
+Index: src/customerEmail.ts
+===================================================================
+--- src/customerEmail.ts
++++ src/customerEmail.ts
+@@ -1,6 +1,6 @@
+ export function emailLabel(email: string) {
+   if (email.trim().length === 0) {
+-    return "Missing";
++    return "No email";
+   }
+   return email.trim();
+ }
+Index: src/adminEmail.ts
+===================================================================
+--- src/adminEmail.ts
++++ src/adminEmail.ts
+@@ -1,6 +1,6 @@
+ export function emailLabel(email: string) {
+   if (email.trim().length === 0) {
+-    return "Missing";
++    return "No email";
+   }
+   return email.trim();
+ }

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: AGENTS.md\n===================================================================\n--- AGENTS.md\n+++ AGENTS.md\n@@ -42,6 +42,8 @@\n \n All model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.\n \n+The `pi‑ai` module (`src/lib/llm/model.ts`) acts as the LLM model adapter layer, providing a unified interface for different model providers.\n+\n LLM workflow tools are isolated controllers registered in `src/workflows/llmTools/toolRegistry.ts`.\n \n Each workflow tool module owns:",
+  "proposal": {
+    "summary": "Add note that pi-ai is the LLM model adapter layer",
+    "edits": [
+      {
+        "path": "AGENTS.md",
+        "oldText": "## LLM requests and tools\n\nRequest start/effects: `src/workflows/llmRequest/startLlmRequest.ts`  \nContext building: `src/lib/llm/context.ts`  \nStreaming/model/prompt wiring: `src/lib/llm/streamResponse.ts`, `src/lib/llm/model.ts`, `src/prompts/`\n\nAll model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.",
+        "newText": "## LLM requests and tools\n\nRequest start/effects: `src/workflows/llmRequest/startLlmRequest.ts`  \nContext building: `src/lib/llm/context.ts`  \nStreaming/model/prompt wiring: `src/lib/llm/streamResponse.ts`, `src/lib/llm/model.ts`, `src/prompts/`\n\nAll model-facing prompt text must live under `src/prompts/` and be loaded through `src/lib/llm/prompts.ts`. Keep the configurable prompt set small; tool schema descriptions may stay beside the tool definitions.\n\nThe `pi‑ai` module (`src/lib/llm/model.ts`) acts as the LLM model adapter layer, providing a unified interface for different model providers."
+      }
+    ]
+  },
+  "status": "valid"
+}

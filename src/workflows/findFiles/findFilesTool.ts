@@ -8,7 +8,7 @@ export const FIND_RELEVANT_FILES_TOOL_NAME = "find_relevant_files";
 export const findRelevantFilesTool: Tool = {
   name: FIND_RELEVANT_FILES_TOOL_NAME,
   description:
-    "Ask Clutch to search the project for files relevant to the user's request. Use this when the selected context is missing, likely incomplete, or the user asks about code but has not provided enough files. This opens an interactive file-picking workflow for the user; do not answer with guessed file names.",
+    "Ask Clutch to search the project for files relevant to the user's request. Use this for discovery, stack traces, missing source, unrelated/truncated context, or code questions without enough selected files. This opens an interactive file-picking workflow; do not answer with guessed file names.",
   parameters: Type.Object({
     goal: Type.String({
       description:

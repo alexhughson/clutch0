@@ -1,0 +1,16 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [
+      { "path": "src/orderModel.ts" },
+      { "path": "src/orderSerializer.ts" },
+      { "path": "src/orderView.ts" },
+      { "path": "src/orderSerializer.test.ts" }
+    ]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should consistently rename customerId to accountId across the type, serializer output, view string, test input, and expected serialized object."
+  }
+}

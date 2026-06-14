@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerBadge.ts\n===================================================================\n--- src/customerBadge.ts\n+++ src/customerBadge.ts\n@@ -1,6 +1,6 @@\n export function badgeText(status: \"active\" | \"paused\") {\n   if (status === \"paused\") {\n-    return \"Paused\";\n+    return \"On hold\";\n   }\n   return \"Active\";\n }",
+  "proposal": {
+    "summary": "Change paused badge text to \"On hold\" in src/customerBadge.ts",
+    "edits": [
+      {
+        "path": "src/customerBadge.ts",
+        "oldText": "  if (status === \"paused\") {\n    return \"Paused\";\n  }",
+        "newText": "  if (status === \"paused\") {\n    return \"On hold\";\n  }"
+      }
+    ]
+  },
+  "status": "valid"
+}

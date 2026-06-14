@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/paging.ts\n===================================================================\n--- src/paging.ts\n+++ src/paging.ts\n@@ -1,5 +1,5 @@\n export function pageCount(totalItems: number, pageSize: number) {\n-  return Math.floor(totalItems / pageSize);\n+  return Math.ceil(totalItems / pageSize);\n }\n \n export function firstPage() {",
+  "proposal": {
+    "summary": "Use Math.ceil for page count to correctly handle remaining items",
+    "edits": [
+      {
+        "path": "src/paging.ts",
+        "oldText": "export function pageCount(totalItems: number, pageSize: number) {\n  return Math.floor(totalItems / pageSize);\n}",
+        "newText": "export function pageCount(totalItems: number, pageSize: number) {\n  return Math.ceil(totalItems / pageSize);\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

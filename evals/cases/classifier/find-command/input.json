@@ -1,0 +1,10 @@
+{
+  "command": "find",
+  "question": "Find the files involved in login redirects.",
+  "workspace": {
+    "files": {
+      "src/auth/login.ts": "export function login() { return \"/home\"; }\n",
+      "src/routes.ts": "export const routes = [\"/login\", \"/home\"];\n"
+    }
+  }
+}

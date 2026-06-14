@@ -1,4 +1,5 @@
 import type { KeyEvent } from "@opentui/core";
+import type { ComposerState } from "../../app/appTypes";
 import { getContextItemActionForKeyEvent } from "../../lib/context/contextItemActions";
 import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
@@ -11,6 +12,7 @@ import { assertNever } from "../../lib/invariant";
 import {
   startAgentAskRequest,
   startAgentEditRequest,
+  startAgentSkillRequest,
 } from "../../workflows/agentAsk/startAgentAskRequest";
 import { runContextItemAction } from "../../workflows/contextItems/contextItemActionRunner";
 import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
@@ -375,13 +377,23 @@ function submitQuestion(event: KeyEvent) {
 
   const intent = getSubmissionIntent(currentState.workspace.composer.message);
   if (intent !== null) {
-    runSubmissionIntent(intent);
+    const submittedComposer = currentState.workspace.composer;
+    currentState.actions.compose.setComposerState({
+      cursorPosition: 0,
+      message: "",
+    });
+    runSubmissionIntent(intent, submittedComposer);
   }
 }
 
-function runSubmissionIntent(intent: SubmissionIntent) {
+function runSubmissionIntent(
+  intent: SubmissionIntent,
+  submittedComposer: ComposerState,
+) {
   if (intent.kind === "show-context") {
-    startShowContextRequest(intent.question);
+    startShowContextRequest(intent.question, {
+      rejectComposer: submittedComposer,
+    });
     return;
   }
 
@@ -396,18 +408,28 @@ function runSubmissionIntent(intent: SubmissionIntent) {
   }
 
   if (intent.kind === "agent-ask") {
-    startAgentAskRequest(intent.prompt);
+    startAgentAskRequest(intent.prompt, { rejectComposer: submittedComposer });
     return;
   }
 
   if (intent.kind === "agent-edit") {
-    startAgentEditRequest(intent.prompt);
+    startAgentEditRequest(intent.prompt, { rejectComposer: submittedComposer });
+    return;
+  }
+
+  if (intent.kind === "agent-skill") {
+    startAgentSkillRequest({
+      prompt: intent.prompt,
+      rejectComposer: submittedComposer,
+      skillName: intent.skillName,
+    });
     return;
   }
 
   if (intent.kind === "shell-command") {
     startShellCommandRequest(intent.prompt, {
       commandDirective: intent.commandDirective,
+      rejectComposer: submittedComposer,
     });
     return;
   }
@@ -416,6 +438,7 @@ function runSubmissionIntent(intent: SubmissionIntent) {
     startLlmRequest(intent.question, {
       allowedToolNames: intent.allowedToolNames,
       commandDirective: intent.commandDirective,
+      rejectComposer: submittedComposer,
     });
     return;
   }

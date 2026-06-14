@@ -1,0 +1,9 @@
+{
+  "command": "edit",
+  "question": "Create a new file src/string/capitalize.ts that exports a capitalize function.",
+  "workspace": {
+    "files": {
+      "src/index.ts": "export {};\n"
+    }
+  }
+}

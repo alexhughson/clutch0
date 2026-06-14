@@ -11,7 +11,7 @@ test("renders prompt templates and fails on missing variables", () => {
       commandDirective: "Do the thing.",
       question: "What changed?",
     }),
-  ).toBe("Do the thing.\n\nUser request:\nWhat changed?");
+  ).toBe("Do the thing.\n\nOriginal request:\nWhat changed?");
 
   expect(() =>
     renderPrompt("context/command-user-message.md", {

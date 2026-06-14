@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused customer currency file only, use USD as the default currency.",
+  "workspace": {
+    "files": {
+      "src/customerCurrency.ts": "export function defaultCurrency() {\n  return \"EUR\";\n}\n",
+      "src/adminCurrency.ts": "export function defaultCurrency() {\n  return \"EUR\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerCurrency.ts", "focused": true },
+    { "kind": "file", "path": "src/adminCurrency.ts" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused report file only, pass includeDrafts: true to loadInvoices. Do not change the dashboard file.",
+  "workspace": {
+    "files": {
+      "src/dashboard.ts": "import { loadInvoices } from \"./invoiceApi\";\n\nexport async function dashboardInvoices(accountId: string) {\n  return await loadInvoices({ accountId });\n}\n",
+      "src/report.ts": "import { loadInvoices } from \"./invoiceApi\";\n\nexport async function reportInvoices(accountId: string) {\n  return await loadInvoices({ accountId });\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/dashboard.ts" },
+    { "kind": "file", "path": "src/report.ts", "focused": true }
+  ]
+}

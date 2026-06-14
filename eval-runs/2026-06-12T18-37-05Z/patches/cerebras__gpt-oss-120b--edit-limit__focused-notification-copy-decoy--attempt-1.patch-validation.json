@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerNotification.ts\n===================================================================\n--- src/customerNotification.ts\n+++ src/customerNotification.ts\n@@ -1,3 +1,3 @@\n export function savedNotification() {\n-  return \"Saved\";\n+  return \"Saved successfully\";\n }\nIndex: src/adminNotification.ts\n===================================================================\n--- src/adminNotification.ts\n+++ src/adminNotification.ts\n@@ -1,3 +1,3 @@\n export function savedNotification() {\n-  return \"Saved\";\n+  return \"Saved successfully\";\n }",
+  "proposal": {
+    "summary": "Update saved notification text to \"Saved successfully\" in both customer and admin notification files",
+    "edits": [
+      {
+        "path": "src/customerNotification.ts",
+        "oldText": "export function savedNotification() {\n  return \"Saved\";\n}",
+        "newText": "export function savedNotification() {\n  return \"Saved successfully\";\n}"
+      },
+      {
+        "path": "src/adminNotification.ts",
+        "oldText": "export function savedNotification() {\n  return \"Saved\";\n}",
+        "newText": "export function savedNotification() {\n  return \"Saved successfully\";\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

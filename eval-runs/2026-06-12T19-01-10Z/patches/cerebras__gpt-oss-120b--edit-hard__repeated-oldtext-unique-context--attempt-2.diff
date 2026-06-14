@@ -1,0 +1,12 @@
+Index: src/labels.ts
+===================================================================
+--- src/labels.ts
++++ src/labels.ts
+@@ -5,7 +5,7 @@
+     case "member":
+       return "Member";
+     default:
+-      return "Unknown";
++      return "Guest";
+   }
+ }

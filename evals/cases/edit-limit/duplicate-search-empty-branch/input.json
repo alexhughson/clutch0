@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Change only the search empty state message to \"No matching results\". Leave the filter empty state unchanged.",
+  "workspace": {
+    "files": {
+      "src/emptyStates.ts": "export function searchEmptyState(hasResults: boolean) {\n  if (!hasResults) {\n    return \"No results\";\n  }\n  return \"Results ready\";\n}\n\nexport function filterEmptyState(hasResults: boolean) {\n  if (!hasResults) {\n    return \"No results\";\n  }\n  return \"Results ready\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/emptyStates.ts", "focused": true }
+  ]
+}

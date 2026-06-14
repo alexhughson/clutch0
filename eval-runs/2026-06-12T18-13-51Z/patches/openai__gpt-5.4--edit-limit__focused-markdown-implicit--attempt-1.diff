@@ -1,0 +1,11 @@
+Index: docs/customer-runbook.md
+===================================================================
+--- docs/customer-runbook.md
++++ docs/customer-runbook.md
+@@ -2,5 +2,5 @@
+ 
+ ## Escalation
+ 
+-Contact: support@example.com
++Contact: customers@example.com
+ Window: business hours

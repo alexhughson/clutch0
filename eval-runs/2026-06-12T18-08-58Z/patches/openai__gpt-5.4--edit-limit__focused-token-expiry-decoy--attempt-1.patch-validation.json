@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerToken.ts\n===================================================================\n--- src/customerToken.ts\n+++ src/customerToken.ts\n@@ -1,6 +1,6 @@\n export function tokenState(expired: boolean) {\n   if (expired) {\n-    return \"active\";\n+    return \"inactive\";\n   }\n   return \"active\";\n }",
+  "proposal": {
+    "summary": "Return \"inactive\" for expired customer tokens.",
+    "edits": [
+      {
+        "path": "src/customerToken.ts",
+        "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n",
+        "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/retry.ts\n===================================================================\n--- src/retry.ts\n+++ src/retry.ts\n@@ -1,3 +1,6 @@\n-export function shouldRetry(status: number) {\n-  return status === 429 || status >= 500;\n+export function shouldRetry(method: string, status: number) {\n+  if (status === 429) {\n+    return method === \"GET\" || method === \"HEAD\";\n+  }\n+  return status >= 500;\n }\nIndex: src/client.ts\n===================================================================\n--- src/client.ts\n+++ src/client.ts\n@@ -1,7 +1,7 @@\n import { shouldRetry } from \"./retry\";\n \n-export async function request(method: \"GET\" | \"POST\", status: number) {\n-  if (shouldRetry(status)) {\n+export async function request(method: \"GET\" | \"POST\" | \"HEAD\", status: number) {\n+  if (shouldRetry(method, status)) {\n     return \"retry\";\n   }\n   return `${method}:done`;",
+  "proposal": {
+    "summary": "Update shouldRetry to consider HTTP method for 429 retries and adjust client request signature and call",
+    "edits": [
+      {
+        "path": "src/retry.ts",
+        "oldText": "export function shouldRetry(status: number) {\n  return status === 429 || status >= 500;\n}",
+        "newText": "export function shouldRetry(method: string, status: number) {\n  if (status === 429) {\n    return method === \"GET\" || method === \"HEAD\";\n  }\n  return status >= 500;\n}"
+      },
+      {
+        "path": "src/client.ts",
+        "oldText": "export async function request(method: \"GET\" | \"POST\", status: number) {\n  if (shouldRetry(status)) {\n    return \"retry\";\n  }\n  return `${method}:done`;\n}",
+        "newText": "export async function request(method: \"GET\" | \"POST\" | \"HEAD\", status: number) {\n  if (shouldRetry(method, status)) {\n    return \"retry\";\n  }\n  return `${method}:done`;\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

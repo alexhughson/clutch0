@@ -1,0 +1,11 @@
+{
+  "classification": "propose_patch",
+  "patch": { "required": true, "mustBeValid": true },
+  "toolArguments": {
+    "edits": [{ "path": "src/parser.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should target the focused parser file and handle blank input by returning null without changing unrelated formatting code."
+  }
+}

@@ -88,6 +88,7 @@ export type RelevantFileCandidate = {
 
 export type ResponseTaskState = {
   kind: "response";
+  rejectComposer?: ComposerState;
   request: LlmRequestState;
 };
 
@@ -96,9 +97,11 @@ export type ContextItemViewerTaskState = {
   applyStatus: "apply-error" | "applying" | "idle";
   itemId: string;
   kind: "context-item-viewer";
+  rejectComposer?: ComposerState;
 };
 
 export type ConfigTaskState = {
+  agent: ClutchModelSelection;
   configuredProviders: SupportedClutchLlmProvider[];
   kind: "config";
   mode: "first-run" | "settings";
@@ -112,6 +115,7 @@ export type CreateFileTaskState = {
   id: number;
   kind: "create-file";
   prompt: string;
+  rejectComposer?: ComposerState;
   validation: CreateFileValidationResult;
 };
 
@@ -121,6 +125,7 @@ export type ShowContextTaskState = {
   id: number;
   kind: "show-context";
   question: string;
+  rejectComposer?: ComposerState;
   status: "done" | "error" | "loading";
 };
 
@@ -129,6 +134,7 @@ export type ShellCommandTaskState = {
   id: number;
   kind: "shell-command";
   prompt: string;
+  rejectComposer?: ComposerState;
   replacement?: ShellCommandReplacementTarget;
   result?: ShellCommandResult;
   savedContextItemId?: string;
@@ -142,6 +148,7 @@ export type FindFilesTaskState = {
   goal: string;
   hints: string[];
   kind: "find-files";
+  rejectComposer?: ComposerState;
   selectedIndex: number;
   status: "searching" | "results" | "error";
 };
@@ -175,6 +182,7 @@ export type AppActions = {
     setComposerState: (composerState: ComposerState) => void;
     startLlmRequest: (options: {
       question: string;
+      rejectComposer?: ComposerState;
       replacement?: ContextItemReplacementTarget;
     }) => number | null;
   };
@@ -202,7 +210,11 @@ export type AppActions = {
       diffText: string;
       summary: string;
     }) => void;
-    start: (options: { mode: AgentAskMode; prompt: string }) => string | null;
+    start: (options: {
+      mode: AgentAskMode;
+      prompt: string;
+      rejectComposer?: ComposerState;
+    }) => string | null;
     startMessage: (options: { itemId: string }) => void;
     updateSandboxDiff: (options: {
       itemId: string;
@@ -230,7 +242,10 @@ export type AppActions = {
   showContext: {
     fail: (options: { errorMessage: string; requestId: number }) => void;
     finish: (options: { content: string; requestId: number }) => void;
-    start: (options: { question: string }) => number | null;
+    start: (options: {
+      question: string;
+      rejectComposer?: ComposerState;
+    }) => number | null;
   };
   shellCommand: {
     fail: (options: { errorMessage: string; requestId: number }) => void;
@@ -241,6 +256,7 @@ export type AppActions = {
     saveOutputToContext: (options: { requestId: number }) => void;
     start: (options: {
       prompt: string;
+      rejectComposer?: ComposerState;
       replacement?: ShellCommandReplacementTarget;
     }) => number | null;
   };

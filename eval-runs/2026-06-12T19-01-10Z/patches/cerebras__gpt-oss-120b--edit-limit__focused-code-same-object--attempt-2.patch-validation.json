@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerNotice.ts\n===================================================================\n--- src/customerNotice.ts\n+++ src/customerNotice.ts\n@@ -1,4 +1,4 @@\n export const notice = {\n-  title: \"Service update\",\n+  title: \"Maintenance window\",\n   body: \"We will post details soon.\",\n };",
+  "proposal": {
+    "summary": "Update notice title in customerNotice.ts to \"Maintenance window\"",
+    "edits": [
+      {
+        "path": "src/customerNotice.ts",
+        "oldText": "export const notice = {\n  title: \"Service update\",\n  body: \"We will post details soon.\",\n};",
+        "newText": "export const notice = {\n  title: \"Maintenance window\",\n  body: \"We will post details soon.\",\n};"
+      }
+    ]
+  },
+  "status": "valid"
+}

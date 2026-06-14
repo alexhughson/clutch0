@@ -1,11 +1,18 @@
+import type { ComposerState } from "../../app/appTypes";
 import { buildLlmContext } from "../../lib/llm/context";
 import { patchAwareSystemPrompt } from "../../lib/llm/prompts";
 import { getLlmWorkflowTools } from "../llmTools/toolRegistry";
 import { useAppStore } from "../../store/appStore";
 
-export function startShowContextRequest(question: string) {
+export function startShowContextRequest(
+  question: string,
+  options: { rejectComposer?: ComposerState } = {},
+) {
   const currentState = useAppStore.getState();
-  const requestId = currentState.actions.showContext.start({ question });
+  const requestId = currentState.actions.showContext.start({
+    question,
+    rejectComposer: options.rejectComposer,
+  });
   if (requestId === null) {
     return;
   }

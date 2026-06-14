@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "In the Production example only, change timeoutMs from 30000 to 45000. Leave the Staging example unchanged.",
+  "workspace": {
+    "files": {
+      "docs/config.md": "# Config Examples\n\n## Staging\n\n```json\n{\n  \"mode\": \"staging\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```\n\n## Production\n\n```json\n{\n  \"mode\": \"production\",\n  \"timeoutMs\": 30000,\n  \"retries\": 2\n}\n```\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "docs/config.md", "focused": true }
+  ]
+}

@@ -1,0 +1,13 @@
+Index: AGENTS.md
+===================================================================
+--- AGENTS.md
++++ AGENTS.md
+@@ -2,6 +2,8 @@
+ 
+ OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.
+ 
++pi-ai is the LLM model adapter layer.
++
+ ## Core map
+ 
+ - App shell: `src/index.tsx`, `src/App.tsx`

@@ -1,0 +1,10 @@
+{
+  "question": "Trace how checkout totals are calculated.",
+  "workspace": {
+    "files": {
+      "src/colors.ts": "export const colors = [\"red\", \"green\"];\n",
+      "src/checkout/totals.ts": "export function total(lines: { price: number }[]) {\n  return lines.reduce((sum, line) => sum + line.price, 0);\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/colors.ts", "focused": true }]
+}

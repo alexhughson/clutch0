@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "deploy/limits.yml"
+    }
+  ],
+  "proposal": {
+    "summary": "Update production worker timeout from 30 to 45",
+    "edits": [
+      {
+        "path": "deploy/limits.yml",
+        "oldText": "  worker:\n    concurrency: 4\n    timeout: 30",
+        "newText": "  worker:\n    concurrency: 4\n    timeout: 45"
+      }
+    ]
+  },
+  "status": "invalid"
+}

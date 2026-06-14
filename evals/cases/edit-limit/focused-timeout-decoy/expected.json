@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerTimeout.ts"],
+    "allowedPaths": ["src/customerTimeout.ts"],
+    "forbiddenPaths": ["src/adminTimeout.ts"],
+    "diffIncludes": ["+  timeoutMs: 8000,"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerTimeout.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerTimeout.ts file, changing timeoutMs to 8000. adminTimeout.ts must remain unchanged."
+  }
+}

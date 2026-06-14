@@ -1,0 +1,30 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText did not match the current file content.",
+      "path": "src/customerIds.ts"
+    },
+    {
+      "editIndex": 1,
+      "message": "oldText did not match the current file content.",
+      "path": "src/adminIds.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Return an empty array instead of [\"missing\"] when ids is empty in normalizeIds functions",
+    "edits": [
+      {
+        "path": "src/customerIds.ts",
+        "oldText": "    if (ids.length === 0) {\n        return [\"missing\"];\n    }",
+        "newText": "    if (ids.length === 0) {\n        return [];\n    }"
+      },
+      {
+        "path": "src/adminIds.ts",
+        "oldText": "    if (ids.length === 0) {\n        return [\"missing\"];\n    }",
+        "newText": "    if (ids.length === 0) {\n        return [];\n    }"
+      }
+    ]
+  },
+  "status": "invalid"
+}

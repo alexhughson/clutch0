@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/status.ts\n===================================================================\n--- src/status.ts\n+++ src/status.ts\n@@ -1,5 +1,8 @@\n+const STATUS_LABELS: Record<\"open\" | \"closed\", string> = {\n+  open: \"Open\",\n+  closed: \"Closed\",\n+};\n+\n export function statusLabel(status: \"open\" | \"closed\") {\n-  if (status === \"open\") return \"Open\";\n-  if (status === \"closed\") return \"Closed\";\n-  return \"Closed\";\n+  return STATUS_LABELS[status];\n }",
+  "proposal": {
+    "summary": "Extract status labels into a constant map and simplify the function",
+    "edits": [
+      {
+        "path": "src/status.ts",
+        "oldText": "export function statusLabel(status: \"open\" | \"closed\") {\n  if (status === \"open\") return \"Open\";\n  if (status === \"closed\") return \"Closed\";\n  return \"Closed\";\n}\n",
+        "newText": "const STATUS_LABELS: Record<\"open\" | \"closed\", string> = {\n  open: \"Open\",\n  closed: \"Closed\",\n};\n\nexport function statusLabel(status: \"open\" | \"closed\") {\n  return STATUS_LABELS[status];\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

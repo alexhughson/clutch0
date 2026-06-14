@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerTotal.ts"],
+    "allowedPaths": ["src/customerTotal.ts"],
+    "forbiddenPaths": ["src/adminTotal.ts"],
+    "diffIncludes": ["Total:"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerTotal.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerTotal.ts file so total labels are prefixed with \"Total: \". adminTotal.ts must remain unchanged."
+  }
+}

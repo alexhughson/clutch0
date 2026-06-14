@@ -53,6 +53,43 @@ test("rejecting to edit closes the task while preserving composer text", () => {
   });
 });
 
+test("rejecting to edit restores the task draft when present", () => {
+  const harness = createHarness({
+    ...createInitialAppState(),
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      rejectComposer: {
+        cursorPosition: 17,
+        message: "/ask Update code",
+      },
+      request: {
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        question: "Update code",
+        responseText: "",
+        status: "done",
+      },
+    },
+    workspace: {
+      ...createInitialAppState().workspace,
+      composer: {
+        cursorPosition: 0,
+        message: "",
+      },
+    },
+  });
+
+  harness.navigation.rejectToEdit();
+
+  expect(harness.state.activeTask).toBeNull();
+  expect(harness.state.workspace.composer).toEqual({
+    cursorPosition: 17,
+    message: "/ask Update code",
+  });
+});
+
 test("accepting closes the task and clears composer text", () => {
   const harness = createHarness({
     ...createInitialAppState(),

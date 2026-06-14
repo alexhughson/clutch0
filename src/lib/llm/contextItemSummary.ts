@@ -1,15 +1,20 @@
 import {
   complete,
+  completeSimple,
   type AssistantMessage,
+  type Context,
   type TextContent,
 } from "@earendil-works/pi-ai";
 import type {
   ContextItemSummarizationInput,
   GeneratedContextItemSummary,
 } from "../../types";
-import { resolveConfiguredLlmModel } from "../config/clutchConfig";
+import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
 import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
-import { maxOutputTokensForModel } from "./requestOptions";
+import {
+  configuredLlmRequestOptions,
+  usesProviderSpecificRequestOptions,
+} from "./requestOptions";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;
 const MAX_ONE_LINE_CHARACTERS = 100;
@@ -22,25 +27,25 @@ export type ContextItemSummaryGenerator = (
 export async function generateContextItemSummary(
   input: ContextItemSummarizationInput,
 ): Promise<GeneratedContextItemSummary> {
-  const { apiKey, model } = resolveConfiguredLlmModel("summarization");
-  const message = await complete(
-    model,
-    {
-      messages: [
-        {
-          content: renderPrompt("context-summary/user.md", {
-            content: input.content.slice(0, MAX_SUMMARY_INPUT_CHARACTERS),
-            label: input.label,
-            type: input.type,
-          }),
-          role: "user",
-          timestamp: Date.now(),
-        },
-      ],
-      systemPrompt: contextItemSummarySystemPrompt,
-    },
-    { apiKey, maxTokens: maxOutputTokensForModel(model) },
-  );
+  const request = await resolveConfiguredLlmRequest("summarization");
+  const context = {
+    messages: [
+      {
+        content: renderPrompt("context-summary/user.md", {
+          content: input.content.slice(0, MAX_SUMMARY_INPUT_CHARACTERS),
+          label: input.label,
+          type: input.type,
+        }),
+        role: "user" as const,
+        timestamp: Date.now(),
+      },
+    ],
+    systemPrompt: contextItemSummarySystemPrompt,
+  } satisfies Context;
+  const requestOptions = configuredLlmRequestOptions(request);
+  const message = await (usesProviderSpecificRequestOptions(request)
+    ? complete(request.model, context, requestOptions)
+    : completeSimple(request.model, context, requestOptions));
 
   const parsed = parseSummaryResponse(getAssistantText(message));
   return {

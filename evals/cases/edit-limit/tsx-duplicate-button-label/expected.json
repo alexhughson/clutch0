@@ -1,0 +1,19 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/actions.tsx"],
+    "allowedPaths": ["src/actions.tsx"],
+    "diffIncludes": [
+      "+      <button data-kind=\"secondary\">Keep editing</button>"
+    ]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/actions.tsx" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only the secondary button label to Keep editing. The primary button must remain Continue."
+  }
+}

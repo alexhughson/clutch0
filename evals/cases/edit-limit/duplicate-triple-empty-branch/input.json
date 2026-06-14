@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Change only projectsEmpty's empty message to \"No projects found\". Leave teamsEmpty and tasksEmpty unchanged.",
+  "workspace": {
+    "files": {
+      "src/emptyMessages.ts": "export function teamsEmpty(count: number) {\n  if (count === 0) {\n    return \"Nothing found\";\n  }\n  return \"Teams available\";\n}\n\nexport function projectsEmpty(count: number) {\n  if (count === 0) {\n    return \"Nothing found\";\n  }\n  return \"Projects available\";\n}\n\nexport function tasksEmpty(count: number) {\n  if (count === 0) {\n    return \"Nothing found\";\n  }\n  return \"Tasks available\";\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/emptyMessages.ts", "focused": true }
+  ]
+}

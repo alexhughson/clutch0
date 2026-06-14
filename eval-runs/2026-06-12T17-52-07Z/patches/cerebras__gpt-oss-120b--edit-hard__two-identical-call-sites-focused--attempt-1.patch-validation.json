@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/report.ts\n===================================================================\n--- src/report.ts\n+++ src/report.ts\n@@ -1,5 +1,5 @@\n import { loadInvoices } from \"./invoiceApi\";\n \n export async function reportInvoices(accountId: string) {\n-  return await loadInvoices({ accountId });\n+  return await loadInvoices({ accountId, includeDrafts: true });\n }",
+  "proposal": {
+    "summary": "Pass includeDrafts:true to loadInvoices in reportInvoices",
+    "edits": [
+      {
+        "path": "src/report.ts",
+        "oldText": "export async function reportInvoices(accountId: string) {\n  return await loadInvoices({ accountId });\n}",
+        "newText": "export async function reportInvoices(accountId: string) {\n  return await loadInvoices({ accountId, includeDrafts: true });\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

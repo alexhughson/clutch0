@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText did not match the current file content.",
+      "path": "src/actions.tsx"
+    }
+  ],
+  "proposal": {
+    "summary": "Update secondary action button label to 'Keep editing'",
+    "edits": [
+      {
+        "path": "src/actions.tsx",
+        "oldText": "          <button data-kind=\"secondary\">Continue</button>",
+        "newText": "          <button data-kind=\"secondary\">Keep editing</button>"
+      }
+    ]
+  },
+  "status": "invalid"
+}

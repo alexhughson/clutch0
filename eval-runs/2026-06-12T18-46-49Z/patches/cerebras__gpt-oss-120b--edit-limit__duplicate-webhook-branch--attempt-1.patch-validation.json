@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/messages.ts\n===================================================================\n--- src/messages.ts\n+++ src/messages.ts\n@@ -1,6 +1,6 @@\n export function webhookMessage(state: \"queued\" | \"sent\") {\n   if (state === \"queued\") {\n-    return \"Queued\";\n+    return \"Webhook queued\";\n   }\n   return \"Sent\";\n }",
+  "proposal": {
+    "summary": "Change webhook queued message text to \"Webhook queued\"",
+    "edits": [
+      {
+        "path": "src/messages.ts",
+        "oldText": "export function webhookMessage(state: \"queued\" | \"sent\") {\n  if (state === \"queued\") {\n    return \"Queued\";\n  }\n  return \"Sent\";\n}",
+        "newText": "export function webhookMessage(state: \"queued\" | \"sent\") {\n  if (state === \"queued\") {\n    return \"Webhook queued\";\n  }\n  return \"Sent\";\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

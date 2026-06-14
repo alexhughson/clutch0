@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerTitle.ts\n===================================================================\n--- src/customerTitle.ts\n+++ src/customerTitle.ts\n@@ -1,6 +1,6 @@\n export function displayTitle(title: string) {\n   if (title.trim().length === 0) {\n-    return \"Missing title\";\n+    return \"Untitled\";\n   }\n   return title.trim();\n }",
+  "proposal": {
+    "summary": "Use \"Untitled\" for blank customer titles instead of \"Missing title\".",
+    "edits": [
+      {
+        "path": "src/customerTitle.ts",
+        "oldText": "export function displayTitle(title: string) {\n  if (title.trim().length === 0) {\n    return \"Missing title\";\n  }\n  return title.trim();\n}\n",
+        "newText": "export function displayTitle(title: string) {\n  if (title.trim().length === 0) {\n    return \"Untitled\";\n  }\n  return title.trim();\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

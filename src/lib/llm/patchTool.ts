@@ -7,7 +7,7 @@ export const PROPOSE_PATCH_TOOL_NAME = "propose_patch";
 export const proposePatchTool: Tool = {
   name: PROPOSE_PATCH_TOOL_NAME,
   description:
-    "Propose exact file edits for the user to review. This only proposes a patch; it does not apply changes.",
+    "Propose exact, path-scoped file edits for the user to review. This only proposes a patch; it does not apply changes. Call this as a tool; do not print its JSON arguments as assistant text.",
   parameters: Type.Object({
     summary: Type.String({
       description: "A concise summary of the proposed code changes.",
@@ -16,18 +16,21 @@ export const proposePatchTool: Tool = {
       Type.Object({
         path: Type.String({
           description:
-            "Path to the file to edit, relative to the working directory.",
+            "Path to edit, relative to the working directory. Use only focused, explicitly requested, or necessary files.",
         }),
         oldText: Type.String({
           description:
-            "Exact existing text to replace. Must match the current file exactly and uniquely. Use an empty string only to create a new file.",
+            "Exact existing text copied from this file, with unchanged indentation. It must match once; prefer the enclosing block for small one-line changes or repeated snippets. Empty only for a new file.",
         }),
         newText: Type.String({
           description:
-            "Replacement text for oldText, or full file contents for a new file.",
+            "Replacement text for oldText, or full file contents for a new file. Must be a string, including for multiline code or Markdown; do not use arrays or objects.",
         }),
       }),
-      { description: "One or more exact search/replace edits." },
+      {
+        description:
+          "One or more exact search/replace edit objects. Every item must be an object, not a JSON string or placeholder; do not include comments, prose, or extra keys.",
+      },
     ),
   }),
 };

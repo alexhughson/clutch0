@@ -1,0 +1,30 @@
+Index: src/cardRenderer.ts
+===================================================================
+--- src/cardRenderer.ts
++++ src/cardRenderer.ts
+@@ -1,4 +1,4 @@
+-export type CardType = "summary" | "detail" | "experimental";
++export type CardType = "summary" | "detail";
+ 
+ export function renderCard(type: CardType) {
+   switch (type) {
+@@ -6,7 +6,6 @@
+       return "Summary card";
+     case "detail":
+       return "Detail card";
+-    case "experimental":
+-      return "Experimental card";
++
+   }
+ }
+Index: src/cardRenderer.test.ts
+===================================================================
+--- src/cardRenderer.test.ts
++++ src/cardRenderer.test.ts
+@@ -3,5 +3,5 @@
+ test("renders cards", () => {
+   expect(renderCard("summary")).toBe("Summary card");
+   expect(renderCard("detail")).toBe("Detail card");
+-  expect(renderCard("experimental")).toBe("Experimental card");
++
+ });

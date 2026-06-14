@@ -1,0 +1,12 @@
+Index: docs/rollout.md
+===================================================================
+--- docs/rollout.md
++++ docs/rollout.md
+@@ -2,7 +2,7 @@
+ 
+ ## API Rollout
+ 
+-- [ ] Notify support
++- [x] Notify support
+ - [ ] Update dashboard
+ - [ ] Verify metrics

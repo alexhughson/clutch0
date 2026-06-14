@@ -1,0 +1,12 @@
+Index: AGENTS.md
+===================================================================
+--- AGENTS.md
++++ AGENTS.md
+@@ -1,5 +1,7 @@
+ # Clutch
+ 
++pi-ai is the LLM model adapter layer
++
+ OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.
+ 
+ ## Core map

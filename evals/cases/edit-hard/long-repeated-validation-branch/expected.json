@@ -1,0 +1,19 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/validators.ts"],
+    "allowedPaths": ["src/validators.ts"],
+    "diffIncludes": [
+      "+    return { ok: false, reason: \"Missing coupon code\" };"
+    ]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/validators.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should change only the empty-code branch inside validateCoupon. All other Invalid reasons, including validateCoupon's short-code branch, must remain unchanged."
+  }
+}

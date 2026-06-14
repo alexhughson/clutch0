@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/actions.tsx\n===================================================================\n--- src/actions.tsx\n+++ src/actions.tsx\n@@ -2,7 +2,7 @@\n   return (\n     <footer>\n       <button data-kind=\"primary\">Continue</button>\n-      <button data-kind=\"secondary\">Continue</button>\n+      <button data-kind=\"secondary\">Keep editing</button>\n     </footer>\n   );\n }",
+  "proposal": {
+    "summary": "Change secondary button label to \"Keep editing\"",
+    "edits": [
+      {
+        "path": "src/actions.tsx",
+        "oldText": "      <button data-kind=\"secondary\">Continue</button>",
+        "newText": "      <button data-kind=\"secondary\">Keep editing</button>"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerListCopy.ts\n===================================================================\n--- src/customerListCopy.ts\n+++ src/customerListCopy.ts\n@@ -1,6 +1,6 @@\n export function listTitle(items: string[]) {\n   if (items.length === 0) {\n-    return \"Empty\";\n+    return \"No saved items\";\n   }\n   return \"Saved items\";\n }",
+  "proposal": {
+    "summary": "Return 'No saved items' when list is empty in customerListCopy",
+    "edits": [
+      {
+        "path": "src/customerListCopy.ts",
+        "oldText": "  if (items.length === 0) {\n    return \"Empty\";\n  }",
+        "newText": "  if (items.length === 0) {\n    return \"No saved items\";\n  }"
+      }
+    ]
+  },
+  "status": "valid"
+}

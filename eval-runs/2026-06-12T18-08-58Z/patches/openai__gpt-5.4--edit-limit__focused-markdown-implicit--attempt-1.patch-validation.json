@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: docs/customer-runbook.md\n===================================================================\n--- docs/customer-runbook.md\n+++ docs/customer-runbook.md\n@@ -2,5 +2,5 @@\n \n ## Escalation\n \n-Contact: support@example.com\n+Contact: customers@example.com\n Window: business hours",
+  "proposal": {
+    "summary": "Update the customer runbook escalation contact to customers@example.com.",
+    "edits": [
+      {
+        "path": "docs/customer-runbook.md",
+        "oldText": "## Escalation\n\nContact: support@example.com\nWindow: business hours\n",
+        "newText": "## Escalation\n\nContact: customers@example.com\nWindow: business hours\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

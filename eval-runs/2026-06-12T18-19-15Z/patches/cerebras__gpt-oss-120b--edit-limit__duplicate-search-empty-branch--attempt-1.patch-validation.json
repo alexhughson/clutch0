@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 2 times; it must match exactly once.",
+      "path": "src/emptyStates.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update searchEmptyState empty state message",
+    "edits": [
+      {
+        "path": "src/emptyStates.ts",
+        "oldText": "    return \"No results\";",
+        "newText": "    return \"No matching results\";"
+      }
+    ]
+  },
+  "status": "invalid"
+}

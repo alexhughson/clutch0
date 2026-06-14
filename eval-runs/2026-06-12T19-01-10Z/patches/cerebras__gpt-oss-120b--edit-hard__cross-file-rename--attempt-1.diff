@@ -1,0 +1,21 @@
+Index: src/money.ts
+===================================================================
+--- src/money.ts
++++ src/money.ts
+@@ -1,3 +1,3 @@
+-export function formatCents(cents: number) {
++export function formatAmount(cents: number) {
+   return (cents / 100).toFixed(2);
+ }
+Index: src/cart.ts
+===================================================================
+--- src/cart.ts
++++ src/cart.ts
+@@ -1,5 +1,5 @@
+-import { formatCents } from "./money";
++import { formatAmount } from "./money";
+ 
+ export function renderCartTotal(totalCents: number) {
+-  return `Total: ${formatCents(totalCents)}`;
++  return `Total: ${formatAmount(totalCents)}`;
+ }

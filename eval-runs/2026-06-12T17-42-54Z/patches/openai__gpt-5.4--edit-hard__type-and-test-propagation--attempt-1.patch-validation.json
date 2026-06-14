@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/discount.ts\n===================================================================\n--- src/discount.ts\n+++ src/discount.ts\n@@ -1,4 +1,4 @@\n-export type DiscountKind = \"none\" | \"percent\";\n+export type DiscountKind = \"none\" | \"percent\" | \"fixed\";\n \n export function describeDiscount(kind: DiscountKind) {\n   switch (kind) {\n@@ -6,5 +6,7 @@\n       return \"No discount\";\n     case \"percent\":\n       return \"Percentage\";\n+    case \"fixed\":\n+      return \"Fixed amount\";\n   }\n }\nIndex: src/discount.test.ts\n===================================================================\n--- src/discount.test.ts\n+++ src/discount.test.ts\n@@ -3,4 +3,5 @@\n test(\"describes discounts\", () => {\n   expect(describeDiscount(\"none\")).toBe(\"No discount\");\n   expect(describeDiscount(\"percent\")).toBe(\"Percentage\");\n+  expect(describeDiscount(\"fixed\")).toBe(\"Fixed amount\");\n });",
+  "proposal": {
+    "summary": "Add fixed discount kind support and cover it in tests.",
+    "edits": [
+      {
+        "path": "src/discount.ts",
+        "oldText": "export type DiscountKind = \"none\" | \"percent\";\n\nexport function describeDiscount(kind: DiscountKind) {\n  switch (kind) {\n    case \"none\":\n      return \"No discount\";\n    case \"percent\":\n      return \"Percentage\";\n  }\n}\n",
+        "newText": "export type DiscountKind = \"none\" | \"percent\" | \"fixed\";\n\nexport function describeDiscount(kind: DiscountKind) {\n  switch (kind) {\n    case \"none\":\n      return \"No discount\";\n    case \"percent\":\n      return \"Percentage\";\n    case \"fixed\":\n      return \"Fixed amount\";\n  }\n}\n"
+      },
+      {
+        "path": "src/discount.test.ts",
+        "oldText": "import { describeDiscount } from \"./discount\";\n\ntest(\"describes discounts\", () => {\n  expect(describeDiscount(\"none\")).toBe(\"No discount\");\n  expect(describeDiscount(\"percent\")).toBe(\"Percentage\");\n});\n",
+        "newText": "import { describeDiscount } from \"./discount\";\n\ntest(\"describes discounts\", () => {\n  expect(describeDiscount(\"none\")).toBe(\"No discount\");\n  expect(describeDiscount(\"percent\")).toBe(\"Percentage\");\n  expect(describeDiscount(\"fixed\")).toBe(\"Fixed amount\");\n});\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

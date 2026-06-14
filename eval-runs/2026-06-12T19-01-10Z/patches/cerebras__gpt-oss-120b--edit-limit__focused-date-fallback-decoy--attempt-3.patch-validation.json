@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/customerDate.ts\n===================================================================\n--- src/customerDate.ts\n+++ src/customerDate.ts\n@@ -1,6 +1,6 @@\n export function dateLabel(date: string | null) {\n   if (date === null) {\n-    return \"Unknown\";\n+    return \"No date\";\n   }\n   return date;\n }\nIndex: src/adminDate.ts\n===================================================================\n--- src/adminDate.ts\n+++ src/adminDate.ts\n@@ -1,6 +1,6 @@\n export function dateLabel(date: string | null) {\n   if (date === null) {\n-    return \"Unknown\";\n+    return \"No date\";\n   }\n   return date;\n }",
+  "proposal": {
+    "summary": "Change missing date label from \"Unknown\" to \"No date\" in dateLabel functions",
+    "edits": [
+      {
+        "path": "src/customerDate.ts",
+        "oldText": "if (date === null) {\n    return \"Unknown\";\n  }",
+        "newText": "if (date === null) {\n    return \"No date\";\n  }"
+      },
+      {
+        "path": "src/adminDate.ts",
+        "oldText": "if (date === null) {\n    return \"Unknown\";\n  }",
+        "newText": "if (date === null) {\n    return \"No date\";\n  }"
+      }
+    ]
+  },
+  "status": "valid"
+}

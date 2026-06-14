@@ -1,0 +1,10 @@
+{
+  "command": "edit",
+  "question": "Change only the billing feature flag disabled reason to \"Billing disabled\". Leave the support flag reason unchanged.",
+  "workspace": {
+    "files": {
+      "src/flags.ts": "export function billingFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}\n\nexport function supportFlag(enabled: boolean) {\n  if (!enabled) {\n    return { enabled: false, reason: \"Off\" };\n  }\n  return { enabled: true };\n}\n"
+    }
+  },
+  "contextItems": [{ "kind": "file", "path": "src/flags.ts", "focused": true }]
+}

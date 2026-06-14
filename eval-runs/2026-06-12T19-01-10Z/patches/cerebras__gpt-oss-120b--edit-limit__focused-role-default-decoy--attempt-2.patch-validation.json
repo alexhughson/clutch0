@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerRole.ts\n===================================================================\n--- src/customerRole.ts\n+++ src/customerRole.ts\n@@ -1,6 +1,6 @@\n export function normalizeRole(role: string | null) {\n   if (role === null) {\n-    return \"member\";\n+    return \"guest\";\n   }\n   return role;\n }",
+  "proposal": {
+    "summary": "Change default role from \"member\" to \"guest\" in customerRole.normalizeRole",
+    "edits": [
+      {
+        "path": "src/customerRole.ts",
+        "oldText": "export function normalizeRole(role: string | null) {\n  if (role === null) {\n    return \"member\";\n  }\n  return role;\n}",
+        "newText": "export function normalizeRole(role: string | null) {\n  if (role === null) {\n    return \"guest\";\n  }\n  return role;\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

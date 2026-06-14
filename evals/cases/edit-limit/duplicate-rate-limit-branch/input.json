@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Change only apiRateLimit's disabled reason to \"API limit disabled\". Leave jobRateLimit unchanged.",
+  "workspace": {
+    "files": {
+      "src/rateLimits.ts": "export function apiRateLimit(enabled: boolean) {\n  if (!enabled) {\n    return { limit: 0, reason: \"Disabled\" };\n  }\n  return { limit: 100 };\n}\n\nexport function jobRateLimit(enabled: boolean) {\n  if (!enabled) {\n    return { limit: 0, reason: \"Disabled\" };\n  }\n  return { limit: 100 };\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/rateLimits.ts", "focused": true }
+  ]
+}

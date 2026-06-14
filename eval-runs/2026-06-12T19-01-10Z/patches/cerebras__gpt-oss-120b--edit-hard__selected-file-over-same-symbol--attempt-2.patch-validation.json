@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerSummary.ts\n===================================================================\n--- src/customerSummary.ts\n+++ src/customerSummary.ts\n@@ -1,3 +1,3 @@\n export function buildSummary(items: string[]) {\n-  return `Items: ${items.join(\", \")}`;\n+  return `Items (${items.length}): ${items.join(\", \")}`;\n }",
+  "proposal": {
+    "summary": "Include item count in customer summary buildSummary",
+    "edits": [
+      {
+        "path": "src/customerSummary.ts",
+        "oldText": "export function buildSummary(items: string[]) {\n  return `Items: ${items.join(\", \")}`;\n}",
+        "newText": "export function buildSummary(items: string[]) {\n  return `Items (${items.length}): ${items.join(\", \")}`;\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

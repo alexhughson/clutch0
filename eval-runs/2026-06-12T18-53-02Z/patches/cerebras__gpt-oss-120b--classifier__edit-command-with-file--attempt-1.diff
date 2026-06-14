@@ -1,0 +1,11 @@
+Index: src/plural.ts
+===================================================================
+--- src/plural.ts
++++ src/plural.ts
+@@ -1,3 +1,6 @@
+ export function resultLabel(count: number) {
++  if (count === 1) {
++    return `${count} result`;
++  }
+   return `${count} results`;
+ }

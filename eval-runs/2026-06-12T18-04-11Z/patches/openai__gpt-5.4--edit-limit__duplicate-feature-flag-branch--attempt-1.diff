@@ -1,0 +1,12 @@
+Index: src/flags.ts
+===================================================================
+--- src/flags.ts
++++ src/flags.ts
+@@ -1,6 +1,6 @@
+ export function billingFlag(enabled: boolean) {
+   if (!enabled) {
+-    return { enabled: false, reason: "Off" };
++    return { enabled: false, reason: "Billing disabled" };
+   }
+   return { enabled: true };
+ }

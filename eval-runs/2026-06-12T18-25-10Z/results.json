@@ -1,0 +1,464 @@
+{
+  "errors": [],
+  "judge": "openai:gpt-5.4-mini",
+  "repeat": 1,
+  "results": [
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "The user wants to modify the focused customer description file only, to use \"No description\" when the description is blank, instead of \"Missing\". Currently the function returns \"Missing\". So we need to edit src/customerDescription.ts.\n\nWe need to produce a patch using propose_patch tool. Changing the returned string.\n\nWe need to replace \"Missing\" with \"No description\". Ensure we match exact oldText.\n\nThe current file content:\n\nexport function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}\n\nWe need to replace return \"Missing\"; with return \"No description\";\n\nMake edit.\n\nWe'll produce a propose_patch with summary and edit.",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "f31479801",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Return \"No description\" for blank description in customerDescription.ts",
+                  "edits": [
+                    {
+                      "path": "src/customerDescription.ts",
+                      "oldText": "    return \"Missing\";",
+                      "newText": "    return \"No description\";"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 188,
+              "output": 216,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 916,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781288710614,
+            "responseId": "chatcmpl-cbe92368-e421-4ad6-9948-74d105f407e2"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "f31479801",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Return \"No description\" for blank description in customerDescription.ts",
+              "edits": [
+                {
+                  "path": "src/customerDescription.ts",
+                  "oldText": "    return \"Missing\";",
+                  "newText": "    return \"No description\";"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "f31479801",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Return \"No description\" for blank description in customerDescription.ts",
+                "edits": [
+                  {
+                    "path": "src/customerDescription.ts",
+                    "oldText": "    return \"Missing\";",
+                    "newText": "    return \"No description\";"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-description-fallback-decoy",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly updates only src/customerDescription.ts, changes the blank-description fallback to \"No description\", and leaves adminDescription.ts untouched.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/customerDescription.ts\n===================================================================\n--- src/customerDescription.ts\n+++ src/customerDescription.ts\n@@ -1,6 +1,6 @@\n export function descriptionLabel(description: string) {\n   if (description.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No description\";\n   }\n   return description.trim();\n }",
+            "proposal": {
+              "summary": "Return \"No description\" for blank description in customerDescription.ts",
+              "edits": [
+                {
+                  "path": "src/customerDescription.ts",
+                  "oldText": "    return \"Missing\";",
+                  "newText": "    return \"No description\";"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-description-fallback-decoy--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-description-fallback-decoy--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-description-fallback-decoy",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "We need to modify customerToken.ts to treat expired tokens as inactive. Currently tokenState returns \"active\" regardless. Should return \"inactive\" when expired true. So change function: if (expired) return \"inactive\"; else return \"active\". Keep adminToken unchanged.\n\nWe need to propose patch on src/customerToken.ts. Must include oldText that matches exactly and uniquely. Provide oldText snippet. Use full function with same formatting. Provide newText.\n\nLet's craft edit.\n\nOldText:\n\nexport function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n\nNewText:\n\nexport function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}\n\nWill this be unique? It appears only this file has that function. Should be fine.\n\nNow call propose_patch with summary.\n\n",
+                "thinkingSignature": "reasoning"
+              },
+              {
+                "type": "toolCall",
+                "id": "7c0f8cb34",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Treat expired tokens as inactive in src/customerToken.ts",
+                  "edits": [
+                    {
+                      "path": "src/customerToken.ts",
+                      "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}",
+                      "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-completions",
+            "provider": "cerebras",
+            "model": "gpt-oss-120b",
+            "usage": {
+              "input": 173,
+              "output": 310,
+              "cacheRead": 512,
+              "cacheWrite": 0,
+              "totalTokens": 995,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781288712189,
+            "responseId": "chatcmpl-310a9d8a-e343-4f72-a76e-e467193e9a76"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "7c0f8cb34",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Treat expired tokens as inactive in src/customerToken.ts",
+              "edits": [
+                {
+                  "path": "src/customerToken.ts",
+                  "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}",
+                  "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "7c0f8cb34",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Treat expired tokens as inactive in src/customerToken.ts",
+                "edits": [
+                  {
+                    "path": "src/customerToken.ts",
+                    "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}",
+                    "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-token-expiry-decoy",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch only edits src/customerToken.ts and changes expired tokens to return \"inactive\" as required; adminToken.ts remains unchanged.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/customerToken.ts\n===================================================================\n--- src/customerToken.ts\n+++ src/customerToken.ts\n@@ -1,6 +1,6 @@\n export function tokenState(expired: boolean) {\n   if (expired) {\n-    return \"active\";\n+    return \"inactive\";\n   }\n   return \"active\";\n }",
+            "proposal": {
+              "summary": "Treat expired tokens as inactive in src/customerToken.ts",
+              "edits": [
+                {
+                  "path": "src/customerToken.ts",
+                  "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}",
+                  "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "cerebras:gpt-oss-120b",
+          "generatedDiffPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-token-expiry-decoy--attempt-1.diff",
+          "patchValidationPath": "patches/cerebras__gpt-oss-120b--edit-limit__focused-token-expiry-decoy--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-token-expiry-decoy",
+      "passed": true,
+      "target": "cerebras:gpt-oss-120b"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "",
+                "thinkingSignature": "{\"id\":\"rs_0bc68803d5c59a38016a2c4f0a82ac819eb06724f33cada85b\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLE8K_58qaOfjppuilc30QbOGeG-dWSTOZ4BzHsv0WZZUmINC2Cr502370Ed728RkRIqfX_sto4KoXF-jiEcJ_pxoHa-UsjDQppyEzg9aeXtBi6Uh1zIdq1dEzJ7_chQdNH0SZXXkT9_OAa81h2No85U1oGFShs1xDKKH_8_9Zdg8wYySdfyi2IHVMK_fhjxJZtSZejsP7-pytchGpGsbIGgQNYsv9YGgqjLYGsljCkhP9v06-S-AOuez0L-79F424Vu_qweRPtzm0m3XJzIPcGneCUhOUs4BlY8uwJZbRkdgeQ7G6IvFOEkBDL3XHoIK63x6H2GijmwhWXFav4UqQOfOP2hTe2WfiWyryCiUpJgL5PS0ooki5R-G2VUf4k8tJqqVHRZ3Uz7cy6zQJ7ozsmWgM-GPhj9s9yKGCSpgb-bp3LwLdaXN0MZVPMHGDPHqXIhSGTVJ16KqjluGAygnbBjWqjd6NXsv7KAcMejW-zH_0fPQNj7E7BSp-xzuCj0Iv4nwKuvDYkwQ9tqeTvpDCZGCllak9pOePFWGfKyRrJvnn4ddxLqbD0eDG5_-m0v6oiisyAwFsMlNegkpSlk2ZVnhpr8qjQWYmon1TukWP5AAEQJ9b-ED6HcELnmwF8LkffNKVkeVbwVfamE8FcBtWnWIz8WA9lNgxOKZHJVI6H6dF4cFcU9qgTPgOVJbJ97EE1ybb1Tuy3S0DaQIaePqNAxO9vcvVtCyr_9cvuwRily7pDV1lFPYowQxbfFDVpgRLpuzaiDHMRPfgByrPM2p6Ec81vOvinMN4_KJWN3MHtWmzZuazkk3kY5NqlagA6Ox95iPPZKO3imVw7alMcLxsZPANdzVBNpCXk4HUpYnZc56UfBIgbuV3F59GY7zXCBoqH8BbLvPn9jzcnysEddReg4s4VsFQsRwQrM1tnvZRut-V9n4qKKAVUlQMZwT4Bozxrux8oE0X_ZcX0SkUN_-B-KV5w==\",\"summary\":[]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_uAXS5hHqCB8wA2MJqKgOxv2w|fc_0bc68803d5c59a38016a2c4f0ac538819eb443507652bad116",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update customer description fallback text from \"Missing\" to \"No description\".",
+                  "edits": [
+                    {
+                      "path": "src/customerDescription.ts",
+                      "oldText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}\n",
+                      "newText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"No description\";\n  }\n  return description.trim();\n}\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 617,
+              "output": 150,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 767,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781288713786,
+            "responseId": "resp_0bc68803d5c59a38016a2c4f09daa0819ea75bde1177fca3c1"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_uAXS5hHqCB8wA2MJqKgOxv2w|fc_0bc68803d5c59a38016a2c4f0ac538819eb443507652bad116",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update customer description fallback text from \"Missing\" to \"No description\".",
+              "edits": [
+                {
+                  "path": "src/customerDescription.ts",
+                  "oldText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}\n",
+                  "newText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"No description\";\n  }\n  return description.trim();\n}\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_uAXS5hHqCB8wA2MJqKgOxv2w|fc_0bc68803d5c59a38016a2c4f0ac538819eb443507652bad116",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update customer description fallback text from \"Missing\" to \"No description\".",
+                "edits": [
+                  {
+                    "path": "src/customerDescription.ts",
+                    "oldText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}\n",
+                    "newText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"No description\";\n  }\n  return description.trim();\n}\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-description-fallback-decoy",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch correctly edits only src/customerDescription.ts, changes the blank-description fallback to \"No description\", and leaves adminDescription.ts untouched. The validation is valid and matches the rubric exactly.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/customerDescription.ts\n===================================================================\n--- src/customerDescription.ts\n+++ src/customerDescription.ts\n@@ -1,6 +1,6 @@\n export function descriptionLabel(description: string) {\n   if (description.trim().length === 0) {\n-    return \"Missing\";\n+    return \"No description\";\n   }\n   return description.trim();\n }",
+            "proposal": {
+              "summary": "Update customer description fallback text from \"Missing\" to \"No description\".",
+              "edits": [
+                {
+                  "path": "src/customerDescription.ts",
+                  "oldText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"Missing\";\n  }\n  return description.trim();\n}\n",
+                  "newText": "export function descriptionLabel(description: string) {\n  if (description.trim().length === 0) {\n    return \"No description\";\n  }\n  return description.trim();\n}\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__focused-description-fallback-decoy--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__focused-description-fallback-decoy--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-description-fallback-decoy",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    },
+    {
+      "attempts": [
+        {
+          "assistantText": "",
+          "classification": "propose_patch",
+          "rawAssistantMessage": {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "thinking",
+                "thinking": "",
+                "thinkingSignature": "{\"id\":\"rs_00b77073d951c026016a2c4f0d7a8c81a08fed9191d73b791b\",\"type\":\"reasoning\",\"content\":[],\"encrypted_content\":\"gAAAAABqLE8NBuFyKgGw0JmwbfpjrU9Ty7vRuuwST6rCkYTWJEVxilIeMXKU8aHNjIThGaQxSVXdggAMw8QNM8VjLryNh5ilQqUJyhQynBppNDT_bjamQaZmPWLIk9wzAtZI2u5jEYR6Z7pSJ0o7Wj0o7pPd4PUGRCeLAn0nYtuuXQ3J9v8Tr3XYigG_s4dJy5ir4dbcjL5Z8hHTn_4HDo7kch-ICyQPfbstirbL9vy6R9pS1MrD5G56xJ5u14kqovWWd6qba0pXq3x17A78sfZqVyjdI_tdYrhd8rKs2xA_WqKgrATXvzwaGP59vGgf-5jW63DUw7RAf_BRKyGm-hZj6xNgQtAJNDJsXWbbvYDaRyxMf9uM3i1TEhhNZqt9vDCOHonB1vOmrSCPRJq7WONmfDDEZ1_Gih1-Kc4p6c8_QR8HALtU1a6m3IWuKsGWFOW14OV0MbM8CJiwRuDT_zHefGprbompSQIja6cdKMDLDAe985LQ6CsCdUnSuixPRqlrrRvlZxVYCNacRjvfU-7QlUAEaxbtm0QWCsVEoSfLdXXwJxqrYhC79P_hC3Vas_N4PdNCJU6-V1JRJ4Y8tHptVCMorgzlPxdi05eGm8D-MOH0nlsg5wMLGFzFxh2Z0RTIAtQnt9rMazc1owly14zDc9zY6TSTErcw_m9hWdkPbcx850OR4hSlkZk17OCVagHkv4kKwWYWYuWME1ENfL2sRR31_55QKPDSgGfRCUInu5CvPXOB9Dy-BxXh-C9ScJOL4ZZXlrBlewUF3HWh3R6uZz2BzZd05AfjLul3FfSSFD0syFy2z5czJPj8viZ9m5HDLd3X9dxxAZSoEPM9Izdw2-04CX6FUnhUn9k_ErHJCKaaf_jiMhhopZGY0oDusr8QEsO0UgGKrobAUFRQw59Ne5J6IK80eaxzNQmYFMUPOjIeAbOdDwCtdbpWsB64dQzKThJnEU5KjZFocF_NGW8RhufDDJL1IA==\",\"summary\":[]}"
+              },
+              {
+                "type": "toolCall",
+                "id": "call_J54I86Th7NS9sj7m40VztBMx|fc_00b77073d951c026016a2c4f0dcf8081a0bd8f9cc793652d6d",
+                "name": "propose_patch",
+                "arguments": {
+                  "summary": "Update customer token state so expired tokens return inactive, leaving admin token logic unchanged.",
+                  "edits": [
+                    {
+                      "path": "src/customerToken.ts",
+                      "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n",
+                      "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}\n"
+                    }
+                  ]
+                }
+              }
+            ],
+            "api": "openai-responses",
+            "provider": "openai",
+            "model": "gpt-5.4",
+            "usage": {
+              "input": 602,
+              "output": 140,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 742,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "stopReason": "toolUse",
+            "timestamp": 1781288716697,
+            "responseId": "resp_00b77073d951c026016a2c4f0cdffc81a0b9661aa4bda6f0bc"
+          },
+          "toolCall": {
+            "type": "toolCall",
+            "id": "call_J54I86Th7NS9sj7m40VztBMx|fc_00b77073d951c026016a2c4f0dcf8081a0bd8f9cc793652d6d",
+            "name": "propose_patch",
+            "arguments": {
+              "summary": "Update customer token state so expired tokens return inactive, leaving admin token logic unchanged.",
+              "edits": [
+                {
+                  "path": "src/customerToken.ts",
+                  "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n",
+                  "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}\n"
+                }
+              ]
+            }
+          },
+          "toolCalls": [
+            {
+              "type": "toolCall",
+              "id": "call_J54I86Th7NS9sj7m40VztBMx|fc_00b77073d951c026016a2c4f0dcf8081a0bd8f9cc793652d6d",
+              "name": "propose_patch",
+              "arguments": {
+                "summary": "Update customer token state so expired tokens return inactive, leaving admin token logic unchanged.",
+                "edits": [
+                  {
+                    "path": "src/customerToken.ts",
+                    "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n",
+                    "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}\n"
+                  }
+                ]
+              }
+            }
+          ],
+          "casePath": "edit-limit/focused-token-expiry-decoy",
+          "failures": [],
+          "judge": {
+            "passed": true,
+            "rationale": "The patch edits only src/customerToken.ts, changes expired tokens to return \"inactive\", and leaves adminToken.ts untouched, matching the rubric exactly.",
+            "score": 5
+          },
+          "passed": true,
+          "patchValidation": {
+            "diffText": "Index: src/customerToken.ts\n===================================================================\n--- src/customerToken.ts\n+++ src/customerToken.ts\n@@ -1,6 +1,6 @@\n export function tokenState(expired: boolean) {\n   if (expired) {\n-    return \"active\";\n+    return \"inactive\";\n   }\n   return \"active\";\n }",
+            "proposal": {
+              "summary": "Update customer token state so expired tokens return inactive, leaving admin token logic unchanged.",
+              "edits": [
+                {
+                  "path": "src/customerToken.ts",
+                  "oldText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"active\";\n  }\n  return \"active\";\n}\n",
+                  "newText": "export function tokenState(expired: boolean) {\n  if (expired) {\n    return \"inactive\";\n  }\n  return \"active\";\n}\n"
+                }
+              ]
+            },
+            "status": "valid"
+          },
+          "target": "openai:gpt-5.4",
+          "generatedDiffPath": "patches/openai__gpt-5.4--edit-limit__focused-token-expiry-decoy--attempt-1.diff",
+          "patchValidationPath": "patches/openai__gpt-5.4--edit-limit__focused-token-expiry-decoy--attempt-1.patch-validation.json"
+        }
+      ],
+      "casePath": "edit-limit/focused-token-expiry-decoy",
+      "passed": true,
+      "target": "openai:gpt-5.4"
+    }
+  ],
+  "runDir": "eval-runs/2026-06-12T18-25-10Z",
+  "targets": [
+    "cerebras:gpt-oss-120b",
+    "openai:gpt-5.4"
+  ]
+}

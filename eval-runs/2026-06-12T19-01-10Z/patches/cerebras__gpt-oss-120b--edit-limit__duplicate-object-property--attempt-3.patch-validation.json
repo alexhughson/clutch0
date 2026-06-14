@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/copy.ts\n===================================================================\n--- src/copy.ts\n+++ src/copy.ts\n@@ -1,6 +1,6 @@\n export const checkoutCopy = {\n   title: \"Checkout\",\n-  emptyTitle: \"Nothing here\",\n+  emptyTitle: \"No items in cart\",\n   emptyBody: \"Add an item before checking out.\",\n };",
+  "proposal": {
+    "summary": "Update checkoutCopy.emptyTitle to \"No items in cart\" while keeping other copies unchanged",
+    "edits": [
+      {
+        "path": "src/copy.ts",
+        "oldText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"Nothing here\",\n  emptyBody: \"Add an item before checking out.\",\n};",
+        "newText": "export const checkoutCopy = {\n  title: \"Checkout\",\n  emptyTitle: \"No items in cart\",\n  emptyBody: \"Add an item before checking out.\",\n};"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,18 @@
+{
+  "classification": "propose_patch",
+  "patch": {
+    "required": true,
+    "mustBeValid": true,
+    "requiredPaths": ["src/customerRole.ts"],
+    "allowedPaths": ["src/customerRole.ts"],
+    "forbiddenPaths": ["src/adminRole.ts"],
+    "diffIncludes": ["+    return \"guest\";"]
+  },
+  "toolArguments": {
+    "edits": [{ "path": "src/customerRole.ts" }]
+  },
+  "judge": {
+    "minScore": 4,
+    "rubric": "The patch should edit only the focused customerRole.ts file so missing roles default to guest. adminRole.ts must remain unchanged."
+  }
+}

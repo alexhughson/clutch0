@@ -1,0 +1,20 @@
+{
+  "errors": [
+    {
+      "editIndex": 0,
+      "message": "oldText matched 3 times; it must match exactly once.",
+      "path": "src/emptyMessages.ts"
+    }
+  ],
+  "proposal": {
+    "summary": "Update projectsEmpty empty message",
+    "edits": [
+      {
+        "path": "src/emptyMessages.ts",
+        "oldText": "  if (count === 0) {\n    return \"Nothing found\";\n  }",
+        "newText": "  if (count === 0) {\n    return \"No projects found\";\n  }"
+      }
+    ]
+  },
+  "status": "invalid"
+}

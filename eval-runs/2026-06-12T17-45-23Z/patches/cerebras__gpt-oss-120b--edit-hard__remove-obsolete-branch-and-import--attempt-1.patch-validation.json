@@ -1,0 +1,24 @@
+{
+  "diffText": "Index: src/providers.ts\n===================================================================\n--- src/providers.ts\n+++ src/providers.ts\n@@ -1,11 +1,7 @@\n-import { normalizeLegacy } from \"./legacy\";\n \n-export type Provider = \"modern\" | \"beta\" | \"legacy\";\n+export type Provider = \"modern\" | \"beta\";\n \n export function normalizeProvider(provider: Provider) {\n-  if (provider === \"legacy\") {\n-    return normalizeLegacy(provider);\n-  }\n   if (provider === \"beta\") {\n     return \"beta\";\n   }",
+  "proposal": {
+    "summary": "Remove legacy provider support: delete import, remove legacy from Provider type, and simplify normalizeProvider function",
+    "edits": [
+      {
+        "path": "src/providers.ts",
+        "oldText": "import { normalizeLegacy } from \"./legacy\";\n",
+        "newText": ""
+      },
+      {
+        "path": "src/providers.ts",
+        "oldText": "export type Provider = \"modern\" | \"beta\" | \"legacy\";",
+        "newText": "export type Provider = \"modern\" | \"beta\";"
+      },
+      {
+        "path": "src/providers.ts",
+        "oldText": "export function normalizeProvider(provider: Provider) {\n  if (provider === \"legacy\") {\n    return normalizeLegacy(provider);\n  }\n  if (provider === \"beta\") {\n    return \"beta\";\n  }\n  return \"modern\";\n}\n",
+        "newText": "export function normalizeProvider(provider: Provider) {\n  if (provider === \"beta\") {\n    return \"beta\";\n  }\n  return \"modern\";\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

@@ -1,0 +1,12 @@
+{
+  "command": "edit",
+  "question": "Update the loading, empty, and error labels to be more specific. Leave retry unchanged.",
+  "workspace": {
+    "files": {
+      "src/uiLabels.ts": "export const uiLabels = {\n  loading: \"Loading\",\n  empty: \"Empty\",\n  error: \"Error\",\n  retry: \"Retry\"\n};\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/uiLabels.ts", "focused": true }
+  ]
+}

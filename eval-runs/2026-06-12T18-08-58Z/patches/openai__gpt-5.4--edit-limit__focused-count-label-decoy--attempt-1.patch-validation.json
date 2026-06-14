@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerCount.ts\n===================================================================\n--- src/customerCount.ts\n+++ src/customerCount.ts\n@@ -1,6 +1,6 @@\n export function countLabel(count: number) {\n   if (count === 0) {\n-    return \"0 items\";\n+    return \"None\";\n   }\n   return `${count} items`;\n }",
+  "proposal": {
+    "summary": "Update customer count label so zero displays as \"None\" instead of \"0 items\".",
+    "edits": [
+      {
+        "path": "src/customerCount.ts",
+        "oldText": "export function countLabel(count: number) {\n  if (count === 0) {\n    return \"0 items\";\n  }\n  return `${count} items`;\n}\n",
+        "newText": "export function countLabel(count: number) {\n  if (count === 0) {\n    return \"None\";\n  }\n  return `${count} items`;\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

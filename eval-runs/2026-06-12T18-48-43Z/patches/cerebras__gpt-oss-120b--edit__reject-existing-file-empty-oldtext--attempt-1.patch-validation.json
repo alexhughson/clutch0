@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/title.ts\n===================================================================\n--- src/title.ts\n+++ src/title.ts\n@@ -1,1 +1,1 @@\n-export const title = \"Old Dashboard\";\n+export const title = \"New Dashboard\";",
+  "proposal": {
+    "summary": "Update title constant to New Dashboard",
+    "edits": [
+      {
+        "path": "src/title.ts",
+        "oldText": "export const title = \"Old Dashboard\";",
+        "newText": "export const title = \"New Dashboard\";"
+      }
+    ]
+  },
+  "status": "valid"
+}

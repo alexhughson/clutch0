@@ -1,0 +1,60 @@
+Index: src/events.ts
+===================================================================
+--- src/events.ts
++++ src/events.ts
+@@ -1,5 +1,5 @@
+ export type EventName = "order.created" | "refund.created" | "support.ticket";
+ 
+-export function recordEvent(name: EventName) {
+-  return { name, source: "unknown" };
++export function recordEvent(name: EventName, source: string) {
++  return { name, source };
+ }
+Index: src/orders.ts
+===================================================================
+--- src/orders.ts
++++ src/orders.ts
+@@ -1,5 +1,5 @@
+ import { recordEvent } from "./events";
+ 
+ export function recordOrderCreated() {
+-  return recordEvent("order.created");
++  return recordEvent("order.created", "orders");
+ }
+Index: src/refunds.ts
+===================================================================
+--- src/refunds.ts
++++ src/refunds.ts
+@@ -1,5 +1,5 @@
+ import { recordEvent } from "./events";
+ 
+ export function recordRefundCreated() {
+-  return recordEvent("refund.created");
++  return recordEvent("refund.created", "refunds");
+ }
+Index: src/support.ts
+===================================================================
+--- src/support.ts
++++ src/support.ts
+@@ -1,5 +1,5 @@
+ import { recordEvent } from "./events";
+ 
+ export function recordSupportTicket() {
+-  return recordEvent("support.ticket");
++  return recordEvent("support.ticket", "support");
+ }
+Index: src/events.test.ts
+===================================================================
+--- src/events.test.ts
++++ src/events.test.ts
+@@ -1,8 +1,8 @@
+ import { recordEvent } from "./events";
+ 
+ test("records event payload", () => {
+-  expect(recordEvent("support.ticket")).toEqual({
++  expect(recordEvent("support.ticket", "support")).toEqual({
+     name: "support.ticket",
+-    source: "unknown",
++    source: "support",
+   });
+ });

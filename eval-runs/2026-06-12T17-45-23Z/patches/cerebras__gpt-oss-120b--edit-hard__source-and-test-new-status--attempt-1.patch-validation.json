@@ -1,0 +1,19 @@
+{
+  "diffText": "Index: src/status.ts\n===================================================================\n--- src/status.ts\n+++ src/status.ts\n@@ -1,8 +1,11 @@\n-export type TicketStatus = \"open\" | \"closed\";\n+export type TicketStatus = \"open\" | \"closed\" | \"archived\";\n \n export function statusLabel(status: TicketStatus) {\n   if (status === \"open\") {\n     return \"Open\";\n   }\n+  if (status === \"archived\") {\n+    return \"Archived\";\n+  }\n   return \"Closed\";\n }\nIndex: src/status.test.ts\n===================================================================\n--- src/status.test.ts\n+++ src/status.test.ts\n@@ -3,4 +3,5 @@\n test(\"labels ticket status\", () => {\n   expect(statusLabel(\"open\")).toBe(\"Open\");\n   expect(statusLabel(\"closed\")).toBe(\"Closed\");\n+  expect(statusLabel(\"archived\")).toBe(\"Archived\");\n });",
+  "proposal": {
+    "summary": "Add archived ticket status support and test case",
+    "edits": [
+      {
+        "path": "src/status.ts",
+        "oldText": "export type TicketStatus = \"open\" | \"closed\";\n\nexport function statusLabel(status: TicketStatus) {\n  if (status === \"open\") {\n    return \"Open\";\n  }\n  return \"Closed\";\n}\n",
+        "newText": "export type TicketStatus = \"open\" | \"closed\" | \"archived\";\n\nexport function statusLabel(status: TicketStatus) {\n  if (status === \"open\") {\n    return \"Open\";\n  }\n  if (status === \"archived\") {\n    return \"Archived\";\n  }\n  return \"Closed\";\n}\n"
+      },
+      {
+        "path": "src/status.test.ts",
+        "oldText": "import { statusLabel } from \"./status\";\n\ntest(\"labels ticket status\", () => {\n  expect(statusLabel(\"open\")).toBe(\"Open\");\n  expect(statusLabel(\"closed\")).toBe(\"Closed\");\n});\n",
+        "newText": "import { statusLabel } from \"./status\";\n\ntest(\"labels ticket status\", () => {\n  expect(statusLabel(\"open\")).toBe(\"Open\");\n  expect(statusLabel(\"closed\")).toBe(\"Closed\");\n  expect(statusLabel(\"archived\")).toBe(\"Archived\");\n});\n"
+      }
+    ]
+  },
+  "status": "valid"
+}

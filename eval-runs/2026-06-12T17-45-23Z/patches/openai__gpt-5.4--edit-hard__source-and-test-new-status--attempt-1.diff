@@ -1,0 +1,27 @@
+Index: src/status.ts
+===================================================================
+--- src/status.ts
++++ src/status.ts
+@@ -1,8 +1,11 @@
+-export type TicketStatus = "open" | "closed";
++export type TicketStatus = "open" | "closed" | "archived";
+ 
+ export function statusLabel(status: TicketStatus) {
+   if (status === "open") {
+     return "Open";
+   }
++  if (status === "archived") {
++    return "Archived";
++  }
+   return "Closed";
+ }
+Index: src/status.test.ts
+===================================================================
+--- src/status.test.ts
++++ src/status.test.ts
+@@ -3,4 +3,5 @@
+ test("labels ticket status", () => {
+   expect(statusLabel("open")).toBe("Open");
+   expect(statusLabel("closed")).toBe("Closed");
++  expect(statusLabel("archived")).toBe("Archived");
+ });

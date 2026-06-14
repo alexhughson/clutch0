@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "In the focused customer title file only, use \"Untitled\" when the title is blank.",
+  "workspace": {
+    "files": {
+      "src/customerTitle.ts": "export function displayTitle(title: string) {\n  if (title.trim().length === 0) {\n    return \"Missing title\";\n  }\n  return title.trim();\n}\n",
+      "src/adminTitle.ts": "export function displayTitle(title: string) {\n  if (title.trim().length === 0) {\n    return \"Missing title\";\n  }\n  return title.trim();\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerTitle.ts", "focused": true },
+    { "kind": "file", "path": "src/adminTitle.ts" }
+  ]
+}

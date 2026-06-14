@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/emptyMessages.ts\n===================================================================\n--- src/emptyMessages.ts\n+++ src/emptyMessages.ts\n@@ -7,7 +7,7 @@\n \n export function projectsEmpty(count: number) {\n   if (count === 0) {\n-    return \"Nothing found\";\n+    return \"No projects found\";\n   }\n   return \"Projects available\";\n }",
+  "proposal": {
+    "summary": "Change projectsEmpty empty message to \"No projects found\"",
+    "edits": [
+      {
+        "path": "src/emptyMessages.ts",
+        "oldText": "export function projectsEmpty(count: number) {\n  if (count === 0) {\n    return \"Nothing found\";\n  }\n  return \"Projects available\";\n}",
+        "newText": "export function projectsEmpty(count: number) {\n  if (count === 0) {\n    return \"No projects found\";\n  }\n  return \"Projects available\";\n}"
+      }
+    ]
+  },
+  "status": "valid"
+}

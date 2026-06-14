@@ -1,0 +1,14 @@
+{
+  "command": "edit",
+  "question": "Sort labels ascending.",
+  "workspace": {
+    "files": {
+      "src/customerSort.ts": "export function sortLabels(labels: string[]) {\n  return labels.toReversed();\n}\n",
+      "src/adminSort.ts": "export function sortLabels(labels: string[]) {\n  return labels.toReversed();\n}\n"
+    }
+  },
+  "contextItems": [
+    { "kind": "file", "path": "src/customerSort.ts", "focused": true },
+    { "kind": "file", "path": "src/adminSort.ts" }
+  ]
+}

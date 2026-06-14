@@ -45,6 +45,9 @@ function showCreateFileReview(
       id: requestId,
       kind: "create-file",
       prompt: state.activeTask.request.question,
+      ...(state.activeTask.rejectComposer === undefined
+        ? {}
+        : { rejectComposer: state.activeTask.rejectComposer }),
       validation,
     },
   };

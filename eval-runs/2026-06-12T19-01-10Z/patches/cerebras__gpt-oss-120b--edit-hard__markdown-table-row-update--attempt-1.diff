@@ -1,0 +1,11 @@
+Index: docs/service-limits.md
+===================================================================
+--- docs/service-limits.md
++++ docs/service-limits.md
+@@ -3,5 +3,5 @@
+ | Service | Flow | Timeout | State |
+ | --- | --- | --- | --- |
+ | payment-api | checkout | 60s | active |
+-| billing-api | checkout | 60s | active |
++| billing-api | checkout | 90s | active |
+ | billing-api | refunds | 60s | active |

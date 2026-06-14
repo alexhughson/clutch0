@@ -1,0 +1,14 @@
+{
+  "diffText": "Index: src/customerPrice.ts\n===================================================================\n--- src/customerPrice.ts\n+++ src/customerPrice.ts\n@@ -1,6 +1,6 @@\n export function formatPrice(cents: number) {\n   if (cents === 0) {\n-    return \"$0.00\";\n+    return \"Free\";\n   }\n-  return `$${(cents / 100).toFixed(2)}`;\n+  return `${(cents / 100).toFixed(2)}`;\n }",
+  "proposal": {
+    "summary": "Update customer-facing price formatting so zero-valued prices display as \"Free\".",
+    "edits": [
+      {
+        "path": "src/customerPrice.ts",
+        "oldText": "export function formatPrice(cents: number) {\n  if (cents === 0) {\n    return \"$0.00\";\n  }\n  return `$${(cents / 100).toFixed(2)}`;\n}\n",
+        "newText": "export function formatPrice(cents: number) {\n  if (cents === 0) {\n    return \"Free\";\n  }\n  return `$${(cents / 100).toFixed(2)}`;\n}\n"
+      }
+    ]
+  },
+  "status": "valid"
+}
