@@ -1,12 +1,14 @@
 import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import {
+  HighlightedCode,
   HighlightedDiff,
   HighlightedMarkdown,
 } from "./SyntaxHighlightedContent";
 import { isEnterKey } from "../lib/keymap";
-import { applyPatchProposal } from "../lib/patch/patchEngine";
+import type { PatchProgressFile, PatchProgressState } from "../lib/patch/types";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
+import { applyPatchProposalWithRuntimeEvents } from "../workflows/patch/patchApplyRuntime";
 
 type LlmResponseScreenProps = {
   request: LlmRequestState;
@@ -36,8 +38,47 @@ export function LlmResponseScreen({ request }: LlmResponseScreenProps) {
         style={{ fg: "gray" }}
       >{`Question · ${formatStatus(request.status)}`}</text>
       <text>{request.question}</text>
+      <LatencyStats stats={request.latencyStats} />
+      {request.patch === undefined && request.patchProgress !== undefined ? (
+        <PatchProgress progress={request.patchProgress} />
+      ) : null}
       {request.patch === undefined ? <TextResponse request={request} /> : null}
       {request.patch === undefined ? null : <PatchReview request={request} />}
+    </box>
+  );
+}
+
+function LatencyStats({ stats }: { stats?: LlmRequestState["latencyStats"] }) {
+  if (stats === undefined) {
+    return null;
+  }
+
+  return (
+    <text style={{ fg: "gray" }}>{`Latency · TTFT ${formatOptionalLatency(
+      stats.ttftMs,
+      "n/a",
+    )} · total ${formatOptionalLatency(stats.totalMs, "pending")}`}</text>
+  );
+}
+
+function PatchProgress({ progress }: { progress: PatchProgressState }) {
+  return (
+    <box
+      style={{
+        flexDirection: "column",
+        gap: 0,
+        paddingLeft: 1,
+        width: "100%",
+      }}
+    >
+      <text style={{ fg: "gray" }}>
+        {`Patch draft · ${progress.files.length} ${pluralize("file", progress.files.length)} · ${progress.patchCharacterCount} chars`}
+      </text>
+      {progress.files.map((file) => (
+        <text key={`${file.operation}:${file.path}`} style={{ fg: "gray" }}>
+          {formatPatchProgressFile(file)}
+        </text>
+      ))}
     </box>
   );
 }
@@ -93,9 +134,7 @@ function PatchReview({ request }: { request: LlmRequestState }) {
         width: "100%",
       }}
     >
-      <text
-        style={{ fg: "gray" }}
-      >{`Patch · ${formatPatchStatus(patch.applyStatus)}`}</text>
+      <text style={{ fg: "gray" }}>{getPatchReviewHeading(patch)}</text>
       <text>{patch.proposal.summary}</text>
       {patch.status === "valid" ? (
         <scrollbox
@@ -108,17 +147,34 @@ function PatchReview({ request }: { request: LlmRequestState }) {
           <HighlightedDiff diff={patch.diffText} />
         </scrollbox>
       ) : (
-        <box style={{ flexDirection: "column" }}>
-          <text style={{ fg: "red" }}>Patch could not be applied cleanly:</text>
-          {patch.errors.map((error) => (
-            <text
-              key={`${error.editIndex}:${error.path}`}
-              style={{ fg: "red" }}
-            >
-              {error.path || "<unknown>"}: {error.message}
-            </text>
-          ))}
-        </box>
+        <scrollbox
+          style={{
+            flexGrow: 1,
+            height: "100%",
+            width: "100%",
+          }}
+        >
+          <box style={{ flexDirection: "column", gap: 1, width: "100%" }}>
+            <box style={{ flexDirection: "column" }}>
+              <text style={{ fg: "red" }}>{getPatchErrorHeading(patch)}</text>
+              {patch.errors.map((error) => (
+                <text
+                  key={`${error.editIndex}:${error.path}`}
+                  style={{ fg: "red" }}
+                >
+                  {error.path || "<unknown>"}: {error.message}
+                </text>
+              ))}
+            </box>
+            <box style={{ flexDirection: "column", width: "100%" }}>
+              <text style={{ fg: "gray" }}>Patch debug</text>
+              <HighlightedCode
+                content={getInvalidPatchDebugText(request) ?? ""}
+                filetype="text"
+              />
+            </box>
+          </box>
+        </scrollbox>
       )}
       {patch.applyErrorMessage === undefined ? null : (
         <text style={{ fg: "red" }}>{patch.applyErrorMessage}</text>
@@ -214,7 +270,27 @@ function handlePatchReviewKey({
     return;
   }
 
-  if (patch.applyStatus === "applying" || patch.applyStatus === "applied") {
+  if (patch.applyStatus === "applying") {
+    return;
+  }
+
+  if (patch.applyStatus === "applied") {
+    if (
+      patch.status === "valid" &&
+      request.savedContextItemId === undefined &&
+      event.name === "s"
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.response.saveDiffToContext({ requestId: request.id });
+      return;
+    }
+
+    if (event.name === "escape" || isEnterKey(event.name)) {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.navigation.acceptAndClose();
+    }
     return;
   }
 
@@ -269,19 +345,32 @@ function getTextResponseHotkeys(request: LlmRequestState): string | undefined {
     : "Enter clear · Esc edit prompt";
 }
 
-function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
+export function getPatchReviewHotkeys(
+  request: LlmRequestState,
+): string | undefined {
   const patch = request.patch;
   if (
     patch === undefined ||
     request.status !== "done" ||
-    patch.applyStatus === "applying" ||
-    patch.applyStatus === "applied"
+    patch.applyStatus === "applying"
   ) {
     return undefined;
   }
 
+  if (patch.applyStatus === "applied") {
+    return [
+      request.savedContextItemId === undefined
+        ? "s save diff to context"
+        : null,
+      "Enter clear",
+      "Esc close",
+    ]
+      .filter((item): item is string => item !== null)
+      .join(" · ");
+  }
+
   if (patch.status !== "valid") {
-    return "e/Esc edit message";
+    return "e/Esc edit prompt";
   }
 
   return [
@@ -289,11 +378,61 @@ function getPatchReviewHotkeys(request: LlmRequestState): string | undefined {
       ? "Enter/a retry apply"
       : "Enter/a apply",
     request.savedContextItemId === undefined ? "s save diff to context" : null,
-    "e edit message",
-    "Esc edit message",
+    "e edit prompt",
+    "Esc edit prompt",
   ]
     .filter((item): item is string => item !== null)
     .join(" · ");
+}
+
+export function getPatchReviewHeading(
+  patch: NonNullable<LlmRequestState["patch"]>,
+): string {
+  if (patch.status === "invalid") {
+    return "Patch · invalid draft";
+  }
+
+  return `Patch · ${formatPatchStatus(patch.applyStatus)}`;
+}
+
+export function getPatchErrorHeading(
+  patch: NonNullable<LlmRequestState["patch"]>,
+): string {
+  return patch.status === "invalid"
+    ? "Patch draft could not be validated:"
+    : "Patch could not be applied cleanly:";
+}
+
+export function getInvalidPatchDebugText(
+  request: LlmRequestState,
+): string | undefined {
+  const patch = request.patch;
+  if (patch === undefined || patch.status !== "invalid") {
+    return undefined;
+  }
+
+  return [
+    "Question:",
+    request.question,
+    "",
+    "Patch summary:",
+    patch.proposal.summary,
+    "",
+    ...(patch.proposal.toolCallId === undefined
+      ? []
+      : ["Tool call id:", patch.proposal.toolCallId, ""]),
+    "Validation errors:",
+    ...patch.errors.map(
+      (error) =>
+        `- ${error.path || "<unknown>"} [edit ${error.editIndex}]: ${error.message}`,
+    ),
+    "",
+    ...(request.responseText.trim().length === 0
+      ? []
+      : ["Assistant text:", request.responseText, ""]),
+    "Raw apply_patch input:",
+    patch.proposal.patch,
+  ].join("\n");
 }
 
 function formatStatus(status: string): string {
@@ -304,12 +443,40 @@ function formatStatus(status: string): string {
   return status;
 }
 
+export function formatOptionalLatency(
+  milliseconds: number | undefined,
+  fallback: string,
+): string {
+  if (milliseconds === undefined) {
+    return fallback;
+  }
+
+  if (milliseconds < 1000) {
+    return `${milliseconds}ms`;
+  }
+
+  const seconds = milliseconds / 1000;
+  return `${seconds.toFixed(seconds < 10 ? 2 : 1)}s`;
+}
+
 function formatPatchStatus(status: string): string {
   if (status === "apply-error") {
     return "apply error";
   }
 
   return status;
+}
+
+function formatPatchProgressFile(file: PatchProgressFile): string {
+  if (file.movePath !== undefined) {
+    return `${file.operation} ${file.path} -> ${file.movePath}`;
+  }
+
+  return `${file.operation} ${file.path}`;
+}
+
+function pluralize(word: string, count: number): string {
+  return count === 1 ? word : `${word}s`;
 }
 
 async function applyPatch(
@@ -328,8 +495,9 @@ async function applyPatch(
   responseActions.startPatchApply({ requestId: request.id });
 
   try {
-    const result = await applyPatchProposal({
+    const result = await applyPatchProposalWithRuntimeEvents({
       proposal: request.patch.proposal,
+      requestId: request.id,
     });
 
     if (result.status === "invalid") {

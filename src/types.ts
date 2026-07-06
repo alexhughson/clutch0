@@ -12,9 +12,33 @@ export type AgentSandboxContext = {
   summary?: string;
 };
 
-export interface ContextItem {
+export type SessionEvent = {
+  at: number;
+  details?: Record<string, unknown>;
+  itemId?: string;
+  kind: string;
+  schemaVersion: 1;
+};
+
+export type ContextItemState = {
+  id: string;
+  schemaVersion: number;
+  summaryState: ContextItemSummaryState;
+  type: string;
+};
+
+export type ContextItemPersistence<
+  State extends ContextItemState = ContextItemState,
+> =
+  | { kind: "ephemeral"; reason: string }
+  | { kind: "persistent"; snapshot: State };
+
+export interface ContextItem<
+  State extends ContextItemState = ContextItemState,
+> {
   readonly id: string;
-  readonly type: string;
+  readonly state: State;
+  readonly type: State["type"];
 
   formatForLlm(
     options: FormatContextItemForLlmOptions,
@@ -23,7 +47,9 @@ export interface ContextItem {
   getDetailView(
     options: GetContextItemDetailViewOptions,
   ): Promise<ContextItemDetailView | null>;
+  getHistoryEvents(previous: ContextItem | null): readonly SessionEvent[];
   getListLabel(): string;
+  getPersistence(): ContextItemPersistence<State>;
   getSummarizationInput(
     options: GetContextItemSummaryInputOptions,
   ): Promise<ContextItemSummarizationInput | null>;
@@ -103,6 +129,7 @@ export type ContextItemDetailView =
       kind: "agent-output";
       prompt: string;
       sandbox?: AgentSandboxContext;
+      sessionAvailability: "detached" | "live";
       status: "error" | "idle" | "running";
       title: string;
     }

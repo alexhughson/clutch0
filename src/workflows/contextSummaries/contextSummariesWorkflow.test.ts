@@ -5,7 +5,11 @@ import {
   AGENTS_CONTEXT_ITEM_ID,
   createAutomaticContextItems,
 } from "../../lib/context/automaticContextItems";
-import { createSavedLlmResponseContextItem } from "../../lib/context/contextItems";
+import {
+  createPiAgentContextItem,
+  createSavedLlmResponseContextItem,
+  PiAgentContextItem,
+} from "../../lib/context/contextItems";
 import type {
   ContextItemSummarizationInput,
   GeneratedContextItemSummary,
@@ -181,6 +185,79 @@ test("context summaries update automatic context items", async () => {
     detail: "Automatic summary for AGENTS.md.",
     title: "Summary: AGENTS.md",
   });
+});
+
+test("agent output reconciled while summarizing is preserved when summary finishes", async () => {
+  const calls: ContextItemSummarizationInput[] = [];
+  const deferred = createDeferred<GeneratedContextItemSummary>();
+  const agent = createPiAgentContextItem({
+    createdAt: 1,
+    id: "agent:summary-race",
+    mode: "ask",
+    prompt: "Investigate",
+  })
+    .withAgentOutputUpdate({
+      delta: "partial ans",
+      id: "stream:partial",
+      kind: "append-stream-delta",
+      streamKind: "assistant",
+      timestamp: 1,
+    })
+    .withStatus("idle");
+  const harness = createHarness({
+    generateSummary: (input) => {
+      calls.push(input);
+      return deferred.promise;
+    },
+    initialState: {
+      workspace: {
+        ...createInitialAppState().workspace,
+        automaticContextItems: [],
+        contextItems: [agent],
+        focusedContextItemId: agent.id,
+      },
+    },
+  });
+
+  harness.contextSummaries.ensureWorkspaceSummaries();
+  await flushPromises();
+  expect(calls).toHaveLength(1);
+
+  const pendingAgent = harness.state.workspace.contextItems[0];
+  expect(pendingAgent).toBeInstanceOf(PiAgentContextItem);
+  harness.setState({
+    workspace: {
+      ...harness.state.workspace,
+      contextItems: [
+        (pendingAgent as PiAgentContextItem).withAgentOutputUpdate({
+          id: "stream:final",
+          kind: "reconcile-stream",
+          streamKind: "assistant",
+          text: "partial answer with the final sentence",
+          timestamp: 2,
+        }),
+      ],
+    },
+  });
+
+  deferred.resolve({
+    details: "Summary generated from the partial answer.",
+    generatedAt: 3,
+    oneLine: "Partial summary",
+    sourceHash: calls[0]!.sourceHash,
+  });
+  await flushPromises();
+
+  const summarizedAgent = harness.state.workspace.contextItems[0];
+  expect(summarizedAgent).toBeInstanceOf(PiAgentContextItem);
+  expect((summarizedAgent as PiAgentContextItem).blocks).toEqual([
+    expect.objectContaining({
+      kind: "stream",
+      streamKind: "assistant",
+      text: "partial answer with the final sentence",
+    }),
+  ]);
+  expect(summarizedAgent?.getSummaryState().status).toBe("ready");
 });
 
 function createDeferred<T>() {

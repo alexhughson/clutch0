@@ -122,6 +122,41 @@ test("saving a running response creates live context and finish updates it", () 
   expect(item?.id).toBe("saved:1");
 });
 
+test("records latency stats on the active response request", () => {
+  const harness = createHarness({
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      request: {
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        question: "Explain the app",
+        responseText: "",
+        status: "loading",
+      },
+    },
+    nextContextItemId: 1,
+    nextLlmRequestId: 2,
+    workspace: createInitialComposeScreen(),
+  });
+
+  harness.response.setLatencyStats({
+    latencyStats: { ttftMs: 120 },
+    requestId: 1,
+  });
+  harness.response.setLatencyStats({
+    latencyStats: { totalMs: 840 },
+    requestId: 1,
+  });
+
+  expect(
+    harness.state.activeTask?.kind === "response"
+      ? harness.state.activeTask.request.latencyStats
+      : undefined,
+  ).toEqual({ totalMs: 840, ttftMs: 120 });
+});
+
 test("failing a request can replace the response output with debug text", () => {
   const harness = createHarness({
     actions: {} as AppActions,
@@ -159,6 +194,65 @@ test("failing a request can replace the response output with debug text", () => 
   );
 });
 
+test("streaming patch progress updates the active request and clears on patch", () => {
+  const harness = createHarness({
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      request: {
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        question: "Change text",
+        responseText: "",
+        status: "loading",
+      },
+    },
+    nextContextItemId: 1,
+    nextLlmRequestId: 2,
+    workspace: createInitialComposeScreen(),
+  });
+
+  harness.response.setPatchProgress({
+    progress: {
+      files: [{ operation: "update", path: "README.md" }],
+      patchCharacterCount: 80,
+    },
+    requestId: 1,
+  });
+
+  expect(harness.state.activeTask?.kind).toBe("response");
+  if (harness.state.activeTask?.kind !== "response") {
+    return;
+  }
+  expect(harness.state.activeTask.request.status).toBe("streaming");
+  expect(harness.state.activeTask.request.patchProgress).toEqual({
+    files: [{ operation: "update", path: "README.md" }],
+    patchCharacterCount: 80,
+  });
+
+  harness.response.setPatch({
+    patch: {
+      applyStatus: "pending",
+      diffText: "diff --git a/README.md b/README.md",
+      proposal: {
+        patch:
+          "*** Begin Patch\n*** Update File: README.md\n@@\n-old\n+new\n*** End Patch",
+        summary: "Change text",
+      },
+      status: "valid",
+    },
+    requestId: 1,
+  });
+
+  expect(harness.state.activeTask?.kind).toBe("response");
+  if (harness.state.activeTask?.kind !== "response") {
+    return;
+  }
+  expect(harness.state.activeTask.request.patchProgress).toBeUndefined();
+  expect(harness.state.activeTask.request.patch?.status).toBe("valid");
+});
+
 test("saving a running edit replaces the live item with a saved diff", () => {
   const harness = createHarness({
     actions: {} as AppActions,
@@ -188,12 +282,57 @@ test("saving a running edit replaces the live item with a saved diff", () => {
     patch: {
       applyStatus: "pending",
       diffText: "diff --git a/a b/a",
-      proposal: { edits: [], summary: "Change text" },
+      proposal: {
+        patch:
+          "*** Begin Patch\n*** Update File: a\n@@\n-old\n+new\n*** End Patch",
+        summary: "Change text",
+      },
       status: "valid",
     },
     requestId: 1,
   });
 
+  const item = harness.state.workspace.contextItems[0];
+  expect(item).toBeInstanceOf(SavedDiffContextItem);
+  expect(item?.id).toBe("saved:1");
+});
+
+test("saving an applied patch keeps the normalized diff as context", () => {
+  const harness = createHarness({
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      request: {
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        patch: {
+          applyStatus: "applied",
+          diffText: "diff --git a/README.md b/README.md\n-old\n+new",
+          proposal: {
+            patch:
+              "*** Begin Patch\n*** Update File: README.md\n@@\n-old\n+new\n*** End Patch",
+            summary: "Change text",
+          },
+          status: "valid",
+        },
+        question: "Change text",
+        responseText: "Applied.",
+        status: "done",
+      },
+    },
+    nextContextItemId: 1,
+    nextLlmRequestId: 2,
+    workspace: createInitialComposeScreen(),
+  });
+
+  harness.response.saveDiffToContext({ requestId: 1 });
+
+  expect(harness.state.activeTask?.kind).toBe("response");
+  if (harness.state.activeTask?.kind !== "response") {
+    return;
+  }
+  expect(harness.state.activeTask.request.savedContextItemId).toBe("saved:1");
   const item = harness.state.workspace.contextItems[0];
   expect(item).toBeInstanceOf(SavedDiffContextItem);
   expect(item?.id).toBe("saved:1");

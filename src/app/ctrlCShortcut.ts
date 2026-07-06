@@ -10,8 +10,16 @@ export type CtrlCShortcutDecision =
   | "exit"
   | "ignore";
 
+export function isRawCtrlCSequence(sequence: string): boolean {
+  return sequence === "\u0003";
+}
+
 export function isCtrlCKey(event: KeyEvent): boolean {
-  return event.ctrl && event.name === "c";
+  return (
+    (event.ctrl && event.name.toLowerCase() === "c") ||
+    isRawCtrlCSequence(event.sequence) ||
+    isRawCtrlCSequence(event.raw)
+  );
 }
 
 export function getCtrlCShortcutDecision({
@@ -23,16 +31,16 @@ export function getCtrlCShortcutDecision({
   lastBaseCtrlCAt: number | null;
   now: number;
 }): CtrlCShortcutDecision {
-  if (activeTask !== null) {
-    return canCloseTaskWithCtrlC(activeTask) ? "close-task" : "ignore";
-  }
-
   if (
     lastBaseCtrlCAt !== null &&
     now >= lastBaseCtrlCAt &&
     now - lastBaseCtrlCAt <= BASE_CTRL_C_EXIT_INTERVAL_MS
   ) {
     return "exit";
+  }
+
+  if (activeTask !== null) {
+    return canCloseTaskWithCtrlC(activeTask) ? "close-task" : "arm-exit";
   }
 
   return "arm-exit";

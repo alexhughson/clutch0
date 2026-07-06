@@ -58,7 +58,9 @@ export interface McpToolRuntime {
   callTool(options: {
     arguments: Record<string, unknown>;
     serverName: string;
+    signal?: AbortSignal;
     toolName: string;
   }): Promise<McpToolOutput>;
+  close?(): Promise<void> | void;
   listTools(serverName: string): Promise<McpToolMetadata[]>;
 }

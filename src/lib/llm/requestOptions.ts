@@ -18,6 +18,17 @@ const OPENROUTER_PRIORITY_MODEL_PREFIXES = [
   "google/",
   "openai/",
 ] as const;
+const OPENROUTER_OPENAI_REASONING_MODEL_PREFIXES = [
+  "openai/gpt-5",
+  "openai/o",
+  "xai/grok",
+] as const;
+const OPENROUTER_GEMINI_REASONING_MODEL_PREFIX = "google/gemini-3";
+
+type OpenRouterReasoning = {
+  effort: string;
+  exclude: true;
+};
 
 type ConfiguredLlmRequestOptions = SimpleStreamOptions &
   ProviderStreamOptions & {
@@ -90,6 +101,11 @@ export function configuredLlmRequestOptions({
     model,
     serviceTier: configuredServiceTier,
   });
+  const openRouterPayloadOptions = openRouterPayloadOptionsForRequest({
+    effortLevel,
+    model,
+    serviceTier,
+  });
   return {
     apiKey,
     headers,
@@ -98,9 +114,9 @@ export function configuredLlmRequestOptions({
     ...(serviceTier === undefined || !isOpenAiResponsesPriorityModel(model)
       ? {}
       : { reasoningEffort: reasoning, serviceTier }),
-    ...(serviceTier === undefined || !isOpenRouterPriorityModel(model)
+    ...(openRouterPayloadOptions === undefined
       ? {}
-      : { onPayload: withOpenRouterPriorityServiceTier }),
+      : { onPayload: openRouterPayloadOptions }),
     signal,
   };
 }
@@ -119,7 +135,108 @@ function isOpenRouterPriorityModel(model: Model<Api>): boolean {
   );
 }
 
-function withOpenRouterPriorityServiceTier(payload: unknown): unknown {
+function isOpenRouterChatCompletionsModel(model: Model<Api>): boolean {
+  return model.provider === "openrouter" && model.api === "openai-completions";
+}
+
+function isOpenRouterGeminiReasoningModel(model: Model<Api>): boolean {
+  return model.id
+    .toLowerCase()
+    .startsWith(OPENROUTER_GEMINI_REASONING_MODEL_PREFIX);
+}
+
+function isOpenRouterOpenAiReasoningModel(model: Model<Api>): boolean {
+  const modelId = model.id.toLowerCase();
+  return OPENROUTER_OPENAI_REASONING_MODEL_PREFIXES.some((prefix) =>
+    modelId.startsWith(prefix),
+  );
+}
+
+function openRouterReasoningForRequest({
+  effortLevel,
+  model,
+}: {
+  effortLevel: ClutchModelEffortLevel;
+  model: Model<Api>;
+}): OpenRouterReasoning | undefined {
+  if (!isOpenRouterChatCompletionsModel(model)) {
+    return undefined;
+  }
+
+  if (isOpenRouterGeminiReasoningModel(model)) {
+    const effort =
+      effortLevel === "off"
+        ? "minimal"
+        : mappedOpenRouterReasoningEffort({ effortLevel, model });
+    return { effort, exclude: true };
+  }
+
+  if (!isOpenRouterOpenAiReasoningModel(model)) {
+    return undefined;
+  }
+
+  return {
+    effort:
+      effortLevel === "off"
+        ? "none"
+        : mappedOpenRouterReasoningEffort({ effortLevel, model }),
+    exclude: true,
+  };
+}
+
+function mappedOpenRouterReasoningEffort({
+  effortLevel,
+  model,
+}: {
+  effortLevel: Exclude<ClutchModelEffortLevel, "off">;
+  model: Model<Api>;
+}): string {
+  const effort = model.thinkingLevelMap?.[effortLevel] ?? effortLevel;
+  if (effort === null) {
+    throw new Error(
+      `OpenRouter model ${model.id} cannot use effort level ${effortLevel}.`,
+    );
+  }
+  return effort;
+}
+
+function openRouterPayloadOptionsForRequest({
+  effortLevel,
+  model,
+  serviceTier,
+}: {
+  effortLevel: ClutchModelEffortLevel;
+  model: Model<Api>;
+  serviceTier: typeof PRIORITY_SERVICE_TIER | undefined;
+}): ProviderStreamOptions["onPayload"] | undefined {
+  if (!isOpenRouterChatCompletionsModel(model)) {
+    return undefined;
+  }
+
+  const reasoning = openRouterReasoningForRequest({ effortLevel, model });
+  const shouldSetPriorityServiceTier =
+    serviceTier !== undefined && isOpenRouterPriorityModel(model);
+  if (reasoning === undefined && !shouldSetPriorityServiceTier) {
+    return undefined;
+  }
+
+  return (payload) =>
+    withOpenRouterPayloadOptions({
+      payload,
+      reasoning,
+      serviceTier: shouldSetPriorityServiceTier ? serviceTier : undefined,
+    });
+}
+
+function withOpenRouterPayloadOptions({
+  payload,
+  reasoning,
+  serviceTier,
+}: {
+  payload: unknown;
+  reasoning: OpenRouterReasoning | undefined;
+  serviceTier: typeof PRIORITY_SERVICE_TIER | undefined;
+}): unknown {
   if (
     payload === null ||
     typeof payload !== "object" ||
@@ -132,6 +249,7 @@ function withOpenRouterPriorityServiceTier(payload: unknown): unknown {
 
   return {
     ...payload,
-    service_tier: PRIORITY_SERVICE_TIER,
+    ...(reasoning === undefined ? {} : { reasoning }),
+    ...(serviceTier === undefined ? {} : { service_tier: serviceTier }),
   };
 }

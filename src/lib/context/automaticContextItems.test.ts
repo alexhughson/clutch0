@@ -37,6 +37,47 @@ test("unstaged changes detail shows the working tree diff", async () => {
   expect(detail.diffText).toContain("+after");
 });
 
+test("unstaged changes detail includes untracked non-ignored files", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, ".gitignore"), "ignored.txt\n");
+  await writeFile(join(root, "new.txt"), "hello from an untracked file\n");
+  await writeFile(join(root, "ignored.txt"), "ignored\n");
+
+  const detail = await getUnstagedChangesItem().getDetailView({ root });
+
+  expect(detail?.kind).toBe("diff");
+  if (detail?.kind !== "diff") {
+    throw new Error("Expected diff detail view.");
+  }
+
+  expect(detail.diffText).toContain("diff --git a/new.txt b/new.txt");
+  expect(detail.diffText).toContain("new file mode");
+  expect(detail.diffText).toContain("+hello from an untracked file");
+  expect(detail.diffText).not.toContain(
+    "diff --git a/ignored.txt b/ignored.txt",
+  );
+});
+
+test("unstaged changes detail truncates large working tree diffs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "large.txt"), repeatLines("before", 30_000));
+  await git(root, ["add", "large.txt"]);
+  await writeFile(join(root, "large.txt"), repeatLines("after", 30_000));
+
+  const detail = await getUnstagedChangesItem().getDetailView({ root });
+
+  expect(detail?.kind).toBe("diff");
+  if (detail?.kind !== "diff") {
+    throw new Error("Expected diff detail view.");
+  }
+
+  expect(detail.diffText).toContain("--- a/large.txt");
+  expect(detail.diffText).toContain("[Context truncated.]");
+  expect(detail.diffText.length).toBeLessThan(130_000);
+});
+
 test("unstaged changes detail shows an empty state when the tree is clean", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
   await git(root, ["init"]);
@@ -75,4 +116,11 @@ function getUnstagedChangesItem() {
 
 async function git(root: string, args: readonly string[]) {
   await execFileAsync("git", ["-C", root, ...args]);
+}
+
+function repeatLines(prefix: string, count: number): string {
+  return Array.from(
+    { length: count },
+    (_, index) => `${prefix} ${index}\n`,
+  ).join("");
 }

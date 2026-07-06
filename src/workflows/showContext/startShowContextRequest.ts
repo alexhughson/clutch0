@@ -1,6 +1,6 @@
 import type { ComposerState } from "../../app/appTypes";
 import { buildLlmContext } from "../../lib/llm/context";
-import { patchAwareSystemPrompt } from "../../lib/llm/prompts";
+import { buildPatchAwareSystemPrompt } from "../../lib/llm/prompts";
 import { getLlmWorkflowTools } from "../llmTools/toolRegistry";
 import { useAppStore } from "../../store/appStore";
 
@@ -19,13 +19,16 @@ export function startShowContextRequest(
 
   const contextItems = currentState.workspace.contextItems;
   const focusedContextItemId = currentState.workspace.focusedContextItemId;
+  const tools = getLlmWorkflowTools();
 
   void buildLlmContext({
     contextItems,
     focusedContextItemId,
     question: question.length === 0 ? "(no question)" : question,
-    systemPrompt: patchAwareSystemPrompt,
-    tools: getLlmWorkflowTools(),
+    systemPrompt: buildPatchAwareSystemPrompt({
+      toolNames: tools.map((tool) => tool.name),
+    }),
+    tools,
   }).then(
     ({ context }) => {
       useAppStore.getState().actions.showContext.finish({

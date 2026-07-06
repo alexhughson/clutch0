@@ -170,10 +170,12 @@ export function parseLlmSlashCommandInvocation(
 export async function routeLlmWorkflowToolCalls({
   allowedToolNames,
   root,
+  signal,
   toolCalls,
 }: {
   allowedToolNames?: readonly string[];
   root?: string;
+  signal?: AbortSignal;
   toolCalls: readonly ToolCall[];
 }): Promise<LlmWorkflowToolResult | null> {
   if (toolCalls.length === 0) {
@@ -198,7 +200,7 @@ export async function routeLlmWorkflowToolCalls({
     `LLM called unregistered or disallowed workflow tool: ${toolCall.name}`,
   );
 
-  return await controller.routeToolCall({ root, toolCall });
+  return await controller.routeToolCall({ root, signal, toolCall });
 }
 
 export function handleLlmWorkflowResult({

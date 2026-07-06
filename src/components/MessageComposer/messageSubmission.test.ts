@@ -7,6 +7,7 @@ test("plain text submits an LLM request", () => {
     allowedToolNames: undefined,
     commandDirective: undefined,
     kind: "llm-request",
+    patchToolMode: undefined,
     question: "explain the app",
   });
 });
@@ -73,6 +74,7 @@ test("tool slash commands keep their allowed tool rail", () => {
     allowedToolNames: [expect.any(String)],
     commandDirective: expect.any(String),
     kind: "llm-request",
+    patchToolMode: "review",
     question: "update parser",
   });
 });

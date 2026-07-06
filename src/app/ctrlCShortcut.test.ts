@@ -5,12 +5,22 @@ import {
   BASE_CTRL_C_EXIT_INTERVAL_MS,
   getCtrlCShortcutDecision,
   isCtrlCKey,
+  isRawCtrlCSequence,
 } from "./ctrlCShortcut";
 
 test("recognizes ctrl+c key events", () => {
   expect(isCtrlCKey(keyEvent({ ctrl: true, name: "c" }))).toBe(true);
+  expect(isCtrlCKey(keyEvent({ ctrl: true, name: "C" }))).toBe(true);
+  expect(isCtrlCKey(keyEvent({ name: "", raw: "\u0003", sequence: "\u0003" }))).toBe(
+    true,
+  );
   expect(isCtrlCKey(keyEvent({ name: "c" }))).toBe(false);
   expect(isCtrlCKey(keyEvent({ ctrl: true, name: "x" }))).toBe(false);
+});
+
+test("recognizes raw ctrl+c input sequences", () => {
+  expect(isRawCtrlCSequence("\u0003")).toBe(true);
+  expect(isRawCtrlCSequence("c")).toBe(false);
 });
 
 test("requires two ctrl+c presses on the base screen to exit", () => {
@@ -54,7 +64,7 @@ test("closes an idle context item viewer", () => {
   ).toBe("close-task");
 });
 
-test("does not close tasks while they are applying or loading", () => {
+test("arms exit for tasks that cannot be safely closed", () => {
   expect(
     getCtrlCShortcutDecision({
       activeTask: {
@@ -62,20 +72,30 @@ test("does not close tasks while they are applying or loading", () => {
         itemId: "diff:1",
         kind: "context-item-viewer",
       },
-      lastBaseCtrlCAt: 1000,
-      now: 1100,
+      lastBaseCtrlCAt: null,
+      now: 1000,
     }),
-  ).toBe("ignore");
+  ).toBe("arm-exit");
+  expect(
+    getCtrlCShortcutDecision({
+      activeTask: responseTask("streaming"),
+      lastBaseCtrlCAt: null,
+      now: 1000,
+    }),
+  ).toBe("arm-exit");
+});
+
+test("exits on a second ctrl+c even when the active task cannot close", () => {
   expect(
     getCtrlCShortcutDecision({
       activeTask: responseTask("streaming"),
       lastBaseCtrlCAt: 1000,
       now: 1100,
     }),
-  ).toBe("ignore");
+  ).toBe("exit");
 });
 
-test("does not close first-run config with ctrl+c", () => {
+test("arms exit instead of closing first-run config", () => {
   expect(
     getCtrlCShortcutDecision({
       activeTask: {
@@ -89,7 +109,7 @@ test("does not close first-run config with ctrl+c", () => {
       lastBaseCtrlCAt: null,
       now: 1000,
     }),
-  ).toBe("ignore");
+  ).toBe("arm-exit");
 });
 
 function responseTask(

@@ -1,0 +1,1 @@
+- Use add_context_files only when the user asks to add known files or exact paths are already the requested next step. For discovery, stack traces, suspected files, or missing source, use find_relevant_files.

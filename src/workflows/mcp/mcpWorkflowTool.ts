@@ -12,25 +12,32 @@ import type {
 } from "../../lib/mcp/mcpTypes";
 import { renderPrompt } from "../../lib/llm/prompts";
 import { invariant } from "../../lib/invariant";
+import { recordSessionRuntimeEvent } from "../../store/appStore";
 import type {
   LlmSlashCommand,
   LlmWorkflowToolController,
 } from "../llmTools/types";
 
 export type McpWorkflowResources = {
+  close?: () => Promise<void> | void;
   slashCommands: readonly LlmSlashCommand[];
   toolControllers: readonly LlmWorkflowToolController[];
 };
 
 export async function loadMcpWorkflowResources({
+  onCloseReady,
   root = process.cwd(),
   runtime,
 }: {
+  onCloseReady?: (close: () => Promise<void> | void) => void;
   root?: string;
   runtime?: McpToolRuntime;
 } = {}): Promise<McpWorkflowResources> {
   const config = loadMcpConfig({ root });
   const mcpRuntime = runtime ?? new McpClientRegistry(config);
+  if (mcpRuntime.close !== undefined) {
+    onCloseReady?.(() => mcpRuntime.close?.());
+  }
   const registeredTools = await loadDirectMcpTools({
     config,
     runtime: mcpRuntime,
@@ -50,6 +57,7 @@ export function createMcpWorkflowResources({
   tools: readonly McpRegisteredTool[];
 }): McpWorkflowResources {
   return {
+    ...(runtime.close === undefined ? {} : { close: () => runtime.close?.() }),
     slashCommands: createMcpSlashCommands(tools),
     toolControllers: tools.map((tool) =>
       createMcpWorkflowToolController({ runtime, tool }),
@@ -79,20 +87,47 @@ function createMcpWorkflowToolController({
         responseText: result.responseText,
       });
     },
-    async routeToolCall({ toolCall }) {
+    async routeToolCall({ signal, toolCall }) {
       invariant(
         toolCall.name === tool.toolName,
         `${tool.toolName} routed unexpected tool ${toolCall.name}`,
       );
 
-      return {
-        kind: "mcp-tool-output" as const,
-        output: await runtime.callTool({
-          arguments: parseMcpToolArguments(toolCall),
+      const arguments_ = parseMcpToolArguments(toolCall);
+      recordSessionRuntimeEvent({
+        kind: "mcp-tool.started",
+        serverName: tool.serverName,
+        toolName: tool.name,
+        workflowToolName: tool.toolName,
+      });
+      try {
+        const output = await runtime.callTool({
+          arguments: arguments_,
+          serverName: tool.serverName,
+          signal,
+          toolName: tool.name,
+        });
+        recordSessionRuntimeEvent({
+          isError: output.isError,
+          kind: "mcp-tool.finished",
           serverName: tool.serverName,
           toolName: tool.name,
-        }),
-      };
+          workflowToolName: tool.toolName,
+        });
+        return {
+          kind: "mcp-tool-output" as const,
+          output,
+        };
+      } catch (error) {
+        recordSessionRuntimeEvent({
+          errorMessage: error instanceof Error ? error.message : String(error),
+          kind: "mcp-tool.failed",
+          serverName: tool.serverName,
+          toolName: tool.name,
+          workflowToolName: tool.toolName,
+        });
+        throw error;
+      }
     },
   };
 }

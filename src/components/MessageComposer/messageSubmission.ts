@@ -3,6 +3,7 @@ import {
   type LlmSlashCommandInvocation,
 } from "../../workflows/llmTools/toolRegistry";
 import { parseAgentSkillSlashCommandName } from "../../workflows/agentAsk/agentSkillCommand";
+import type { PatchToolMode } from "../../workflows/llmTools/types";
 
 export type SubmissionIntent =
   | {
@@ -25,6 +26,7 @@ export type SubmissionIntent =
       allowedToolNames?: readonly string[];
       commandDirective?: string;
       kind: "llm-request";
+      patchToolMode?: PatchToolMode;
       question: string;
     }
   | {
@@ -93,6 +95,7 @@ export function getSubmissionIntent(message: string): SubmissionIntent | null {
     allowedToolNames: invocation?.command.allowedToolNames,
     commandDirective: invocation?.command.promptDirective,
     kind: "llm-request",
+    patchToolMode: invocation?.command.patchToolMode,
     question: requestQuestion,
   };
 }

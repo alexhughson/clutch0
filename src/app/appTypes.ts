@@ -3,7 +3,7 @@ import type {
   AgentOutputUpdate,
 } from "../lib/agentOutput/agentOutputTypes";
 import type { CreateFileValidationResult } from "../lib/createFile/createFile";
-import type { PatchReviewState } from "../lib/patch/types";
+import type { PatchProgressState, PatchReviewState } from "../lib/patch/types";
 import type {
   ClutchModelSelection,
   SupportedClutchLlmProvider,
@@ -28,6 +28,11 @@ export type AppTask =
 
 export type LlmRequestStatus = "loading" | "streaming" | "done" | "error";
 
+export type LlmRequestLatencyStats = {
+  totalMs?: number;
+  ttftMs?: number;
+};
+
 export type ContextItemReplacementTarget = {
   contextItemId: string;
   expectedResult: "diff" | "text";
@@ -41,7 +46,9 @@ type LlmRequestBase = {
   contextItems: ContextItem[];
   focusedContextItemId: string | null;
   id: number;
+  latencyStats?: LlmRequestLatencyStats;
   patch?: PatchReviewState;
+  patchProgress?: PatchProgressState;
   question: string;
   replacement?: ContextItemReplacementTarget;
   responseText: string;
@@ -306,6 +313,14 @@ export type AppActions = {
     saveDiffToContext: (options: { requestId: number }) => void;
     saveTextToContext: (options: { requestId: number }) => void;
     setPatch: (options: { patch: PatchReviewState; requestId: number }) => void;
+    setLatencyStats: (options: {
+      latencyStats: LlmRequestLatencyStats;
+      requestId: number;
+    }) => void;
+    setPatchProgress: (options: {
+      progress: PatchProgressState;
+      requestId: number;
+    }) => void;
     startPatchApply: (options: { requestId: number }) => void;
   };
 };

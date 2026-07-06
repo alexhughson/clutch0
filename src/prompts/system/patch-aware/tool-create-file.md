@@ -1,0 +1,1 @@
+- When the tool is available, use create_file for one explicit brand-new file.

@@ -5,11 +5,14 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import {
   createAgentToolBlock,
-  formatPiAgentOutputUpdate,
+  createPiAgentOutputFormatter,
+  getLatestAssistantText,
+  type PiAgentOutputFormatter,
 } from "../../lib/agentOutput/piAgentOutputAdapter";
+import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import { buildAgentPromptWithContext } from "../../lib/llm/agentContext";
 import { createConfiguredPiAgentSession } from "../../lib/llm/piAgentSession";
-import { useAppStore } from "../../store/appStore";
+import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
 import type { AgentAskMode, ContextItem } from "../../types";
 import {
   activateAgentAskTools,
@@ -24,12 +27,23 @@ import {
 } from "./agentSandbox";
 
 type AgentAskHandle = {
+  outputFormatter: PiAgentOutputFormatter;
   sandbox?: AgentSandbox;
   session: AgentSession;
   unsubscribe: () => void;
 };
 
+type AgentAskStartupHandle = {
+  abort: () => void;
+  done: Promise<void>;
+  sandbox?: AgentSandbox;
+  session?: AgentSession;
+  unsubscribe?: () => void;
+  registered: boolean;
+};
+
 const agentAskSessions = new Map<string, AgentAskHandle>();
+const agentAskStartups = new Map<string, AgentAskStartupHandle>();
 
 export async function startAgentAskSession({
   itemId,
@@ -38,6 +52,7 @@ export async function startAgentAskSession({
   mode = "ask",
   prompt,
   root = process.cwd(),
+  signal,
   skillName,
 }: {
   contextItems: readonly ContextItem[];
@@ -46,12 +61,73 @@ export async function startAgentAskSession({
   mode?: AgentAskMode;
   prompt: string;
   root?: string;
+  signal?: AbortSignal;
   skillName?: string;
 }) {
-  let sandbox: AgentSandbox | undefined;
+  if (agentAskSessions.has(itemId) || agentAskStartups.has(itemId)) {
+    throw new Error(`Agent session already exists for context item ${itemId}.`);
+  }
+
+  const abortHandle = createStartupAbortHandle(signal);
+  const startup: AgentAskStartupHandle = {
+    abort: abortHandle.abort,
+    done: Promise.resolve(),
+    registered: false,
+  };
+  agentAskStartups.set(itemId, startup);
+  startup.done = runAgentAskSessionStartup({
+    contextItems,
+    focusedContextItemId,
+    itemId,
+    mode,
+    prompt,
+    root,
+    signal: abortHandle.signal,
+    skillName,
+    startup,
+  }).finally(() => {
+    abortHandle.dispose();
+    agentAskStartups.delete(itemId);
+  });
+  await startup.done;
+}
+
+async function runAgentAskSessionStartup({
+  itemId,
+  contextItems,
+  focusedContextItemId,
+  mode,
+  prompt,
+  root,
+  signal,
+  skillName,
+  startup,
+}: {
+  contextItems: readonly ContextItem[];
+  focusedContextItemId: string | null;
+  itemId: string;
+  mode: AgentAskMode;
+  prompt: string;
+  root: string;
+  signal: AbortSignal;
+  skillName?: string;
+  startup: AgentAskStartupHandle;
+}) {
+  recordSessionRuntimeEvent({
+    contextItemIds: contextItems.map((item) => item.id),
+    focusedContextItemId,
+    itemId,
+    kind: "agent-session.started",
+    mode,
+    skillName,
+  });
 
   try {
-    sandbox = mode === "edit" ? await createAgentSandbox({ root }) : undefined;
+    throwIfAgentSessionAborted(signal);
+    const sandbox =
+      mode === "edit" ? await createAgentSandbox({ root, signal }) : undefined;
+    startup.sandbox = sandbox;
+    throwIfAgentSessionAborted(signal);
     const sessionRoot = sandbox?.path ?? root;
     if (sandbox !== undefined) {
       useAppStore.getState().actions.agentAsk.attachSandbox({
@@ -63,11 +139,17 @@ export async function startAgentAskSession({
           root: sandbox.root,
         },
       });
+      recordSessionRuntimeEvent({
+        itemId,
+        kind: "agent-session.sandbox-attached",
+        sandboxPath: sandbox.path,
+      });
     }
 
     const resourceLoader = await createAgentAskResourceLoader({
       root: sessionRoot,
     });
+    throwIfAgentSessionAborted(signal);
     const initialPrompt = await buildInitialAgentPrompt({
       contextItems,
       focusedContextItemId,
@@ -76,24 +158,43 @@ export async function startAgentAskSession({
       root: sessionRoot,
       skillName,
     });
+    throwIfAgentSessionAborted(signal);
     const { session } = await createConfiguredPiAgentSession({
       cwd: sessionRoot,
       noTools: "builtin",
       resourceLoader,
       sessionManager: SessionManager.inMemory(sessionRoot),
     });
+    startup.session = session;
+    if (isAgentSessionAborted(signal)) {
+      throw new Error("Agent session was aborted.");
+    }
     activateAgentAskTools(session, mode);
 
+    const outputFormatter = createPiAgentOutputFormatter();
     const unsubscribe = session.subscribe((event) => {
-      const update = formatPiAgentOutputUpdate(event);
-      if (update !== null) {
-        useAppStore
-          .getState()
-          .actions.agentAsk.recordOutput({ itemId, update });
-      }
+      recordAgentOutputUpdates({
+        itemId,
+        source: "event",
+        updates: outputFormatter.format(event),
+      });
     });
+    startup.unsubscribe = unsubscribe;
+    if (isAgentSessionAborted(signal)) {
+      throw new Error("Agent session was aborted.");
+    }
 
-    agentAskSessions.set(itemId, { sandbox, session, unsubscribe });
+    agentAskSessions.set(itemId, {
+      outputFormatter,
+      sandbox,
+      session,
+      unsubscribe,
+    });
+    startup.registered = true;
+    startup.sandbox = undefined;
+    startup.session = undefined;
+    startup.unsubscribe = undefined;
+    agentAskStartups.delete(itemId);
     useAppStore.getState().actions.agentAsk.recordOutput({
       itemId,
       update: {
@@ -112,14 +213,27 @@ export async function startAgentAskSession({
     });
     await runAgentPrompt(itemId, initialPrompt);
   } catch (error) {
-    if (sandbox !== undefined) {
-      await removeAgentSandbox(sandbox);
-    }
+    await disposeAgentAskStartup(startup);
+    recordSessionRuntimeEvent({
+      errorMessage: error instanceof Error ? error.message : String(error),
+      itemId,
+      kind: "agent-session.failed",
+    });
     useAppStore.getState().actions.agentAsk.fail({
       errorMessage: error instanceof Error ? error.message : String(error),
       itemId,
     });
   }
+}
+
+function throwIfAgentSessionAborted(signal: AbortSignal | undefined) {
+  if (isAgentSessionAborted(signal)) {
+    throw new Error("Agent session was aborted.");
+  }
+}
+
+function isAgentSessionAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
 }
 
 async function buildInitialAgentPrompt({
@@ -180,7 +294,14 @@ export async function sendAgentAskMessage({
   await runAgentPrompt(itemId, message);
 }
 
-export function disposeAgentAskSession(itemId: string) {
+export async function disposeAgentAskSession(itemId: string): Promise<void> {
+  const startup = agentAskStartups.get(itemId);
+  if (startup !== undefined) {
+    startup.abort();
+    await startup.done;
+    return;
+  }
+
   const handle = agentAskSessions.get(itemId);
   if (handle === undefined) {
     return;
@@ -188,10 +309,31 @@ export function disposeAgentAskSession(itemId: string) {
 
   handle.unsubscribe();
   handle.session.dispose();
-  if (handle.sandbox !== undefined) {
-    void removeAgentSandbox(handle.sandbox);
-  }
+  recordSessionRuntimeEvent({
+    itemId,
+    kind: "agent-session.disposed",
+    sandboxPath: handle.sandbox?.path,
+  });
   agentAskSessions.delete(itemId);
+  if (handle.sandbox !== undefined) {
+    await removeAgentSandbox(handle.sandbox);
+  }
+}
+
+export async function disposeAllAgentAskSessions(): Promise<void> {
+  const startups = [...agentAskStartups.values()];
+  for (const startup of startups) {
+    startup.abort();
+  }
+
+  await Promise.all(
+    [
+      ...[...agentAskSessions.keys()].map((itemId) =>
+        disposeAgentAskSession(itemId),
+      ),
+      ...startups.map((startup) => startup.done),
+    ],
+  );
 }
 
 export async function saveAgentSandboxDiffToContext(itemId: string) {
@@ -225,6 +367,11 @@ export async function saveAgentSandboxDiffToContext(itemId: string) {
     diffText: diff.diffText,
     summary: diff.summary,
   });
+  recordSessionRuntimeEvent({
+    itemId,
+    kind: "agent-session.sandbox-diff-saved",
+    summary: diff.summary,
+  });
 }
 
 async function runAgentPrompt(itemId: string, message: string) {
@@ -235,21 +382,75 @@ async function runAgentPrompt(itemId: string, message: string) {
 
   try {
     const wasStreaming = handle.session.isStreaming;
+    recordSessionRuntimeEvent({
+      followUp: wasStreaming,
+      itemId,
+      kind: "agent-session.prompt-started",
+      messageLength: message.length,
+    });
     if (wasStreaming) {
       await handle.session.followUp(message);
       return;
     }
 
+    handle.outputFormatter.beginPrompt();
     await handle.session.prompt(message);
+    recordFinalAgentOutput(itemId, handle);
     if (handle.sandbox !== undefined) {
       await refreshAgentSandboxDiff(itemId, handle.sandbox);
     }
+    recordSessionRuntimeEvent({
+      itemId,
+      kind: "agent-session.prompt-finished",
+    });
     useAppStore.getState().actions.agentAsk.finish({ itemId });
   } catch (error) {
+    recordSessionRuntimeEvent({
+      errorMessage: error instanceof Error ? error.message : String(error),
+      itemId,
+      kind: "agent-session.prompt-failed",
+    });
     useAppStore.getState().actions.agentAsk.fail({
       errorMessage: error instanceof Error ? error.message : String(error),
       itemId,
     });
+  }
+}
+
+function recordFinalAgentOutput(itemId: string, handle: AgentAskHandle) {
+  const updates = handle.outputFormatter.formatFinalMessages(
+    handle.session.messages,
+  );
+  if (updates.length === 0) {
+    return;
+  }
+
+  recordSessionRuntimeEvent({
+    itemId,
+    kind: "agent-session.final-output-reconciled",
+    messageLength: getLatestAssistantText(handle.session.messages)?.length ?? 0,
+    updateCount: updates.length,
+  });
+  recordAgentOutputUpdates({ itemId, source: "final-state", updates });
+}
+
+function recordAgentOutputUpdates({
+  itemId,
+  source,
+  updates,
+}: {
+  itemId: string;
+  source: "event" | "final-state";
+  updates: readonly AgentOutputUpdate[];
+}) {
+  for (const update of updates) {
+    recordSessionRuntimeEvent({
+      itemId,
+      kind: "agent-session.output",
+      source,
+      updateKind: update.kind,
+    });
+    useAppStore.getState().actions.agentAsk.recordOutput({ itemId, update });
   }
 }
 
@@ -280,4 +481,46 @@ async function refreshAgentSandboxDiff(itemId: string, sandbox: AgentSandbox) {
     });
     throw error;
   }
+}
+
+function createStartupAbortHandle(parentSignal: AbortSignal | undefined): {
+  abort: () => void;
+  dispose: () => void;
+  signal: AbortSignal;
+} {
+  const controller = new AbortController();
+  const abort = () => {
+    controller.abort();
+  };
+
+  if (parentSignal?.aborted === true) {
+    controller.abort();
+  } else {
+    parentSignal?.addEventListener("abort", abort, { once: true });
+  }
+
+  return {
+    abort,
+    dispose: () => {
+      parentSignal?.removeEventListener("abort", abort);
+    },
+    signal: controller.signal,
+  };
+}
+
+async function disposeAgentAskStartup(
+  startup: AgentAskStartupHandle,
+): Promise<void> {
+  if (startup.registered) {
+    return;
+  }
+
+  startup.unsubscribe?.();
+  startup.session?.dispose();
+  if (startup.sandbox !== undefined) {
+    await removeAgentSandbox(startup.sandbox);
+  }
+  startup.sandbox = undefined;
+  startup.session = undefined;
+  startup.unsubscribe = undefined;
 }

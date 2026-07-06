@@ -1,0 +1,1 @@
+- When the tool is available, use apply_patch for edits to existing files, mixed create/edit changes, diffs, fixes, and refactors.

@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { promisify } from "node:util";
 import { expect, test } from "bun:test";
 import {
   createFileContextItem,
@@ -16,6 +18,8 @@ import {
   buildLlmContext,
   MAX_FILE_CONTEXT_CHARACTERS,
 } from "./context";
+
+const execFileAsync = promisify(execFile);
 
 test("assembles automatic file context with selected context", () => {
   const selected = createFileContextItem("src/App.tsx");
@@ -98,6 +102,26 @@ test("adds directory automatic context without making it selected context", asyn
   expect(getUserContent(context)).toContain("example.ts");
 });
 
+test("adds untracked files to automatic current diff context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, ".gitignore"), "ignored.txt\n");
+  await writeFile(join(root, "new.ts"), "export const fresh = true;\n");
+  await writeFile(join(root, "ignored.txt"), "ignored\n");
+
+  const { context } = await buildLlmContext({
+    contextItems: [],
+    question: "What changed?",
+    root,
+  });
+
+  const userContent = getUserContent(context);
+  expect(userContent).toContain('<automatic_context name="current_diff">');
+  expect(userContent).toContain("diff --git a/new.ts b/new.ts");
+  expect(userContent).toContain("+export const fresh = true;");
+  expect(userContent).not.toContain("diff --git a/ignored.txt b/ignored.txt");
+});
+
 test("includes AGENTS.md through normal selected file context", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
   await writeFile(join(root, "AGENTS.md"), "Follow the project rules.\n");
@@ -129,7 +153,11 @@ test("builds LLM context from saved responses and diffs", async () => {
         diffText: "--- a/example.ts\n+++ b/example.ts",
         id: "saved:2",
         prompt: "Change the answer",
-        proposal: { summary: "Update answer", edits: [] },
+        proposal: {
+          patch:
+            "*** Begin Patch\n*** Update File: example.ts\n@@\n-old\n+new\n*** End Patch",
+          summary: "Update answer",
+        },
         sourceRequestId: 2,
         summary: "Update answer",
       }),
@@ -173,10 +201,8 @@ test("agent session context includes only the latest assistant message", async (
   const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
   const { context } = await buildLlmContext({
     contextItems: [
-      new PiAgentContextItem(
-        "agent:1",
-        "Investigate routing",
-        [
+      new PiAgentContextItem({
+        blocks: [
           {
             id: "status:1",
             kind: "status",
@@ -213,9 +239,16 @@ test("agent session context includes only the latest assistant message", async (
             timestamp: 5,
           },
         ],
-        "idle",
-        1_700_000_000_000,
-      ),
+        createdAt: 1_700_000_000_000,
+        id: "agent:1",
+        mode: "ask",
+        prompt: "Investigate routing",
+        schemaVersion: 1,
+        sessionAvailability: "live",
+        status: "idle",
+        summaryState: { status: "missing" },
+        type: "pi-agent",
+      }),
     ],
     question: "Use agent context",
     root,
@@ -278,4 +311,8 @@ function getUserContent(
   }
 
   return content;
+}
+
+async function git(root: string, args: readonly string[]) {
+  await execFileAsync("git", ["-C", root, ...args]);
 }

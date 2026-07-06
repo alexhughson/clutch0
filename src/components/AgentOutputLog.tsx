@@ -1,4 +1,5 @@
 import type { AgentOutputBlock } from "../lib/agentOutput/agentOutputTypes";
+import { splitAgentOutputBlocksForDisplay } from "../lib/agentOutput/agentOutputDisplay";
 import { HighlightedMarkdown } from "./SyntaxHighlightedContent";
 
 type AgentOutputLogProps = {
@@ -12,6 +13,52 @@ export function AgentOutputLog({
   emptyMessage = "Waiting for agent output...",
   height,
 }: AgentOutputLogProps) {
+  const { activityBlocks, latestAssistantBlock } =
+    splitAgentOutputBlocksForDisplay(blocks);
+  if (latestAssistantBlock !== null) {
+    const activityHeight =
+      height === undefined ? "35%" : Math.max(1, Math.floor(height / 3));
+    const assistantHeight =
+      height === undefined
+        ? "65%"
+        : Math.max(1, height - Math.max(1, Math.floor(height / 3)));
+
+    return (
+      <box
+        style={{
+          flexDirection: "column",
+          flexGrow: height === undefined ? 1 : undefined,
+          gap: 1,
+          height: height ?? "100%",
+          width: "100%",
+        }}
+      >
+        {activityBlocks.length === 0 ? null : (
+          <scrollbox
+            stickyScroll
+            stickyStart="bottom"
+            style={{ height: activityHeight, width: "100%" }}
+          >
+            {activityBlocks.map((block) => (
+              <AgentOutputBlockView block={block} key={block.id} />
+            ))}
+          </scrollbox>
+        )}
+        <scrollbox
+          stickyScroll
+          stickyStart="bottom"
+          style={{
+            flexGrow: activityBlocks.length === 0 ? 1 : undefined,
+            height: activityBlocks.length === 0 ? "100%" : assistantHeight,
+            width: "100%",
+          }}
+        >
+          <AgentOutputBlockView block={latestAssistantBlock} />
+        </scrollbox>
+      </box>
+    );
+  }
+
   return (
     <scrollbox
       stickyScroll
@@ -25,7 +72,7 @@ export function AgentOutputLog({
       {blocks.length === 0 ? (
         <text style={{ fg: "gray" }}>{emptyMessage}</text>
       ) : (
-        blocks.map((block) => (
+        activityBlocks.map((block) => (
           <AgentOutputBlockView block={block} key={block.id} />
         ))
       )}
@@ -55,8 +102,15 @@ function AgentOutputBlockView({ block }: { block: AgentOutputBlock }) {
   }
 
   return (
-    <box style={{ flexDirection: "column" }}>
-      <text style={{ fg: "gray" }}>assistant:</text>
+    <box
+      style={{
+        backgroundColor: "#111827",
+        flexDirection: "column",
+        paddingX: 2,
+        paddingY: 1,
+        width: "100%",
+      }}
+    >
       <HighlightedMarkdown content={block.text} />
     </box>
   );

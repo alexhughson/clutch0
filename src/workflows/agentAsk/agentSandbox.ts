@@ -16,15 +16,20 @@ export type AgentSandboxDiff = {
 
 export async function createAgentSandbox({
   root = process.cwd(),
+  signal,
 }: {
   root?: string;
+  signal?: AbortSignal;
 } = {}): Promise<AgentSandbox> {
+  throwIfSandboxAborted(signal);
   const resolvedRoot = await realpath(resolve(root));
   const gitRoot = await realpath(
     await gitOutput(["rev-parse", "--show-toplevel"], {
       cwd: resolvedRoot,
+      signal,
     }),
   );
+  throwIfSandboxAborted(signal);
   if (gitRoot !== resolvedRoot) {
     throw new Error(
       `Agent edit sandbox root must be the git repository root. Got ${resolvedRoot}; git root is ${gitRoot}`,
@@ -34,17 +39,29 @@ export async function createAgentSandbox({
   const sandboxPath = await mkdtemp(join(tmpdir(), "clutch-agent-edit-"));
 
   try {
+    throwIfSandboxAborted(signal);
     await gitOutput(["worktree", "add", "--detach", sandboxPath, "HEAD"], {
       cwd: resolvedRoot,
+      signal,
     });
+    throwIfSandboxAborted(signal);
     await replaceWorktreeFilesWithWorkspaceSnapshot({
       root: resolvedRoot,
+      signal,
       sandboxPath,
     });
-    const baselineTree = await writeSnapshotTree(sandboxPath);
+    const baselineTree = await writeSnapshotTree(sandboxPath, signal);
     return { baselineTree, path: sandboxPath, root: resolvedRoot };
   } catch (error) {
-    await removeAgentSandbox({ path: sandboxPath, root: resolvedRoot });
+    try {
+      await removeAgentSandbox({ path: sandboxPath, root: resolvedRoot });
+    } catch (cleanupError) {
+      if (!isSandboxAborted(signal)) {
+        throw new Error(
+          `Agent sandbox creation failed: ${formatErrorMessage(error)} Cleanup failed: ${formatErrorMessage(cleanupError)}`,
+        );
+      }
+    }
     throw error;
   }
 }
@@ -112,26 +129,35 @@ export async function removeAgentSandbox(sandbox: {
 
 async function replaceWorktreeFilesWithWorkspaceSnapshot({
   root,
+  signal,
   sandboxPath,
 }: {
   root: string;
+  signal?: AbortSignal;
   sandboxPath: string;
 }) {
+  throwIfSandboxAborted(signal);
   for (const entry of await readdir(sandboxPath)) {
+    throwIfSandboxAborted(signal);
     if (entry !== ".git") {
       await rm(join(sandboxPath, entry), { force: true, recursive: true });
     }
   }
 
+  throwIfSandboxAborted(signal);
   await cp(root, sandboxPath, {
     errorOnExist: false,
     filter: (source) => basename(source) !== ".git",
     force: true,
     recursive: true,
   });
+  throwIfSandboxAborted(signal);
 }
 
-async function writeSnapshotTree(sandboxPath: string): Promise<string> {
+async function writeSnapshotTree(
+  sandboxPath: string,
+  signal: AbortSignal | undefined,
+): Promise<string> {
   const indexPath = await mkdtemp(
     join(tmpdir(), "clutch-agent-baseline-index-"),
   );
@@ -139,9 +165,13 @@ async function writeSnapshotTree(sandboxPath: string): Promise<string> {
 
   try {
     const env = { GIT_INDEX_FILE: gitIndexFile };
-    await gitOutput(["read-tree", "HEAD"], { cwd: sandboxPath, env });
-    await gitOutput(["add", "-A", "--", "."], { cwd: sandboxPath, env });
-    return await gitOutput(["write-tree"], { cwd: sandboxPath, env });
+    await gitOutput(["read-tree", "HEAD"], { cwd: sandboxPath, env, signal });
+    await gitOutput(["add", "-A", "--", "."], {
+      cwd: sandboxPath,
+      env,
+      signal,
+    });
+    return await gitOutput(["write-tree"], { cwd: sandboxPath, env, signal });
   } finally {
     await rm(indexPath, { force: true, recursive: true });
   }
@@ -153,12 +183,21 @@ function gitOutput(
     cwd: string;
     env?: Record<string, string>;
     input?: string;
+    signal?: AbortSignal;
     trimOutput?: boolean;
   },
 ): Promise<string> {
   return new Promise((resolveOutput, reject) => {
+    if (isSandboxAborted(options.signal)) {
+      reject(new Error("Agent sandbox operation was aborted."));
+      return;
+    }
+
+    let settled = false;
+    let aborted = false;
     const child = spawn("git", args, {
       cwd: options.cwd,
+      detached: true,
       env: { ...process.env, ...options.env },
       stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     });
@@ -174,6 +213,11 @@ function gitOutput(
       return;
     }
 
+    function abort() {
+      aborted = true;
+      killProcessTree(child.pid, "SIGTERM");
+    }
+
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -182,22 +226,89 @@ function gitOutput(
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
-    child.on("error", reject);
+    child.on("error", (error) => {
+      finish(error);
+    });
     child.on("close", (code) => {
-      if (code === 0) {
-        resolveOutput(options.trimOutput === false ? stdout : stdout.trimEnd());
+      if (aborted) {
+        finish(new Error("Agent sandbox operation was aborted."));
         return;
       }
 
-      reject(
+      if (code === 0) {
+        finish(null, options.trimOutput === false ? stdout : stdout.trimEnd());
+        return;
+      }
+
+      finish(
         new Error(
           `git ${args.join(" ")} failed with exit code ${code}: ${stderr.trim()}`,
         ),
       );
     });
 
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (isSandboxAborted(options.signal)) {
+      abort();
+    }
+
     if (options.input !== undefined) {
       child.stdin?.end(options.input);
     }
+
+    function finish(error: Error | null, output?: string) {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      options.signal?.removeEventListener("abort", abort);
+      if (error === null) {
+        resolveOutput(output ?? "");
+      } else {
+        reject(error);
+      }
+    }
   });
+}
+
+function throwIfSandboxAborted(signal: AbortSignal | undefined) {
+  if (isSandboxAborted(signal)) {
+    throw new Error("Agent sandbox operation was aborted.");
+  }
+}
+
+function isSandboxAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function killProcessTree(pid: number | undefined, signal: NodeJS.Signals) {
+  if (pid === undefined) {
+    return;
+  }
+
+  try {
+    process.kill(-pid, signal);
+  } catch (error) {
+    if (!isNoSuchProcessError(error)) {
+      try {
+        process.kill(pid, signal);
+      } catch {
+        // The git process may already have exited between abort and cleanup.
+      }
+    }
+  }
+}
+
+function isNoSuchProcessError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "ESRCH"
+  );
 }

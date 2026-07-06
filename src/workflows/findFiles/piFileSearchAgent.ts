@@ -1,4 +1,8 @@
-import { defineTool, SessionManager } from "@earendil-works/pi-coding-agent";
+import {
+  defineTool,
+  type AgentSession,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { RelevantFileCandidate } from "../../app/appTypes";
 import { buildAgentContextSnapshot } from "../../lib/llm/agentContext";
@@ -8,7 +12,7 @@ import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import type { ContextItem } from "../../types";
 import {
   createAgentToolBlock,
-  formatPiAgentOutputUpdate,
+  createPiAgentOutputFormatter,
 } from "../../lib/agentOutput/piAgentOutputAdapter";
 
 export type RunPiFileSearchAgentOptions = {
@@ -18,6 +22,7 @@ export type RunPiFileSearchAgentOptions = {
   hints: readonly string[];
   onAgentOutput?: (update: AgentOutputUpdate) => void;
   root?: string;
+  signal?: AbortSignal;
 };
 
 export async function runPiFileSearchAgent({
@@ -27,13 +32,19 @@ export async function runPiFileSearchAgent({
   hints,
   onAgentOutput,
   root = process.cwd(),
+  signal,
 }: RunPiFileSearchAgentOptions): Promise<RelevantFileCandidate[]> {
+  if (isAbortSignalAborted(signal)) {
+    throw new Error("File search was aborted.");
+  }
+
   let submittedFiles: RelevantFileCandidate[] | null = null;
   const context = await buildAgentContextSnapshot({
     contextItems,
     focusedContextItemId,
     root,
   });
+  throwIfFileSearchAborted(signal);
 
   const submitRelevantFilesTool = defineTool({
     name: "submit_relevant_files",
@@ -81,33 +92,73 @@ export async function runPiFileSearchAgent({
     },
   });
 
-  const { session } = await createConfiguredPiAgentSession({
+  let session: AgentSession | null = null;
+  let disposed = false;
+  function disposeSession() {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    session?.dispose();
+  }
+
+  const abortHandle = createFileSearchAbortHandle(signal, disposeSession);
+  const sessionCreation = createConfiguredPiAgentSession({
     cwd: root,
     customTools: [submitRelevantFilesTool],
     sessionManager: SessionManager.inMemory(root),
     tools: ["read", "grep", "find", "ls", "submit_relevant_files"],
-  });
-
-  const unsubscribe = session.subscribe((event) => {
-    const update = formatPiAgentOutputUpdate(event);
-    if (update !== null) {
-      onAgentOutput?.(update);
+  }).then((created) => {
+    session = created.session;
+    if (isAbortSignalAborted(signal)) {
+      disposeSession();
+      throw createFileSearchAbortError();
     }
+
+    return created;
   });
+  sessionCreation.catch(() => {});
 
   try {
-    onAgentOutput?.({
-      block: createAgentToolBlock({
-        phase: "start",
-        summary: "file search agent",
-        toolName: "pi",
-      }),
-      kind: "append-block",
+    const created =
+      abortHandle.promise === null
+        ? await sessionCreation
+        : await Promise.race([sessionCreation, abortHandle.promise]);
+    session = created.session;
+
+    const outputFormatter = createPiAgentOutputFormatter();
+    const unsubscribe = session.subscribe((event) => {
+      for (const update of outputFormatter.format(event)) {
+        onAgentOutput?.(update);
+      }
     });
-    await session.prompt(formatSearchPrompt({ context, goal, hints }));
+
+    try {
+      onAgentOutput?.({
+        block: createAgentToolBlock({
+          phase: "start",
+          summary: "file search agent",
+          toolName: "pi",
+        }),
+        kind: "append-block",
+      });
+      outputFormatter.beginPrompt();
+      const prompt = session.prompt(formatSearchPrompt({ context, goal, hints }));
+      await (abortHandle.promise === null
+        ? prompt
+        : Promise.race([prompt, abortHandle.promise]));
+      for (const update of outputFormatter.formatFinalMessages(
+        session.messages,
+      )) {
+        onAgentOutput?.(update);
+      }
+    } finally {
+      unsubscribe();
+      disposeSession();
+    }
   } finally {
-    unsubscribe();
-    session.dispose();
+    abortHandle.dispose();
   }
 
   return submittedFiles ?? [];
@@ -160,4 +211,48 @@ function normalizeCandidates(
 
 function normalizePath(path: string): string {
   return path.trim().replace(/^\.\//, "").split("\\").join("/");
+}
+
+function isAbortSignalAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
+}
+
+function throwIfFileSearchAborted(signal: AbortSignal | undefined) {
+  if (isAbortSignalAborted(signal)) {
+    throw createFileSearchAbortError();
+  }
+}
+
+function createFileSearchAbortError(): Error {
+  return new Error("File search was aborted.");
+}
+
+function createFileSearchAbortHandle(
+  signal: AbortSignal | undefined,
+  onAbort: () => void,
+): { dispose: () => void; promise: Promise<never> | null } {
+  if (signal === undefined) {
+    return { dispose: () => {}, promise: null };
+  }
+
+  let rejectAbort: (error: Error) => void = () => {};
+  const promise = new Promise<never>((_resolve, reject) => {
+    rejectAbort = reject;
+  });
+  const abort = () => {
+    onAbort();
+    rejectAbort(createFileSearchAbortError());
+  };
+
+  signal.addEventListener("abort", abort, { once: true });
+  if (signal.aborted) {
+    abort();
+  }
+
+  return {
+    dispose: () => {
+      signal.removeEventListener("abort", abort);
+    },
+    promise,
+  };
 }

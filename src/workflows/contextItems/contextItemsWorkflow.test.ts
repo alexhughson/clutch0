@@ -35,7 +35,11 @@ test("opening a saved diff routes to the context item viewer task", () => {
     diffText: "diff --git a/a b/a",
     id: "saved:1",
     prompt: "Change a",
-    proposal: { edits: [], summary: "Change a" },
+    proposal: {
+      patch:
+        "*** Begin Patch\n*** Update File: a\n@@\n-old\n+new\n*** End Patch",
+      summary: "Change a",
+    },
     sourceRequestId: 1,
     summary: "Change a",
   });
@@ -62,7 +66,11 @@ test("finishing saved diff apply closes the task and removes the diff", () => {
     diffText: "diff --git a/a b/a",
     id: "saved:1",
     prompt: "Change a",
-    proposal: { edits: [], summary: "Change a" },
+    proposal: {
+      patch:
+        "*** Begin Patch\n*** Update File: a\n@@\n-old\n+new\n*** End Patch",
+      summary: "Change a",
+    },
     sourceRequestId: 1,
     summary: "Change a",
   });

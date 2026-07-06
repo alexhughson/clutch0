@@ -33,7 +33,7 @@ test("separates assistant and thinking stream blocks", () => {
 
 test("tool blocks interrupt stream coalescing", () => {
   const blocks = [
-    delta("thinking", "before"),
+    delta("thinking", "before", "thinking:before"),
     block({
       id: "tool",
       kind: "tool",
@@ -42,7 +42,7 @@ test("tool blocks interrupt stream coalescing", () => {
       timestamp: 1,
       toolName: "grep",
     }),
-    delta("thinking", "after"),
+    delta("thinking", "after", "thinking:after"),
   ].reduce(
     (currentBlocks, update) => applyAgentOutputUpdate(currentBlocks, update),
     [] as AgentOutputBlock[],
@@ -78,15 +78,131 @@ test("caps blocks and stream text", () => {
   ).toEqual(["two", "three"]);
 });
 
+test("does not cut off assistant output at the thinking trace limit", () => {
+  const firstChunk = "a".repeat(4_500);
+  const finalChunk = " final sentence";
+  const blocks = [
+    delta("assistant", firstChunk),
+    delta("assistant", finalChunk),
+  ].reduce(
+    (currentBlocks, update) => applyAgentOutputUpdate(currentBlocks, update),
+    [] as AgentOutputBlock[],
+  );
+
+  expect(blocks[0]).toMatchObject({
+    kind: "stream",
+    streamKind: "assistant",
+    text: `${firstChunk}${finalChunk}`,
+  });
+});
+
+test("does not cap long finalized assistant output by default", () => {
+  const finalText = `${"a".repeat(130_000)} final sentence`;
+  const blocks = applyAgentOutputUpdate([], reconcile(finalText));
+
+  expect(blocks[0]).toMatchObject({
+    kind: "stream",
+    streamKind: "assistant",
+    text: finalText,
+  });
+});
+
+test("keeps default thinking traces bounded", () => {
+  const blocks = applyAgentOutputUpdate(
+    [],
+    delta("thinking", "t".repeat(4_500)),
+  );
+
+  expect(blocks[0]).toMatchObject({
+    kind: "stream",
+    streamKind: "thinking",
+    truncated: true,
+  });
+  expect(
+    blocks[0]?.kind === "stream" ? blocks[0].text.endsWith("…") : false,
+  ).toBe(true);
+});
+
+test("reconciles final assistant text after trailing agent events", () => {
+  const blocks = [
+    delta("assistant", "partial ans"),
+    block(status("pi: turn complete (0 tool result(s))")),
+    reconcile("partial answer with final sentence"),
+    block(status("pi: agent done")),
+  ].reduce(
+    (currentBlocks, update) => applyAgentOutputUpdate(currentBlocks, update),
+    [] as AgentOutputBlock[],
+  );
+
+  expect(blocks).toHaveLength(3);
+  expect(blocks[0]).toMatchObject({
+    kind: "stream",
+    streamKind: "assistant",
+    text: "partial answer with final sentence",
+  });
+});
+
+test("appends reconciled assistant text when no deltas were streamed", () => {
+  const blocks = [
+    block(status("pi: thinking")),
+    reconcile("final answer"),
+  ].reduce(
+    (currentBlocks, update) => applyAgentOutputUpdate(currentBlocks, update),
+    [] as AgentOutputBlock[],
+  );
+
+  expect(blocks[1]).toMatchObject({
+    kind: "stream",
+    streamKind: "assistant",
+    text: "final answer",
+  });
+});
+
+test("does not replace an older assistant message when final text arrives after summarizing without deltas", () => {
+  const blocks = [
+    delta("assistant", "Earlier complete answer."),
+    block(status("pi: compaction started (threshold)")),
+    block(status("pi: compaction ended (threshold)")),
+    reconcile("New final answer after summarizing."),
+    block(status("pi: agent done")),
+  ].reduce(
+    (currentBlocks, update) => applyAgentOutputUpdate(currentBlocks, update),
+    [] as AgentOutputBlock[],
+  );
+
+  const assistantBlocks = blocks.filter(
+    (
+      outputBlock,
+    ): outputBlock is Extract<AgentOutputBlock, { kind: "stream" }> =>
+      outputBlock.kind === "stream" && outputBlock.streamKind === "assistant",
+  );
+
+  expect(assistantBlocks.map((outputBlock) => outputBlock.text)).toEqual([
+    "Earlier complete answer.",
+    "New final answer after summarizing.",
+  ]);
+});
+
 function delta(
   streamKind: "assistant" | "thinking",
   delta: string,
+  id = `delta:${streamKind}`,
 ): AgentOutputUpdate {
   return {
     delta,
-    id: `delta:${streamKind}:${delta}`,
+    id,
     kind: "append-stream-delta",
     streamKind,
+    timestamp: 1,
+  };
+}
+
+function reconcile(text: string): AgentOutputUpdate {
+  return {
+    id: `reconcile:${text}`,
+    kind: "reconcile-stream",
+    streamKind: "assistant",
+    text,
     timestamp: 1,
   };
 }

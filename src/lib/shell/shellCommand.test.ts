@@ -1,0 +1,42 @@
+import { expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { runShellCommand } from "./shellCommand";
+
+test("shell commands can be aborted without marking the run as a timeout", async () => {
+  const controller = new AbortController();
+  const resultPromise = runShellCommand({
+    command: "sleep 10",
+    signal: controller.signal,
+  });
+
+  controller.abort();
+  const result = await resultPromise;
+
+  expect(result.exitCode).toBeNull();
+  expect(result.signal).toBe("SIGTERM");
+  expect(result.timedOut).toBe(false);
+});
+
+test("shell commands respect already-aborted signals", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-shell-aborted-"));
+  const markerPath = join(root, "spawned");
+  const controller = new AbortController();
+  controller.abort();
+
+  try {
+    const result = await runShellCommand({
+      command: `touch ${markerPath}`,
+      signal: controller.signal,
+    });
+
+    expect(result.exitCode).toBeNull();
+    expect(result.signal).toBe("SIGTERM");
+    expect(result.timedOut).toBe(false);
+    expect(existsSync(markerPath)).toBe(false);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+});

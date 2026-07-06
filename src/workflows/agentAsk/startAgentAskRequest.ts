@@ -1,4 +1,5 @@
 import { assembleLlmContextInput } from "../../lib/llm/context";
+import { createRuntimeAbortHandle } from "../../lib/session/runtimeInterrupts";
 import { useAppStore } from "../../store/appStore";
 import type { ComposerState } from "../../app/appTypes";
 import type { AgentAskMode } from "../../types";
@@ -32,13 +33,17 @@ export function startAgentAskRequest(
     return;
   }
 
+  const abortHandle = createRuntimeAbortHandle();
   void startAgentAskSession({
     contextItems,
     focusedContextItemId,
     itemId,
     mode,
     prompt,
+    signal: abortHandle.signal,
     skillName,
+  }).finally(() => {
+    abortHandle.dispose();
   });
 }
 

@@ -1,7 +1,7 @@
 import type { ContextItem } from "../../types";
 import { getLlmWorkflowTools } from "../../workflows/llmTools/toolRegistry";
 import { buildLlmContext, type BuiltLlmContext } from "./context";
-import { patchAwareSystemPrompt, renderPrompt } from "./prompts";
+import { buildPatchAwareSystemPrompt, renderPrompt } from "./prompts";
 
 export type BuildLlmInteractionContextOptions = {
   allowedToolNames?: readonly string[];
@@ -20,13 +20,17 @@ export async function buildLlmInteractionContext({
   question,
   root,
 }: BuildLlmInteractionContextOptions): Promise<BuiltLlmContext> {
+  const tools = getLlmWorkflowTools({ allowedToolNames });
+
   return await buildLlmContext({
     question: formatQuestionForCommand({ commandDirective, question }),
     contextItems,
     focusedContextItemId,
     root,
-    systemPrompt: patchAwareSystemPrompt,
-    tools: getLlmWorkflowTools({ allowedToolNames }),
+    systemPrompt: buildPatchAwareSystemPrompt({
+      toolNames: tools.map((tool) => tool.name),
+    }),
+    tools,
   });
 }
 

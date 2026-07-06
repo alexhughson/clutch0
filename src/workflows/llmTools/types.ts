@@ -1,9 +1,14 @@
 import type { AppActions } from "../../app/appTypes";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import type { CreateFileValidationResult } from "../../lib/createFile/createFile";
-import type { PatchValidationResult } from "../../lib/patch/types";
+import type {
+  PatchReviewState,
+  PatchValidationResult,
+} from "../../lib/patch/types";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 import type { McpToolOutput } from "../../lib/mcp/mcpTypes";
+
+export type PatchToolMode = "apply" | "review";
 
 export type LlmWorkflowToolResult =
   | {
@@ -11,6 +16,7 @@ export type LlmWorkflowToolResult =
       paths: string[];
     }
   | {
+      applyStatus?: PatchReviewState["applyStatus"];
       kind: "patch";
       patch: PatchValidationResult;
     }
@@ -36,6 +42,7 @@ export type LlmSlashCommand = {
   readonly allowedToolNames: readonly string[];
   readonly description: string;
   readonly name: string;
+  readonly patchToolMode?: PatchToolMode;
   readonly promptDirective: string;
   readonly taskKind?:
     | "agent-ask"
@@ -60,6 +67,7 @@ export interface LlmWorkflowToolController {
   }): void;
   routeToolCall(options: {
     root?: string;
+    signal?: AbortSignal;
     toolCall: ToolCall;
   }): Promise<LlmWorkflowToolResult>;
 }

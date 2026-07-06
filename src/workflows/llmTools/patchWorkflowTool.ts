@@ -1,9 +1,9 @@
 import { invariant } from "../../lib/invariant";
 import { editCommandPromptDirective } from "../../lib/llm/prompts";
 import {
+  APPLY_PATCH_TOOL_NAME,
+  applyPatchTool,
   patchProposalFromToolCall,
-  PROPOSE_PATCH_TOOL_NAME,
-  proposePatchTool,
 } from "../../lib/llm/patchTool";
 import { validatePatchProposal } from "../../lib/patch/patchEngine";
 import type { LlmWorkflowToolController } from "./types";
@@ -13,14 +13,15 @@ export const patchWorkflowTool: LlmWorkflowToolController = {
   slashCommand: {
     description: "Ask the LLM to propose a code edit using the patch workflow.",
     name: "edit",
+    patchToolMode: "review",
     promptDirective: editCommandPromptDirective,
     title: "Edit code",
   },
-  tool: proposePatchTool,
+  tool: applyPatchTool,
   handleResult({ actions, requestId, result }) {
     invariant(
       result.kind === "patch",
-      `propose_patch cannot handle ${result.kind} results`,
+      `apply_patch cannot handle ${result.kind} results`,
     );
 
     actions.response.finish({
@@ -29,14 +30,17 @@ export const patchWorkflowTool: LlmWorkflowToolController = {
       responseText: result.responseText,
     });
     actions.response.setPatch({
-      patch: { ...result.patch, applyStatus: "pending" },
+      patch: {
+        ...result.patch,
+        applyStatus: result.applyStatus ?? "pending",
+      },
       requestId,
     });
   },
   async routeToolCall({ root, toolCall }) {
     invariant(
-      toolCall.name === PROPOSE_PATCH_TOOL_NAME,
-      `propose_patch routed unexpected tool ${toolCall.name}`,
+      toolCall.name === APPLY_PATCH_TOOL_NAME,
+      `apply_patch routed unexpected tool ${toolCall.name}`,
     );
 
     const proposal = patchProposalFromToolCall(toolCall);

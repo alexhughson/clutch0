@@ -18,7 +18,7 @@ import {
 type CliOptions = {
   caseFilters: string[];
   casesDir: string;
-  judge: EvalModelSpec | "summarization";
+  judge: EvalModelSpec | "none" | "summarization";
   reportOnly: boolean;
   repeat: number;
   targets: EvalModelSpec[];
@@ -46,7 +46,10 @@ const runDir = join(
 );
 await mkdir(runDir, { recursive: true });
 
-const judgeRequest = await resolveEvalModelRequest(options.judge);
+const judgeRequest =
+  options.judge === "none"
+    ? undefined
+    : await resolveEvalModelRequest(options.judge);
 const targetRequests = await Promise.all(
   options.targets.map((target) => resolveEvalModelRequest(target)),
 );
@@ -57,7 +60,7 @@ const errors: { casePath: string; error: string; target: string }[] = [];
 console.log(
   `running ${cases.length} cases x ${targetRequests.length} targets x ${options.repeat} repeats`,
 );
-console.log(`judge: ${judgeRequest.label}`);
+console.log(`judge: ${judgeRequest?.label ?? "none"}`);
 console.log(`output: ${runDir}`);
 
 for (const targetRequest of targetRequests) {
@@ -104,7 +107,7 @@ for (const targetRequest of targetRequests) {
 
 const report = {
   errors,
-  judge: judgeRequest.label,
+  judge: judgeRequest?.label ?? "none",
   repeat: options.repeat,
   results,
   runDir,
@@ -149,7 +152,7 @@ function parseCliOptions(args: string[]): CliOptions {
   const targets: EvalModelSpec[] = [];
   const caseFilters: string[] = [];
   let casesDir = DEFAULT_EVAL_CASES_DIR;
-  let judge: EvalModelSpec | "summarization" = "summarization";
+  let judge: EvalModelSpec | "none" | "summarization" = "summarization";
   let reportOnly = false;
   let repeat = 3;
 
@@ -161,6 +164,10 @@ function parseCliOptions(args: string[]): CliOptions {
     }
     if (arg === "--judge") {
       judge = parseEvalModelSpec(requiredArg(args, (index += 1), arg));
+      continue;
+    }
+    if (arg === "--no-judge") {
+      judge = "none";
       continue;
     }
     if (arg === "--case") {

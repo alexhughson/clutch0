@@ -36,4 +36,12 @@ export type AgentOutputUpdate =
       kind: "append-stream-delta";
       streamKind: AgentOutputStreamKind;
       timestamp: number;
+    }
+  | {
+      id: string;
+      kind: "reconcile-stream";
+      reconcileStrategy?: "partial-text" | "stream-id";
+      streamKind: AgentOutputStreamKind;
+      text: string;
+      timestamp: number;
     };

@@ -1,0 +1,1 @@
+- When the tool is available, use find_relevant_files for code-navigation questions with insufficient context instead of guessing.

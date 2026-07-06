@@ -41,15 +41,26 @@ export function ContextItemViewerScreen({
   const editableTextDetail =
     item instanceof UserTextContextItem ? item.getEditableDetailView() : null;
   const visibleDetail = liveAgentDetail ?? editableTextDetail ?? detail;
+  const isAgentDetail = visibleDetail?.kind === "agent-output";
   const canAct = screen.applyStatus !== "applying";
   const canRunItemActions =
-    canAct &&
-    visibleDetail?.kind !== "agent-output" &&
-    visibleDetail?.kind !== "editable-text";
+    canAct && !isAgentDetail && visibleDetail?.kind !== "editable-text";
   const itemActions = useMemo(
     () => item?.getActions().filter((action) => action.id !== "open") ?? [],
     [item],
   );
+  const title = isAgentDetail
+    ? undefined
+    : (detail?.title ?? item?.getListLabel() ?? "Context item");
+  const bottomTitle = isAgentDetail
+    ? undefined
+    : canRunItemActions
+      ? getBottomTitle(itemActions)
+      : canAct
+        ? screen.rejectComposer === undefined
+          ? "Esc back"
+          : "Esc edit prompt"
+        : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -120,20 +131,13 @@ export function ContextItemViewerScreen({
 
   return (
     <box
-      title={detail?.title ?? item?.getListLabel() ?? "Context item"}
-      bottomTitle={
-        canRunItemActions
-          ? getBottomTitle(itemActions)
-          : canAct
-            ? screen.rejectComposer === undefined
-              ? "Esc back"
-              : "Esc edit prompt"
-            : undefined
-      }
+      title={title}
+      bottomTitle={bottomTitle}
       bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{
         border: true,
+        borderColor: isAgentDetail ? "#374151" : undefined,
         flexDirection: "column",
         flexGrow: 1,
         gap: 1,
@@ -276,58 +280,107 @@ function AgentDetailView({
     <box
       style={{ flexDirection: "column", flexGrow: 1, gap: 1, height: "100%" }}
     >
-      <text>{`Prompt: ${detail.prompt}`}</text>
-      <text style={{ fg: detail.status === "error" ? "red" : "gray" }}>
-        {detail.status === "running"
-          ? "Agent running…"
-          : detail.status === "error"
-            ? `Agent error: ${detail.errorMessage ?? "unknown error"}`
-            : "Agent idle"}
-      </text>
+      <AgentMetadataPanel detail={detail} />
       {detail.sandbox === undefined ? null : (
-        <box style={{ flexDirection: "column" }}>
+        <box
+          style={{
+            backgroundColor: "#111827",
+            flexDirection: "column",
+            paddingX: 1,
+            paddingY: 1,
+          }}
+        >
           <text>{`Sandbox: ${detail.sandbox.path}`}</text>
           <text>{`Sandbox diff: ${formatSandboxDiffStatus(detail.sandbox)}`}</text>
         </box>
       )}
       <AgentOutputLog blocks={detail.blocks} />
-      <box style={{ flexDirection: "column", gap: 1, height: 3 }}>
-        <text style={{ fg: "gray" }}>Follow-up</text>
-        <input
-          value={message}
-          placeholder="Send a follow-up to this agent session"
-          focused
-          onInput={setMessage}
-          onKeyDown={(event: KeyEvent) => {
-            if (event.ctrl && event.name === "d") {
+      {detail.sessionAvailability === "live" ? (
+        <box style={{ height: 1 }}>
+          <input
+            value={message}
+            placeholder="Send a follow-up to this agent session"
+            focused
+            onInput={setMessage}
+            onKeyDown={(event: KeyEvent) => {
+              if (event.ctrl && event.name === "d") {
+                event.preventDefault();
+                event.stopPropagation();
+                void saveAgentSandboxDiffToContext(detail.itemId);
+                return;
+              }
+
+              if (!isEnterKey(event.name)) {
+                return;
+              }
+
+              const nextMessage = message.trim();
+              if (nextMessage.length === 0) {
+                return;
+              }
+
               event.preventDefault();
               event.stopPropagation();
-              void saveAgentSandboxDiffToContext(detail.itemId);
-              return;
-            }
-
-            if (!isEnterKey(event.name)) {
-              return;
-            }
-
-            const nextMessage = message.trim();
-            if (nextMessage.length === 0) {
-              return;
-            }
-
-            event.preventDefault();
-            event.stopPropagation();
-            setMessage("");
-            void sendAgentAskMessage({
-              itemId: detail.itemId,
-              message: nextMessage,
-            });
-          }}
-          style={{ width: "100%" }}
-        />
-      </box>
+              setMessage("");
+              void sendAgentAskMessage({
+                itemId: detail.itemId,
+                message: nextMessage,
+              });
+            }}
+            style={{ width: "100%" }}
+          />
+        </box>
+      ) : null}
     </box>
   );
+}
+
+function AgentMetadataPanel({
+  detail,
+}: {
+  detail: Extract<ContextItemDetailView, { kind: "agent-output" }>;
+}) {
+  return (
+    <box
+      style={{
+        backgroundColor: "#111827",
+        flexDirection: "column",
+        paddingX: 1,
+        paddingY: 1,
+      }}
+    >
+      <text truncate wrapMode="none">
+        {detail.prompt}
+      </text>
+      <text
+        truncate
+        wrapMode="none"
+        style={{ fg: detail.status === "error" ? "red" : "#94a3b8" }}
+      >
+        {getAgentStatusText(detail)}
+      </text>
+    </box>
+  );
+}
+
+function getAgentStatusText(
+  detail: Extract<ContextItemDetailView, { kind: "agent-output" }>,
+): string {
+  if (detail.status === "running") {
+    return "running";
+  }
+
+  if (detail.sessionAvailability === "detached") {
+    return detail.status === "error"
+      ? `detached: ${detail.errorMessage ?? "interrupted"}`
+      : "detached";
+  }
+
+  if (detail.status === "error") {
+    return `error: ${detail.errorMessage ?? "unknown error"}`;
+  }
+
+  return "idle";
 }
 
 function formatSandboxDiffStatus(

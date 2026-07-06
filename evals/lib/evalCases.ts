@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import type { Context, Tool } from "@earendil-works/pi-ai";
 import type { PatchProposal } from "../../src/lib/patch/types";
+import { patchProposalFromLegacyEdits } from "../../src/lib/patch/patchEngine";
 import type { ShellCommandResult } from "../../src/lib/shell/shellCommand";
 import type { ContextItem } from "../../src/types";
 import {
@@ -438,6 +439,10 @@ function parseContextItemSpec(raw: unknown, path: string): EvalContextItemSpec {
 function parsePatchProposal(raw: unknown, path: string): PatchProposal {
   const proposal = record(raw, `${path} proposal`);
   const summary = stringField(proposal, "summary", path);
+  if (typeof proposal.patch === "string") {
+    return { patch: proposal.patch, summary };
+  }
+
   const edits = arrayField(proposal, "edits", path).map((edit, index) => {
     const recordEdit = record(edit, `${path} proposal.edits[${index}]`);
     return {
@@ -446,7 +451,7 @@ function parsePatchProposal(raw: unknown, path: string): PatchProposal {
       newText: stringField(recordEdit, "newText", path),
     };
   });
-  return { edits, summary };
+  return patchProposalFromLegacyEdits({ edits, summary });
 }
 
 async function readJsonFile(path: string): Promise<unknown> {

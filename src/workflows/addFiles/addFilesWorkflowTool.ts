@@ -10,7 +10,7 @@ export const ADD_CONTEXT_FILES_TOOL_NAME = "add_context_files";
 export const addContextFilesTool: Tool = {
   name: ADD_CONTEXT_FILES_TOOL_NAME,
   description:
-    "Add exact existing project files to the user's selected context. Use when the user asks to add files, or when exact paths are known and adding context is the next step. Do not use for discovery, stack traces, truncated context, or guessed paths from the directory tree; use find_relevant_files instead.",
+    "Add exact existing project files to the user's selected context. Use when the user asks to add files, or when exact paths are known and adding context is the next step. Do not use for discovery, stack traces, truncated context, or guessed paths from the directory tree.",
   parameters: Type.Object({
     paths: Type.Array(Type.String(), {
       description:

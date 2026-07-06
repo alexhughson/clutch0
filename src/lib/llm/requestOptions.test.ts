@@ -101,7 +101,7 @@ test("uses priority service tier for configured OpenAI API key responses models"
   });
 });
 
-test("adds OpenRouter priority service tier to chat-completions payloads", () => {
+test("adds OpenRouter priority service tier and reasoning to chat-completions payloads", () => {
   const model = modelFixture(
     "openrouter",
     32_000,
@@ -120,10 +120,95 @@ test("adds OpenRouter priority service tier to chat-completions payloads", () =>
   expect(usesProviderSpecificRequestOptions(request)).toBe(false);
   expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
     model: "model",
+    reasoning: { effort: "medium", exclude: true },
     service_tier: "priority",
     stream: true,
   });
   expect(options).not.toHaveProperty("serviceTier");
+});
+
+test("turns OpenRouter OpenAI-style reasoning off explicitly", () => {
+  const model = modelFixture(
+    "openrouter",
+    32_000,
+    "openai-completions",
+    "openai/gpt-5.4-mini",
+  );
+  const options = configuredLlmRequestOptions({
+    apiKey: "token",
+    effortLevel: "off",
+    model,
+    serviceTier: "default",
+  });
+
+  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
+    model: "model",
+    reasoning: { effort: "none", exclude: true },
+    stream: true,
+  });
+});
+
+test("uses Gemini minimal as the lowest OpenRouter reasoning level", () => {
+  const model = modelFixture(
+    "openrouter",
+    32_000,
+    "openai-completions",
+    "google/gemini-3.5-flash",
+  );
+  const options = configuredLlmRequestOptions({
+    apiKey: "token",
+    effortLevel: "off",
+    model,
+    serviceTier: "priority",
+  });
+
+  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
+    model: "model",
+    reasoning: { effort: "minimal", exclude: true },
+    service_tier: "priority",
+    stream: true,
+  });
+});
+
+test("maps Gemini xhigh to OpenRouter's highest supported Gemini thinking level", () => {
+  const model = {
+    ...modelFixture(
+      "openrouter",
+      32_000,
+      "openai-completions",
+      "google/gemini-3.1-pro-preview",
+    ),
+    thinkingLevelMap: { xhigh: "high" },
+  } satisfies Model<Api>;
+  const options = configuredLlmRequestOptions({
+    apiKey: "token",
+    effortLevel: "xhigh",
+    model,
+    serviceTier: "default",
+  });
+
+  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
+    model: "model",
+    reasoning: { effort: "high", exclude: true },
+    stream: true,
+  });
+});
+
+test("leaves non-reasoning OpenRouter model payloads unchanged without priority", () => {
+  const model = modelFixture(
+    "openrouter",
+    32_000,
+    "openai-completions",
+    "meta-llama/llama-4.1",
+  );
+  const options = configuredLlmRequestOptions({
+    apiKey: "token",
+    effortLevel: "off",
+    model,
+    serviceTier: "default",
+  });
+
+  expect(options.onPayload).toBeUndefined();
 });
 
 test("rejects priority service tier for unsupported OpenRouter model families", () => {

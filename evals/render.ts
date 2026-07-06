@@ -12,7 +12,7 @@ const cases = await loadEvalCases({ casesDir });
 
 for (const evalCase of cases) {
   const prepared = await prepareEvalCase(evalCase);
-  const promptPath = join(casesDir, evalCase.path, "prompt.md");
+  const promptPath = join(casesDir, evalCase.path, ".prompt.md");
   await mkdir(dirname(promptPath), { recursive: true });
   await writeFile(
     promptPath,

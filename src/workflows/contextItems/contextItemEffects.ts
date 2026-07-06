@@ -3,9 +3,9 @@ import {
   SavedAgentSandboxDiffContextItem,
   SavedDiffContextItem,
 } from "../../lib/context/contextItems";
-import { applyPatchProposal } from "../../lib/patch/patchEngine";
 import { applyAgentSandboxDiff } from "../agentAsk/agentSandbox";
 import { useAppStore } from "../../store/appStore";
+import { applyPatchProposalWithRuntimeEvents } from "../patch/patchApplyRuntime";
 
 export async function applySavedDiffContextItem(itemId: string) {
   const state = useAppStore.getState();
@@ -22,7 +22,11 @@ export async function applySavedDiffContextItem(itemId: string) {
 
   try {
     if (item instanceof SavedDiffContextItem) {
-      const result = await applyPatchProposal({ proposal: item.proposal });
+      const result = await applyPatchProposalWithRuntimeEvents({
+        contextItemId: item.id,
+        proposal: item.proposal,
+        requestId: item.sourceRequestId,
+      });
       if (result.status === "invalid") {
         useAppStore.getState().actions.contextItems.failSavedDiffApply({
           errorMessage: result.errors

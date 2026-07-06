@@ -3,6 +3,7 @@ import type {
   AppActions,
   AppState,
   InProgressLlmRequestForState,
+  LlmRequestLatencyStats,
   LlmRequestState,
 } from "../../app/appTypes";
 import {
@@ -13,7 +14,10 @@ import {
   hasContextItem,
   LiveLlmResponseContextItem,
 } from "../../lib/context/contextItems";
-import type { PatchReviewState } from "../../lib/patch/types";
+import type {
+  PatchProgressState,
+  PatchReviewState,
+} from "../../lib/patch/types";
 
 type SetAppState = (
   partial:
@@ -51,6 +55,10 @@ export function createResponseActions({
       set((state) => saveDiffToContext(state, requestId)),
     saveTextToContext: ({ requestId }) =>
       set((state) => saveTextToContext(state, requestId)),
+    setLatencyStats: ({ latencyStats, requestId }) =>
+      set((state) =>
+        setLatencyStatsOnActiveRequest(state, requestId, latencyStats),
+      ),
     setPatch: ({ patch, requestId }) =>
       set((state) =>
         setPatchOnActiveRequest(
@@ -60,6 +68,10 @@ export function createResponseActions({
           requestId,
         ),
       ),
+    setPatchProgress: ({ progress, requestId }) =>
+      set((state) =>
+        setPatchProgressOnActiveRequest(state, requestId, progress),
+      ),
     startPatchApply: ({ requestId }) =>
       set((state) =>
         updatePatchApplyState(state, requestId, {
@@ -68,6 +80,25 @@ export function createResponseActions({
         }),
       ),
   };
+}
+
+function setLatencyStatsOnActiveRequest(
+  state: AppState,
+  requestId: number,
+  latencyStats: LlmRequestLatencyStats,
+): Partial<AppState> | AppState {
+  const request = getActiveLlmRequest(state, requestId);
+  if (request === null) {
+    return state;
+  }
+
+  return setActiveLlmRequest(state, {
+    ...request,
+    latencyStats: {
+      ...request.latencyStats,
+      ...latencyStats,
+    },
+  });
 }
 
 function appendResponseDelta(
@@ -235,8 +266,10 @@ function setPatchOnActiveRequest(
     };
   }
 
+  const { patchProgress: _patchProgress, ...requestWithoutPatchProgress } =
+    request;
   const requestWithPatch: LlmRequestState = {
-    ...request,
+    ...requestWithoutPatchProgress,
     patch,
   };
 
@@ -298,6 +331,22 @@ function setPatchOnActiveRequest(
       .replace(item)
       .applyTo(state.workspace),
   };
+}
+
+function setPatchProgressOnActiveRequest(
+  state: AppState,
+  requestId: number,
+  progress: PatchProgressState,
+): Partial<AppState> | AppState {
+  if (!isActiveInProgressLlmRequest(state, requestId)) {
+    return state;
+  }
+
+  return setActiveLlmRequest(state, {
+    ...state.activeTask.request,
+    patchProgress: progress,
+    status: "streaming",
+  });
 }
 
 function updatePatchApplyState(

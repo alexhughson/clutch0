@@ -1,9 +1,11 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import type { ToolCall } from "@earendil-works/pi-ai";
-import { PROPOSE_PATCH_TOOL_NAME } from "../../lib/llm/patchTool";
+import type { SessionRecorder } from "../../lib/session/sessionRecorder";
+import { setSessionRecorder } from "../../store/appStore";
+import { APPLY_PATCH_TOOL_NAME } from "../../lib/llm/patchTool";
 import { ADD_CONTEXT_FILES_TOOL_NAME } from "../addFiles/addFilesWorkflowTool";
 import { FIND_RELEVANT_FILES_TOOL_NAME } from "../findFiles/findFilesTool";
 import { CREATE_FILE_TOOL_NAME } from "../createFile/createFileWorkflowTool";
@@ -118,6 +120,220 @@ test("routes shell command tool calls and captures output", async () => {
       command: "printf clutch-cmd",
       exitCode: 0,
       stdout: "clutch-cmd",
+    },
+  });
+});
+
+test("routes apply_patch input tool calls to patch review", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-input-patch-"));
+  await writeFile(join(root, "file.ts"), "const value = 1;\n", "utf8");
+
+  const result = await routeLlmWorkflowToolCalls({
+    root,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: APPLY_PATCH_TOOL_NAME,
+        arguments: {
+          input: [
+            "*** Begin Patch",
+            "*** Update File: file.ts",
+            "@@",
+            "-const value = 1;",
+            "+const value = 2;",
+            "*** End Patch",
+          ].join("\n"),
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  expect(result?.kind).toBe("patch");
+  expect(result?.kind === "patch" ? result.patch.status : "invalid").toBe(
+    "valid",
+  );
+});
+
+test("routes shell apply_patch heredocs into patch review", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-shell-patch-"));
+  await writeFile(join(root, "file.ts"), "const value = 1;\n", "utf8");
+
+  const result = await routeLlmWorkflowToolCalls({
+    allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
+    root,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: RUN_SHELL_COMMAND_TOOL_NAME,
+        arguments: {
+          command: [
+            "apply_patch <<'PATCH'",
+            "*** Begin Patch",
+            "*** Update File: file.ts",
+            "@@",
+            "-const value = 1;",
+            "+const value = 2;",
+            "*** End Patch",
+            "PATCH",
+          ].join("\n"),
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  expect(result?.kind).toBe("patch");
+  expect(result?.kind === "patch" ? result.patch.status : "invalid").toBe(
+    "valid",
+  );
+  expect(await Bun.file(join(root, "file.ts")).text()).toBe(
+    "const value = 1;\n",
+  );
+});
+
+test("routes shell apply_patch argument commands into patch review", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-shell-direct-patch-"));
+  await writeFile(join(root, "file.ts"), "const value = 1;\n", "utf8");
+
+  const result = await routeLlmWorkflowToolCalls({
+    allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
+    root,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: RUN_SHELL_COMMAND_TOOL_NAME,
+        arguments: {
+          command: [
+            "apply_patch '*** Begin Patch",
+            "*** Update File: file.ts",
+            "@@",
+            "-const value = 1;",
+            "+const value = 2;",
+            "*** End Patch'",
+          ].join("\n"),
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  expect(result?.kind).toBe("patch");
+  expect(result?.kind === "patch" ? result.patch.status : "invalid").toBe(
+    "valid",
+  );
+  expect(await Bun.file(join(root, "file.ts")).text()).toBe(
+    "const value = 1;\n",
+  );
+});
+
+test("routes cd shell apply_patch heredocs into root-relative patch review", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-shell-cd-patch-"));
+  await mkdir(join(root, "src"));
+  await writeFile(join(root, "src/file.ts"), "const value = 1;\n", "utf8");
+
+  const result = await routeLlmWorkflowToolCalls({
+    allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
+    root,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: RUN_SHELL_COMMAND_TOOL_NAME,
+        arguments: {
+          command: [
+            "cd src && apply_patch <<'PATCH'",
+            "*** Begin Patch",
+            "*** Update File: file.ts",
+            "@@",
+            "-const value = 1;",
+            "+const value = 2;",
+            "*** End Patch",
+            "PATCH",
+          ].join("\n"),
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  expect(result?.kind).toBe("patch");
+  expect(result?.kind === "patch" ? result.patch.status : "invalid").toBe(
+    "valid",
+  );
+  if (result?.kind !== "patch" || result.patch.status !== "valid") {
+    throw new Error("Expected valid patch result.");
+  }
+  expect(result.patch.diffText).toContain("--- src/file.ts");
+  expect(await Bun.file(join(root, "src/file.ts")).text()).toBe(
+    "const value = 1;\n",
+  );
+});
+
+test("rejects implicit shell patch bodies as patch validation failures", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-shell-implicit-patch-"));
+
+  const result = await routeLlmWorkflowToolCalls({
+    allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
+    root,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: RUN_SHELL_COMMAND_TOOL_NAME,
+        arguments: {
+          command: [
+            "bash -lc '*** Begin Patch",
+            "*** Add File: hello.txt",
+            "+hello",
+            "*** End Patch'",
+          ].join("\n"),
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  expect(result).toMatchObject({
+    kind: "patch",
+    patch: {
+      errors: [
+        {
+          message:
+            'patch detected without explicit call to apply_patch. Rerun as ["apply_patch", "<patch>"]',
+          path: "",
+        },
+      ],
+      status: "invalid",
+    },
+  });
+  expect(await Bun.file(join(root, "hello.txt")).exists()).toBe(false);
+});
+
+test("routes abort signals into shell command tool calls", async () => {
+  const controller = new AbortController();
+  const resultPromise = routeLlmWorkflowToolCalls({
+    allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
+    signal: controller.signal,
+    toolCalls: [
+      {
+        type: "toolCall",
+        id: "tool-1",
+        name: RUN_SHELL_COMMAND_TOOL_NAME,
+        arguments: {
+          command: "sleep 10",
+        },
+      } satisfies ToolCall,
+    ],
+  });
+
+  controller.abort();
+  const result = await resultPromise;
+
+  expect(result).toMatchObject({
+    kind: "command-output",
+    result: {
+      exitCode: null,
+      signal: "SIGTERM",
+      timedOut: false,
     },
   });
 });
@@ -241,7 +457,10 @@ test("derives slash commands from workflow tools plus ask", () => {
   ).toEqual([CREATE_FILE_TOOL_NAME]);
   expect(
     commands.find((command) => command.name === "edit")?.allowedToolNames,
-  ).toEqual([PROPOSE_PATCH_TOOL_NAME]);
+  ).toEqual([APPLY_PATCH_TOOL_NAME]);
+  expect(commands.find((command) => command.name === "edit")?.patchToolMode).toBe(
+    "review",
+  );
   expect(
     commands.find((command) => command.name === "find")?.allowedToolNames,
   ).toEqual([FIND_RELEVANT_FILES_TOOL_NAME]);
@@ -286,6 +505,7 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
 
 test("routes direct MCP tool calls and exposes MCP slash commands", async () => {
   const calls: unknown[] = [];
+  const controller = new AbortController();
   const runtime: McpToolRuntime = {
     async callTool(options) {
       calls.push(options);
@@ -349,6 +569,7 @@ test("routes direct MCP tool calls and exposes MCP slash commands", async () => 
 
     const result = await routeLlmWorkflowToolCalls({
       allowedToolNames: ["mcp_github_search_repositories"],
+      signal: controller.signal,
       toolCalls: [
         {
           arguments: { query: "react" },
@@ -371,12 +592,78 @@ test("routes direct MCP tool calls and exposes MCP slash commands", async () => 
       {
         arguments: { query: "react" },
         serverName: "github",
+        signal: controller.signal,
         toolName: "search_repositories",
       },
     ]);
   } finally {
     setMcpWorkflowResources({ slashCommands: [], toolControllers: [] });
   }
+});
+
+test("MCP workflow routing records runtime lifecycle events", async () => {
+  const runtimeEvents: Record<string, unknown>[] = [];
+  const recorder: SessionRecorder = {
+    close: async () => {},
+    flush: async () => {},
+    recordRuntimeEvent: (event) => {
+      runtimeEvents.push(event);
+    },
+    recordStateChange: () => {},
+  };
+  const runtime: McpToolRuntime = {
+    async callTool(options) {
+      return {
+        arguments: options.arguments,
+        contentText: "ok",
+        isError: false,
+        rawResult: { content: [{ text: "ok", type: "text" }] },
+        serverName: options.serverName,
+        toolName: options.toolName,
+      };
+    },
+    async listTools() {
+      throw new Error("listTools should not be used in this test.");
+    },
+  };
+  setSessionRecorder(recorder);
+  setMcpWorkflowResources(
+    createMcpWorkflowResources({
+      runtime,
+      tools: [
+        {
+          inputSchema: { type: "object" },
+          name: "ping",
+          serverName: "server",
+          slashCommandName: "mcp:server",
+          slashToolName: "mcp:server:ping",
+          toolName: "mcp_server_ping",
+        },
+      ],
+    }),
+  );
+
+  try {
+    await routeLlmWorkflowToolCalls({
+      allowedToolNames: ["mcp_server_ping"],
+      toolCalls: [
+        {
+          arguments: {},
+          id: "tool-1",
+          name: "mcp_server_ping",
+          type: "toolCall",
+        } satisfies ToolCall,
+      ],
+    });
+  } finally {
+    setSessionRecorder(null);
+    setMcpWorkflowResources({ slashCommands: [], toolControllers: [] });
+  }
+
+  expect(runtimeEvents.map((event) => event.kind)).toEqual([
+    "mcp-tool.started",
+    "mcp-tool.finished",
+  ]);
 });
 
 test("parses agent skill slash commands", () => {

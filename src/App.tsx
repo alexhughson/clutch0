@@ -33,9 +33,10 @@ import type { ContextItem, FilePath } from "./types";
 
 type AppProps = {
   filePaths: readonly FilePath[];
+  onExit: () => void;
 };
 
-export function App({ filePaths }: AppProps) {
+export function App({ filePaths, onExit }: AppProps) {
   const actions = useAppStore((state) => state.actions);
   const activeTask = useAppStore((state) => state.activeTask);
   const workspace = useAppStore((state) => state.workspace);
@@ -73,7 +74,8 @@ export function App({ filePaths }: AppProps) {
     }
 
     if (decision === "exit") {
-      process.exit(0);
+      onExit();
+      return;
     }
 
     lastBaseCtrlCAt.current = decision === "arm-exit" ? now : null;

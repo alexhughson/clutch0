@@ -438,6 +438,7 @@ function runSubmissionIntent(
     startLlmRequest(intent.question, {
       allowedToolNames: intent.allowedToolNames,
       commandDirective: intent.commandDirective,
+      patchToolMode: intent.patchToolMode,
       rejectComposer: submittedComposer,
     });
     return;

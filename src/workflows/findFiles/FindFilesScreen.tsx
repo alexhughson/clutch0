@@ -7,10 +7,9 @@ import {
   getFileContextItemId,
   hasContextItem,
 } from "../../lib/context/contextItems";
-import { assembleLlmContextInput } from "../../lib/llm/context";
 import { getVerticalNavigationDirection, isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
-import { runPiFileSearchAgent } from "./piFileSearchAgent";
+import { startFindFilesSearch } from "./findFilesSearchController";
 
 type FindFilesScreenProps = {
   screen: FindFilesScreenState;
@@ -24,42 +23,10 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
       return;
     }
 
-    let cancelled = false;
-    const state = useAppStore.getState();
-    const { contextItems, focusedContextItemId } = assembleLlmContextInput({
-      automaticContextItems: state.workspace.automaticContextItems,
-      contextItems: state.workspace.contextItems,
-      focusedContextItemId: state.workspace.focusedContextItemId,
+    return startFindFilesSearch({
+      actions: actions.findFiles,
+      screen,
     });
-    void runPiFileSearchAgent({
-      contextItems,
-      focusedContextItemId,
-      goal: screen.goal,
-      hints: screen.hints,
-      onAgentOutput: (update) => {
-        if (!cancelled) {
-          actions.findFiles.recordAgentOutput({ update });
-        }
-      },
-    }).then(
-      (candidates) => {
-        if (!cancelled) {
-          actions.findFiles.finish({ candidates });
-        }
-      },
-      (error: unknown) => {
-        if (!cancelled) {
-          actions.findFiles.fail({
-            errorMessage:
-              error instanceof Error ? error.message : String(error),
-          });
-        }
-      },
-    );
-
-    return () => {
-      cancelled = true;
-    };
   }, [actions.findFiles, screen.goal, screen.hints, screen.status]);
 
   useKeyboard((event) => {

@@ -135,36 +135,41 @@ test("renders prompts through real Clutch context and tools", async () => {
 
   expect(prompt).toContain("<file");
   expect(prompt).toContain("src/count.ts");
-  expect(prompt).toContain("propose_patch");
+  expect(prompt).toContain("apply_patch");
   expect(prompt).toContain("User request:");
 });
 
-test("renders the AGENTS.md edit regression with oversized automatic context", async () => {
-  const evalCase = (await loadEvalCases()).find(
-    (candidate) =>
-      candidate.path === "edit-hard/agents-md-clarify-pi-ai-adapter",
-  );
-  expect(evalCase).toBeDefined();
+test(
+  "renders the AGENTS.md edit regression with oversized automatic context",
+  async () => {
+    const evalCase = (await loadEvalCases()).find(
+      (candidate) =>
+        candidate.path === "edit-hard/agents-md-clarify-pi-ai-adapter",
+    );
+    expect(evalCase).toBeDefined();
 
-  const prepared = await prepareEvalCase(evalCase!);
-  const userMessage = String(prepared.context.messages[0]?.content ?? "");
+    const prepared = await prepareEvalCase(evalCase!);
+    const userMessage = String(prepared.context.messages[0]?.content ?? "");
 
-  expect(userMessage.length).toBeGreaterThan(250_000);
-  expect(userMessage).toContain('<automatic_context name="current_diff">');
-  expect(userMessage).toContain('<automatic_context name="directory_tree">');
-  expect(userMessage).toContain("[Context truncated.]");
-  expect(userMessage).toContain(
-    "synthetic/project/packages/very-long-generated-eval-run-output-path-0000",
-  );
-  expect(userMessage).toContain('<file path="AGENTS.md" focused="true">');
-  expect(prepared.context.tools?.map((tool) => tool.name)).toEqual([
-    "propose_patch",
-  ]);
-  expect(evalCase!.expected.repeat).toEqual({ passThreshold: "all" });
-});
+    expect(userMessage.length).toBeGreaterThan(250_000);
+    expect(userMessage).toContain('<automatic_context name="current_diff">');
+    expect(userMessage).toContain('<automatic_context name="directory_tree">');
+    expect(userMessage).toContain("[Context truncated.]");
+    expect(userMessage).toContain(
+      "synthetic/project/packages/very-long-generated-eval-run-output-path-0000",
+    );
+    expect(userMessage).toContain('<file path="AGENTS.md" focused="true">');
+    expect(prepared.context.tools?.map((tool) => tool.name)).toEqual([
+      "apply_patch",
+    ]);
+    expect(evalCase!.expected.repeat).toEqual({ passThreshold: "all" });
+  },
+  15_000,
+);
 
 test("slash command cases restrict tools using Clutch slash command metadata", async () => {
-  const evalCase = (await loadEvalCases()).find(
+  const cases = await loadEvalCases();
+  const evalCase = cases.find(
     (candidate) => candidate.path === "classifier/ask-command-suppresses-tools",
   );
   expect(evalCase).toBeDefined();
@@ -173,6 +178,25 @@ test("slash command cases restrict tools using Clutch slash command metadata", a
 
   expect(prepared.allowedToolNames).toEqual([]);
   expect(prepared.context.tools).toEqual([]);
+  expect(prepared.context.systemPrompt).not.toContain("Workflow tools:");
+  expect(prepared.context.systemPrompt).not.toContain("find_relevant_files");
+
+  const editCase = cases.find(
+    (candidate) => candidate.path === "classifier/edit-command-with-file",
+  );
+  expect(editCase).toBeDefined();
+
+  const preparedEdit = await prepareEvalCase(editCase!);
+
+  expect(preparedEdit.context.tools?.map((tool) => tool.name)).toEqual([
+    "apply_patch",
+  ]);
+  expect(preparedEdit.context.systemPrompt).toContain("apply_patch");
+  expect(preparedEdit.context.systemPrompt).not.toContain(
+    "find_relevant_files",
+  );
+  expect(preparedEdit.context.systemPrompt).not.toContain("add_context_files");
+  expect(preparedEdit.context.systemPrompt).not.toContain("create_file");
 });
 
 test("normalizes assistant messages into classifier results", () => {
@@ -233,13 +257,8 @@ test("writes Clutch validator-generated diffs as eval artifacts", async () => {
           patchValidation: {
             diffText,
             proposal: {
-              edits: [
-                {
-                  newText: "new\n",
-                  oldText: "old\n",
-                  path: "src/example.ts",
-                },
-              ],
+              patch:
+                "*** Begin Patch\n*** Update File: src/example.ts\n@@\n-old\n+new\n*** End Patch",
               summary: "Update example",
             },
             status: "valid",

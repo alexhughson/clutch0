@@ -10,8 +10,11 @@ import type {
   ContextItem,
   ContextItemAction,
   ContextItemDetailView,
+  ContextItemPersistence,
+  ContextItemState,
   ContextItemSummaryState,
   FormattedContextItem,
+  SessionEvent,
 } from "../../types";
 
 const MISSING_SUMMARY_STATE: ContextItemSummaryState = { status: "missing" };
@@ -77,10 +80,21 @@ export function getVisibleContextItemById(
 class UnstagedChangesContextItem implements ContextItem {
   readonly id = UNSTAGED_CHANGES_CONTEXT_ITEM_ID;
   readonly type = "automatic-unstaged-changes";
+  readonly state: ContextItemState & {
+    schemaVersion: 1;
+    type: "automatic-unstaged-changes";
+  };
 
   constructor(
     private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
-  ) {}
+  ) {
+    this.state = {
+      id: this.id,
+      schemaVersion: 1,
+      summaryState,
+      type: this.type,
+    };
+  }
 
   getActions(): readonly ContextItemAction[] {
     return [openContextItemAction(this.id)];
@@ -169,15 +183,37 @@ class UnstagedChangesContextItem implements ContextItem {
   withSummaryState(summaryState: ContextItemSummaryState): ContextItem {
     return new UnstagedChangesContextItem(summaryState);
   }
+
+  getPersistence(): ContextItemPersistence {
+    return {
+      kind: "ephemeral",
+      reason: "Unstaged changes are read from the current workspace.",
+    };
+  }
+
+  getHistoryEvents(): readonly SessionEvent[] {
+    return [];
+  }
 }
 
 class FileListContextItem implements ContextItem {
   readonly id = FILE_LIST_CONTEXT_ITEM_ID;
   readonly type = "automatic-file-list";
+  readonly state: ContextItemState & {
+    schemaVersion: 1;
+    type: "automatic-file-list";
+  };
 
   constructor(
     private readonly summaryState: ContextItemSummaryState = MISSING_SUMMARY_STATE,
-  ) {}
+  ) {
+    this.state = {
+      id: this.id,
+      schemaVersion: 1,
+      summaryState,
+      type: this.type,
+    };
+  }
 
   getActions(): readonly ContextItemAction[] {
     return [openContextItemAction(this.id)];
@@ -240,6 +276,17 @@ class FileListContextItem implements ContextItem {
   withSummaryState(summaryState: ContextItemSummaryState): ContextItem {
     return new FileListContextItem(summaryState);
   }
+
+  getPersistence(): ContextItemPersistence {
+    return {
+      kind: "ephemeral",
+      reason: "File list is read from the current workspace.",
+    };
+  }
+
+  getHistoryEvents(): readonly SessionEvent[] {
+    return [];
+  }
 }
 
 function getAutomaticSummaryView(
@@ -289,11 +336,25 @@ async function readUnstagedChanges({
 }: {
   root: string;
 }): Promise<string> {
-  return readGitDiff({
-    includeStaged: false,
-    maxBuffer: MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS * 2,
-    root,
-  });
+  try {
+    return truncateContent(
+      await readGitDiff({
+        includeStaged: false,
+        maxBuffer: MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS * 2,
+        root,
+      }),
+      MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS,
+    );
+  } catch (error) {
+    if (!isMaxBufferError(error)) {
+      throw error;
+    }
+
+    return truncateContent(
+      getErrorStdout(error),
+      MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS,
+    );
+  }
 }
 
 function gitDiffErrorDetail(error: unknown): ContextItemDetailView {
@@ -306,6 +367,32 @@ function gitDiffErrorDetail(error: unknown): ContextItemDetailView {
 
 function formatUnknownError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isMaxBufferError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code ===
+      "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+  );
+}
+
+function getErrorStdout(error: unknown): string {
+  if (error === null || typeof error !== "object" || !("stdout" in error)) {
+    return "";
+  }
+
+  const stdout = (error as { stdout: unknown }).stdout;
+  return typeof stdout === "string" ? stdout : "";
+}
+
+function truncateContent(content: string, maxCharacters: number): string {
+  if (content.length <= maxCharacters) {
+    return content;
+  }
+
+  return `${content.slice(0, maxCharacters)}\n[Context truncated.]`;
 }
 
 function openContextItemAction(itemId: string): ContextItemAction {

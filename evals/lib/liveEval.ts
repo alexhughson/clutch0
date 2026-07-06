@@ -25,7 +25,11 @@ import {
   configuredLlmRequestOptions,
   usesProviderSpecificRequestOptions,
 } from "../../src/lib/llm/requestOptions";
-import { validatePatchProposal } from "../../src/lib/patch/patchEngine";
+import {
+  getPatchProposalPaths,
+  parseCodexPatch,
+  validatePatchProposal,
+} from "../../src/lib/patch/patchEngine";
 import type {
   PatchProposal,
   PatchValidationResult,
@@ -148,7 +152,7 @@ export async function runPreparedEvalCase({
   repeat,
   targetRequest,
 }: {
-  judgeRequest: EvalModelRequest;
+  judgeRequest?: EvalModelRequest;
   prepared: PreparedEvalCase;
   repeat: number;
   targetRequest: EvalModelRequest;
@@ -182,7 +186,7 @@ export async function runPreparedEvalCaseAttempt({
   prepared,
   targetRequest,
 }: {
-  judgeRequest: EvalModelRequest;
+  judgeRequest?: EvalModelRequest;
   prepared: PreparedEvalCase;
   targetRequest: EvalModelRequest;
 }): Promise<EvalAttemptResult> {
@@ -191,25 +195,40 @@ export async function runPreparedEvalCaseAttempt({
     request: targetRequest,
   });
   const normalized = normalizeAssistantMessage(assistantMessage);
+  const requestFailure = assistantRequestFailure(assistantMessage);
+  if (requestFailure !== null) {
+    return {
+      ...normalized,
+      casePath: prepared.path,
+      failures: [requestFailure],
+      passed: false,
+      target: targetRequest.label,
+    };
+  }
   const failures = await scoreStructuredExpectations({
     normalized,
     prepared,
   });
-  const judge =
-    prepared.expected.judge === undefined
-      ? undefined
-      : await judgeEvalAttempt({
-          judgeRequest,
-          normalized,
-          patchValidation: failures.patchValidation,
-          prepared,
-        });
-
   const failureMessages = failures.failures;
-  if (judge !== undefined && !judge.passed) {
-    failureMessages.push(
-      `judge score ${judge.score} was below ${prepared.expected.judge?.minScore ?? 4}: ${judge.rationale}`,
-    );
+  let judge: JudgeResult | undefined;
+  if (prepared.expected.judge !== undefined && judgeRequest !== undefined) {
+    try {
+      judge = await judgeEvalAttempt({
+        judgeRequest,
+        normalized,
+        patchValidation: failures.patchValidation,
+        prepared,
+      });
+      if (!judge.passed) {
+        failureMessages.push(
+          `judge score ${judge.score} was below ${prepared.expected.judge.minScore ?? 4}: ${judge.rationale}`,
+        );
+      }
+    } catch (error) {
+      failureMessages.push(
+        `judge failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   return {
@@ -221,6 +240,17 @@ export async function runPreparedEvalCaseAttempt({
     patchValidation: failures.patchValidation,
     target: targetRequest.label,
   };
+}
+
+function assistantRequestFailure(message: AssistantMessage): string | null {
+  if (message.stopReason !== "error") {
+    return null;
+  }
+  const errorMessage =
+    "errorMessage" in message && typeof message.errorMessage === "string"
+      ? message.errorMessage
+      : "unknown error";
+  return `target request failed: ${errorMessage}`;
 }
 
 export function normalizeAssistantMessage(
@@ -245,7 +275,10 @@ export function normalizeAssistantMessage(
 
   return {
     assistantText,
-    classification: toolCalls[0]!.name as EvalClassification,
+    classification:
+      toolCalls[0]!.name === "apply_patch"
+        ? "propose_patch"
+        : (toolCalls[0]!.name as EvalClassification),
     rawAssistantMessage: message,
     toolCall: toolCalls[0],
     toolCalls,
@@ -278,10 +311,10 @@ async function scoreStructuredExpectations({
 
   if (
     expected.toolArguments !== undefined &&
-    !matchesExpectedSubset(
-      normalized.toolCall?.arguments,
-      expected.toolArguments,
-    )
+    !toolArgumentsMatch({
+      actual: normalized.toolCall?.arguments,
+      expected: expected.toolArguments,
+    })
   ) {
     failures.push(
       `tool arguments did not include expected subset ${JSON.stringify(expected.toolArguments)}`,
@@ -361,7 +394,7 @@ function scorePatchPathExpectations({
     return;
   }
 
-  const actualPaths = proposal.edits.map((edit) => edit.path);
+  const actualPaths = getPatchProposalPaths(proposal);
   const actualPathSet = new Set(actualPaths);
   for (const path of requiredPaths) {
     if (!actualPathSet.has(path)) {
@@ -575,4 +608,50 @@ function matchesValueSubset(actual: unknown, expected: unknown): boolean {
     );
   }
   return actual === expected;
+}
+
+function toolArgumentsMatch({
+  actual,
+  expected,
+}: {
+  actual: unknown;
+  expected: Record<string, unknown>;
+}): boolean {
+  if (matchesExpectedSubset(actual, expected)) {
+    return true;
+  }
+  if (actual === null || typeof actual !== "object" || Array.isArray(actual)) {
+    return false;
+  }
+
+  const expectedEdits = expected.edits;
+  const patch = (actual as Record<string, unknown>).patch;
+  if (!Array.isArray(expectedEdits) || typeof patch !== "string") {
+    return false;
+  }
+
+  const parsed = parseCodexPatch(patch);
+  if (parsed.status === "invalid") {
+    return false;
+  }
+
+  return expectedEdits.every((edit) => {
+    if (edit === null || typeof edit !== "object" || Array.isArray(edit)) {
+      return false;
+    }
+    const editRecord = edit as Record<string, unknown>;
+    if (typeof editRecord.path !== "string") {
+      return false;
+    }
+    const operation = parsed.patch.operations.find(
+      (candidate) =>
+        candidate.path === editRecord.path ||
+        (candidate.type === "update" && candidate.movePath === editRecord.path),
+    );
+    if (operation === undefined) {
+      return false;
+    }
+
+    return editRecord.oldText === "" ? operation.type === "add" : true;
+  });
 }

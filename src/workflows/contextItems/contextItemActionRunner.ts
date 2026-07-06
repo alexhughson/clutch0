@@ -26,7 +26,7 @@ export function runContextItemAction({
       useAppStore.getState().actions.contextItems.openContextItem({ itemId });
     },
     removeContextItem: (itemId) => {
-      disposeAgentAskSession(itemId);
+      void disposeAgentAskSession(itemId);
       useAppStore.getState().actions.compose.removeContextItem({ itemId });
       if (closeAfterRemove) {
         useAppStore.getState().actions.navigation.dismissPane();
