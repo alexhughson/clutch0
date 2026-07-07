@@ -3,7 +3,12 @@ import { useEffect, useRef, type ReactNode } from "react";
 import type { AppTask, WorkspaceState } from "./app/appTypes";
 import { getCtrlCShortcutDecision, isCtrlCKey } from "./app/ctrlCShortcut";
 import { renderTask } from "./app/taskRegistry";
-import { getWorkspaceLayout, type WorkspaceLayoutMode } from "./app/layout";
+import {
+  getWorkspaceLayout,
+  getWorkspaceStackLayout,
+  WIDE_SUMMARY_HEIGHT,
+  type WorkspaceLayoutMode,
+} from "./app/layout";
 import {
   canUseContextListKeyboardWithPane,
   isWorkspacePaneTask,
@@ -221,7 +226,8 @@ function WorkspaceLayout({
         >
           <text>Clutch0</text>
           <ContextHotkeys
-            contextItems={contextItems}
+            automaticContextItems={workspace.automaticContextItems}
+            contextItems={workspace.contextItems}
             focusedContextItemId={workspace.focusedContextItemId}
             showItemActions={paneTask === null}
           />
@@ -231,7 +237,13 @@ function WorkspaceLayout({
               focusedContextItemId={workspace.focusedContextItemId}
             />
           </box>
-          <box style={{ flexDirection: "column", flexShrink: 0, height: 7 }}>
+          <box
+            style={{
+              flexDirection: "column",
+              flexShrink: 0,
+              height: WIDE_SUMMARY_HEIGHT,
+            }}
+          >
             <FocusedContextItemSummary
               contextItems={contextItems}
               focusedContextItemId={workspace.focusedContextItemId}
@@ -262,20 +274,13 @@ function WorkspaceLayout({
   }
 
   if (mode === "medium") {
-    const summaryHeight = composerHasSuggestions ? 6 : 7;
-    const inputHeight = composerHasSuggestions ? 3 : 4;
-    const suggestionHeight = composerHasSuggestions ? 5 : undefined;
-    const contextHeight = Math.max(
-      3,
-      Math.min(
-        paneTask === null ? 10 : 8,
-        terminalHeight -
-          12 -
-          summaryHeight -
-          inputHeight -
-          (suggestionHeight === undefined ? 0 : suggestionHeight + 1),
-      ),
-    );
+    const { contextHeight, inputHeight, suggestionHeight, summaryHeight } =
+      getWorkspaceStackLayout({
+        composerHasSuggestions,
+        hasPaneTask: paneTask !== null,
+        mode,
+        terminalHeight,
+      });
 
     return (
       <box
@@ -290,7 +295,8 @@ function WorkspaceLayout({
       >
         <text>Clutch0</text>
         <ContextHotkeys
-          contextItems={contextItems}
+          automaticContextItems={workspace.automaticContextItems}
+          contextItems={workspace.contextItems}
           focusedContextItemId={workspace.focusedContextItemId}
           showItemActions={paneTask === null}
         />
@@ -321,17 +327,17 @@ function WorkspaceLayout({
     );
   }
 
-  const compactSuggestionHeight = composerHasSuggestions ? 4 : undefined;
-  const compactInputHeight = 2;
-  const compactSummaryHeight = 5;
-  const compactContextHeight = Math.max(
-    2,
-    terminalHeight -
-      10 -
-      compactSummaryHeight -
-      compactInputHeight -
-      (compactSuggestionHeight === undefined ? 0 : compactSuggestionHeight + 1),
-  );
+  const {
+    contextHeight: compactContextHeight,
+    inputHeight: compactInputHeight,
+    suggestionHeight: compactSuggestionHeight,
+    summaryHeight: compactSummaryHeight,
+  } = getWorkspaceStackLayout({
+    composerHasSuggestions,
+    hasPaneTask: paneTask !== null,
+    mode,
+    terminalHeight,
+  });
 
   return (
     <box
@@ -346,7 +352,8 @@ function WorkspaceLayout({
     >
       <text>Clutch0</text>
       <ContextHotkeys
-        contextItems={contextItems}
+        automaticContextItems={workspace.automaticContextItems}
+        contextItems={workspace.contextItems}
         focusedContextItemId={workspace.focusedContextItemId}
         showItemActions={paneTask === null}
       />
@@ -373,16 +380,21 @@ function WorkspaceLayout({
 }
 
 function ContextHotkeys({
+  automaticContextItems,
   contextItems,
   focusedContextItemId,
   showItemActions,
 }: {
+  automaticContextItems: WorkspaceState["automaticContextItems"];
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
   showItemActions: boolean;
 }) {
-  const focusedItem =
-    contextItems.find((item) => item.id === focusedContextItemId) ?? null;
+  const focusedItem = getVisibleContextItemById(
+    contextItems,
+    focusedContextItemId,
+    automaticContextItems,
+  );
   const hotkeys = [
     "↑/↓ focus",
     ...(showItemActions

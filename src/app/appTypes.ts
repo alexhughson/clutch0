@@ -9,7 +9,6 @@ import type {
   SupportedClutchLlmProvider,
 } from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
-import type { McpToolOutput } from "../lib/mcp/mcpTypes";
 import type {
   AgentAskMode,
   AgentSandboxContext,
@@ -276,13 +275,6 @@ export type AppActions = {
     selectNext: () => void;
     selectPrevious: () => void;
     showSearch: (options: { goal: string; hints: string[] }) => void;
-  };
-  mcp: {
-    finishToolCall: (options: {
-      output: McpToolOutput;
-      requestId: number;
-      responseText: string;
-    }) => void;
   };
   navigation: {
     acceptAndClose: () => void;

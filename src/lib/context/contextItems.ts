@@ -11,7 +11,6 @@ import {
 } from "../patch/patchEngine";
 import type { PatchProposal } from "../patch/types";
 import type { ShellCommandResult } from "../shell/shellCommand";
-import type { McpToolOutput } from "../mcp/mcpTypes";
 import type {
   AgentAskMode,
   AgentSandboxContext,
@@ -28,11 +27,13 @@ import type {
   SessionEvent,
 } from "../../types";
 import {
+  applyDiffAction,
+  openContextItemAction,
+} from "./contextItemActions";
+import {
   formatAgentOutputBlocks,
   formatAttributes,
   formatFile,
-  formatMcpToolOutputForDisplay,
-  formatMcpToolOutputForLlm,
   formatShellCommandOutput,
   getGeneratedSummaryView,
   getLatestAgentAssistantMessage,
@@ -77,13 +78,6 @@ export type ShellCommandOutputContextItemState =
   BaseContextItemState<"shell-command-output"> & {
     createdAt: number;
     result: ShellCommandResult;
-    sourceRequestId: number;
-  };
-
-export type McpToolOutputContextItemState =
-  BaseContextItemState<"mcp-tool-output"> & {
-    createdAt: number;
-    output: McpToolOutput;
     sourceRequestId: number;
   };
 
@@ -136,7 +130,6 @@ export type SavedAgentSandboxDiffContextItemState =
 export type PersistentContextItemState =
   | FileContextItemState
   | LiveLlmResponseContextItemState
-  | McpToolOutputContextItemState
   | PiAgentContextItemState
   | SavedAgentSandboxDiffContextItemState
   | SavedDiffContextItemState
@@ -450,7 +443,7 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
     return {
       consumedFileCharacters: 0,
-      text: `<llm_response${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString() })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<output>\n${truncateContent(this.output, MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n</llm_response>`,
+      text: `<answer${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString() })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<response>\n${truncateContent(this.output, MAX_SAVED_CONTEXT_CHARACTERS)}\n</response>\n</answer>`,
     };
   }
 
@@ -578,7 +571,7 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
     return {
       consumedFileCharacters: 0,
-      text: `<shell_command_output${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), command: this.result.command, exit_code: this.result.exitCode ?? "signal", signal: this.result.signal })}>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</shell_command_output>`,
+      text: `<shell_command${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), exit_code: this.result.exitCode ?? "signal", signal: this.result.signal })}>\n<command>\n${truncateContent(this.result.command, MAX_SAVED_CONTEXT_CHARACTERS)}\n</command>\n<output>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n</shell_command>`,
     };
   }
 
@@ -599,128 +592,6 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
         "shell-command-output.sourceRequestId",
       ),
       type: "shell-command-output",
-    });
-  }
-}
-
-export class McpToolOutputContextItem implements ContextItem<McpToolOutputContextItemState> {
-  readonly type = "mcp-tool-output";
-
-  constructor(readonly state: McpToolOutputContextItemState) {}
-
-  get id(): string {
-    return this.state.id;
-  }
-
-  get output(): McpToolOutput {
-    return this.state.output;
-  }
-
-  get sourceRequestId(): number {
-    return this.state.sourceRequestId;
-  }
-
-  get createdAt(): number {
-    return this.state.createdAt;
-  }
-
-  getListLabel(): string {
-    return this.getSummaryView().title;
-  }
-
-  getSummaryState(): ContextItemSummaryState {
-    return this.state.summaryState;
-  }
-
-  getSummaryView() {
-    return getGeneratedSummaryView(this.state.summaryState, {
-      detail: summarize(formatMcpToolOutputForDisplay(this.output)),
-      title: `MCP ${this.output.serverName}: ${this.output.toolName}`,
-    });
-  }
-
-  withSummaryState(
-    summaryState: ContextItemSummaryState,
-  ): McpToolOutputContextItem {
-    return new McpToolOutputContextItem({ ...this.state, summaryState });
-  }
-
-  getPersistence(): ContextItemPersistence<McpToolOutputContextItemState> {
-    return persistentContextItemState(this.state);
-  }
-
-  getHistoryEvents(previous: ContextItem | null): readonly SessionEvent[] {
-    const baseEvents = contextItemCreatedOrReplacedEvents(this, previous);
-    if (baseEvents !== null) {
-      return baseEvents;
-    }
-
-    if (!(previous instanceof McpToolOutputContextItem)) {
-      return [];
-    }
-
-    return fieldChanged(previous.state, this.state, "output")
-      ? [
-          stateUpdatedEvent({
-            details: {
-              isError: this.output.isError,
-              serverName: this.output.serverName,
-              toolName: this.output.toolName,
-            },
-            item: this,
-            kind: "mcp-tool-output.result-updated",
-          }),
-        ]
-      : [];
-  }
-
-  getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
-  }
-
-  async getSummarizationInput() {
-    const sourceText = `Server: ${this.output.serverName}\nTool: ${this.output.toolName}\nError: ${this.output.isError ? "yes" : "no"}\n\nArguments:\n${safeJsonStringify(this.output.arguments)}\n\nOutput:\n${truncateContent(formatMcpToolOutputForDisplay(this.output), MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
-
-    return {
-      content: sourceText,
-      itemId: this.id,
-      label: `MCP ${this.output.serverName}: ${this.output.toolName}`,
-      sourceHash: hashContent(sourceText),
-      type: this.type,
-    };
-  }
-
-  async getDetailView() {
-    return {
-      content: formatMcpToolOutputForDisplay(this.output),
-      kind: "markdown" as const,
-      title: `MCP ${this.output.serverName}: ${this.output.toolName}`,
-    };
-  }
-
-  async formatForLlm({
-    focused,
-  }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
-    return {
-      consumedFileCharacters: 0,
-      text: `<mcp_tool_output${formatAttributes({ focused, server: this.output.serverName, tool: this.output.toolName, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), is_error: this.output.isError })}>\n<arguments>\n${truncateContent(safeJsonStringify(this.output.arguments), MAX_SAVED_CONTEXT_CHARACTERS)}\n</arguments>\n<result>\n${truncateContent(formatMcpToolOutputForLlm(this.output), MAX_SAVED_CONTEXT_CHARACTERS)}\n</result>\n</mcp_tool_output>`,
-    };
-  }
-
-  static restore(snapshot: unknown): McpToolOutputContextItem {
-    const record = parseContextItemStateBase(snapshot, "mcp-tool-output");
-    return new McpToolOutputContextItem({
-      ...record,
-      createdAt: assertNumber(
-        record.raw.createdAt,
-        "mcp-tool-output.createdAt",
-      ),
-      output: parseMcpToolOutput(record.raw.output, "mcp-tool-output.output"),
-      sourceRequestId: assertNumber(
-        record.raw.sourceRequestId,
-        "mcp-tool-output.sourceRequestId",
-      ),
-      type: "mcp-tool-output",
     });
   }
 }
@@ -813,7 +684,7 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
     return null;
   }
 
-  getEditableDetailView(): Extract<
+  getLiveDetailView(): Extract<
     ContextItemDetailView,
     { kind: "editable-text" }
   > {
@@ -826,7 +697,7 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
   }
 
   async getDetailView() {
-    return this.getEditableDetailView();
+    return this.getLiveDetailView();
   }
 
   async formatForLlm({
@@ -834,7 +705,7 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
     return {
       consumedFileCharacters: 0,
-      text: `<user_text${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString() })}>\n${truncateContent(this.text, MAX_SAVED_CONTEXT_CHARACTERS)}\n</user_text>`,
+      text: `<note${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString() })}>\n${truncateContent(this.text, MAX_SAVED_CONTEXT_CHARACTERS)}\n</note>`,
     };
   }
 
@@ -1003,7 +874,7 @@ export class LiveLlmResponseContextItem implements ContextItem<LiveLlmResponseCo
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
     return {
       consumedFileCharacters: 0,
-      text: `<live_llm_response${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), status: this.status })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<output>\n${truncateContent(this.output, MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n${this.errorMessage === undefined ? "" : `<error>\n${truncateContent(this.errorMessage, MAX_SAVED_CONTEXT_CHARACTERS)}\n</error>\n`}</live_llm_response>`,
+      text: `<answer${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), status: this.status })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<response>\n${truncateContent(this.output, MAX_SAVED_CONTEXT_CHARACTERS)}\n</response>\n${this.errorMessage === undefined ? "" : `<error>\n${truncateContent(this.errorMessage, MAX_SAVED_CONTEXT_CHARACTERS)}\n</error>\n`}</answer>`,
     };
   }
 
@@ -1253,7 +1124,7 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
 
     return {
       consumedFileCharacters: 0,
-      text: `<pi_agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), mode: this.mode, sandbox_path: this.sandbox?.path, sandbox_diff_status: this.sandbox?.diffStatus, status: this.status })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<latest_agent_message>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</latest_agent_message>\n</pi_agent_session>`,
+      text: `<agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), mode: this.mode, sandbox_path: this.sandbox?.path, sandbox_diff_status: this.sandbox?.diffStatus, status: this.status })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<response>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</response>\n</agent_session>`,
     };
   }
 
@@ -1382,7 +1253,7 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
-      applySavedDiffAction(this.id),
+      applyDiffAction(this.id),
       rerunPromptAction({
         expectedResult: "diff",
         prompt: this.prompt,
@@ -1418,7 +1289,7 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
     return {
       consumedFileCharacters: 0,
-      text: `<saved_diff${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString() })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<summary>\n${this.summary}\n</summary>\n<diff>\n${truncateContent(this.diffText, MAX_SAVED_CONTEXT_CHARACTERS)}\n</diff>\n</saved_diff>`,
+      text: `<saved_diff${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString() })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<summary>\n${this.summary}\n</summary>\n<diff>\n${truncateContent(this.diffText, MAX_SAVED_CONTEXT_CHARACTERS)}\n</diff>\n</saved_diff>`,
     };
   }
 
@@ -1525,7 +1396,7 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
-      applyAgentSandboxDiffAction(this.id),
+      applyDiffAction(this.id),
       removeContextItemAction(this.id),
     ];
   }
@@ -1556,7 +1427,7 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
     return {
       consumedFileCharacters: 0,
-      text: `<agent_sandbox_diff${formatAttributes({ focused, source_agent_item_id: this.sourceAgentItemId, created_at: new Date(this.createdAt).toISOString() })}>\n<prompt>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</prompt>\n<summary>\n${truncateContent(this.summary, MAX_SAVED_CONTEXT_CHARACTERS)}\n</summary>\n<diff>\n${truncateContent(this.diffText, MAX_SAVED_CONTEXT_CHARACTERS)}\n</diff>\n</agent_sandbox_diff>`,
+      text: `<agent_sandbox_diff${formatAttributes({ focused, source_agent_item_id: this.sourceAgentItemId, created_at: new Date(this.createdAt).toISOString() })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<summary>\n${truncateContent(this.summary, MAX_SAVED_CONTEXT_CHARACTERS)}\n</summary>\n<diff>\n${truncateContent(this.diffText, MAX_SAVED_CONTEXT_CHARACTERS)}\n</diff>\n</agent_sandbox_diff>`,
     };
   }
 
@@ -1691,28 +1562,6 @@ export function createShellCommandOutputContextItem({
   });
 }
 
-export function createMcpToolOutputContextItem({
-  createdAt,
-  id,
-  output,
-  sourceRequestId,
-}: {
-  createdAt: number;
-  id: string;
-  output: McpToolOutput;
-  sourceRequestId: number;
-}): McpToolOutputContextItem {
-  return new McpToolOutputContextItem({
-    createdAt,
-    id,
-    output: normalizeMcpToolOutputForState(output),
-    schemaVersion: 1,
-    sourceRequestId,
-    summaryState: MISSING_SUMMARY_STATE,
-    type: "mcp-tool-output",
-  });
-}
-
 export function createUserTextContextItem({
   createdAt,
   id,
@@ -1797,7 +1646,6 @@ const contextItemRestorers = {
   file: FileContextItem.restore,
   "llm-response": SavedLlmResponseContextItem.restore,
   "llm-response-live": LiveLlmResponseContextItem.restore,
-  "mcp-tool-output": McpToolOutputContextItem.restore,
   "pi-agent": PiAgentContextItem.restore,
   "shell-command-output": ShellCommandOutputContextItem.restore,
   "user-text": UserTextContextItem.restore,
@@ -2020,23 +1868,6 @@ function parseShellCommandResult(
   };
 }
 
-function parseMcpToolOutput(value: unknown, label: string): McpToolOutput {
-  const record = assertRecord(value, label);
-  const output: McpToolOutput = {
-    arguments: assertRecord(record.arguments, `${label}.arguments`),
-    contentText: assertString(record.contentText, `${label}.contentText`),
-    isError: assertBoolean(record.isError, `${label}.isError`),
-    rawResult: record.rawResult,
-    serverName: assertString(record.serverName, `${label}.serverName`),
-    ...(record.structuredContent === undefined
-      ? {}
-      : { structuredContent: record.structuredContent }),
-    toolName: assertString(record.toolName, `${label}.toolName`),
-  };
-
-  return normalizeMcpToolOutputForState(output);
-}
-
 function parsePatchProposal(value: unknown, label: string): PatchProposal {
   const record = assertRecord(value, label);
   if (record.patch !== undefined) {
@@ -2095,18 +1926,6 @@ function parseAgentSandboxContext(
     ...(record.summary === undefined
       ? {}
       : { summary: assertString(record.summary, `${label}.summary`) }),
-  };
-}
-
-function normalizeMcpToolOutputForState(output: McpToolOutput): McpToolOutput {
-  return {
-    ...output,
-    arguments: sanitizeJsonValue(output.arguments) as Record<string, unknown>,
-    rawResult: sanitizeJsonValue(output.rawResult),
-    structuredContent:
-      output.structuredContent === undefined
-        ? undefined
-        : sanitizeJsonValue(output.structuredContent),
   };
 }
 
@@ -2196,33 +2015,6 @@ export function getContextItemById(
   return contextItems.find((item) => item.id === itemId) ?? null;
 }
 
-function openContextItemAction(itemId: string): ContextItemAction {
-  return {
-    id: "open",
-    label: "open",
-    shortcut: { ctrl: true, display: "Ctrl+o", name: "o" },
-    run: (context) => context.openContextItem(itemId),
-  };
-}
-
-function applySavedDiffAction(itemId: string): ContextItemAction {
-  return {
-    id: "apply",
-    label: "apply",
-    shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
-    run: (context) => context.applySavedDiff(itemId),
-  };
-}
-
-function applyAgentSandboxDiffAction(itemId: string): ContextItemAction {
-  return {
-    id: "apply",
-    label: "apply",
-    shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
-    run: (context) => context.applyAgentSandboxDiff(itemId),
-  };
-}
-
 function saveAgentSandboxDiffAction(itemId: string): ContextItemAction {
   return {
     id: "save-agent-diff",
@@ -2236,6 +2028,7 @@ function removeContextItemAction(itemId: string): ContextItemAction {
   return {
     id: "remove",
     label: "remove",
+    paneShortcut: { display: "x", name: "x" },
     shortcut: { ctrl: true, display: "Ctrl+x", name: "x" },
     run: (context) => context.removeContextItem(itemId),
   };
@@ -2253,6 +2046,7 @@ function rerunPromptAction({
   return {
     id: "rerun",
     label: "rerun",
+    paneShortcut: { display: "r", name: "r" },
     shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
     run: (context) =>
       context.rerunPrompt({ expectedResult, prompt, replaceContextItemId }),
@@ -2269,6 +2063,7 @@ function rerunShellCommandAction({
   return {
     id: "rerun",
     label: "rerun",
+    paneShortcut: { display: "r", name: "r" },
     shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
     run: (context) =>
       context.rerunShellCommand({ command, replaceContextItemId }),

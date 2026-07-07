@@ -35,7 +35,6 @@ test("loads pi skills as agent-ask slash commands", async () => {
     description: "Review project-specific conventions.",
     name: "skill:project-review",
     promptDirective: "",
-    taskKind: "agent-skill",
     title: "Skill: project-review",
   });
 });

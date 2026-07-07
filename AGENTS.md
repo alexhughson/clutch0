@@ -34,6 +34,10 @@ Composer UI/controller/model live in `src/components/MessageComposer/`.
 
 `@file` selection adds `FileContextItem`s. Keyboard shortcuts either navigate suggestions or run the focused context item's actions.
 
+Slash commands are declared in `src/workflows/llmTools/toolRegistry.ts` and executed through each command's `run` handler in `src/workflows/slashCommands/`. Composer submission parses `/name input`, looks up the command, and calls `run` directly.
+
+Compose reruns intentionally overwrite `activeTask` even when a response pane is open. Other slash-started workflows keep the `activeTask !== null` mutex and no-op instead. Stream completions remain safe via per-request guards.
+
 ## LLM requests and tools
 
 Request start/effects: `src/workflows/llmRequest/startLlmRequest.ts`  

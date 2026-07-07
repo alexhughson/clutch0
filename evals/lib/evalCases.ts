@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import type { Context, Tool } from "@earendil-works/pi-ai";
+import type { LlmContext } from "../../src/lib/llm/types";
 import type { PatchProposal } from "../../src/lib/patch/types";
 import { patchProposalFromLegacyEdits } from "../../src/lib/patch/patchEngine";
 import type { ShellCommandResult } from "../../src/lib/shell/shellCommand";
@@ -41,7 +41,7 @@ export type EvalCase = {
 
 export type PreparedEvalCase = EvalCase & {
   allowedToolNames?: readonly string[];
-  context: Context;
+  context: LlmContext;
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
   root: string;

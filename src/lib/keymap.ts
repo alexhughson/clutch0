@@ -33,6 +33,18 @@ export function isEnterKey(keyName: string): boolean {
   );
 }
 
+export function isOpenFocusedContextItemKey(event: KeyEvent): boolean {
+  return (
+    event.name === "o" &&
+    event.ctrl &&
+    !event.shift &&
+    !event.meta &&
+    !event.option &&
+    !event.super &&
+    !event.hyper
+  );
+}
+
 export function getKeyAction<Action extends string>(
   event: KeyEvent,
   bindings: readonly KeyBinding<Action>[],

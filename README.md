@@ -6,7 +6,7 @@ Clutch0 is a largely vibe coded prototype. It is probably buggy, but I am pushin
 
 Clutch tries to make AI coding feel more like driving a standard transmission. You issue the command for each next action rather than an agent loop, anachronistically involving you in tasks that could be automated so that you stay connected to what is happening.
 
-Inspired by the Composer feature that Cursor launched briefly before adding their agent, you build a context window from files, command outputs, mcp calls, and have the LLM perform operations one at a time.
+Inspired by the Composer feature that Cursor launched briefly before adding their agent, you build a context window from files, command outputs, saved answers, and have the LLM perform operations one at a time.
 
 <img width="1303" height="610" alt="image" src="https://github.com/user-attachments/assets/cb51357e-4c4b-435c-bc1b-b2523d85cef7" />
 
@@ -33,14 +33,6 @@ Connect an LLM - The UX feels better with a fast LLM like GPT-5.4 mini or someth
 Type @ and a file name in the input box to add it to context. Or issue the /add command and mention some files to add (the add command can only see paths not contents)
 
 Highlight one of those files and issue an /edit command to make an edit
-
-## Cursor Composer adapter
-
-Clutch can use Cursor Composer models through the [Cursor TypeScript SDK](https://cursor.com/docs/sdk/typescript) as a primary model provider. Run `/config`, add a Cursor API key, choose Cursor for the Primary model, and select the Composer 2.5 Fast model variant from the SDK model list.
-
-The Cursor SDK exposes Composer through an agent executor, not a plain chat-completions API. Clutch uses a small Node worker around the SDK's local executor, stores the SDK model selection in model metadata, and formats the current Clutch context as one Composer prompt. Clutch workflow tools are exposed as SDK custom tools and captured back into Clutch's normal tool router. Cursor's own built-in tools are blocked so ordinary Clutch completions do not run Cursor-side shell, write, or edit operations.
-
-Cursor is primary-model only. Configure agent and summarization models with OpenAI, OpenRouter, or another regular provider.
 
 ## Some potential taglines
 
@@ -99,26 +91,6 @@ Ask the LLM a question. The answer can be saved into context, and re-run.
 - ### /say
 
 Add your text directly to the context list without calling the LLM. The new context item opens immediately and can be edited in place.
-
-- ### /mcp:server and /mcp:server:tool
-
-Call configured MCP tools. Clutch reads MCP config from `~/.config/mcp/mcp.json`, `~/.clutch/mcp.json`, `.mcp.json`, and `.clutch/mcp.json`. Only tools enabled by `directTools` are exposed to the core classifier and slash commands. MCP tool outputs are saved as context items.
-
-Example:
-
-```json
-{
-  "settings": { "toolPrefix": "short", "directTools": false },
-  "mcpServers": {
-    "github-mcp": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_TOKEN": "${GITHUB_TOKEN}" },
-      "directTools": ["search_repositories"]
-    }
-  }
-}
-```
 
 - ### /agent-ask
 

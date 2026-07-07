@@ -135,6 +135,8 @@ function startLlmRequest({
   replacement?: ContextItemReplacementTarget;
   set: SetAppState;
 }): number | null {
+  // Compose reruns intentionally overwrite activeTask even when a response pane
+  // is already open. Other workflows keep the activeTask mutex and no-op instead.
   const state = get();
   const requestId = state.nextLlmRequestId;
   const { contextItems, focusedContextItemId } = assembleLlmContextInput({

@@ -1,31 +1,36 @@
-import type { Context, Tool } from "@earendil-works/pi-ai";
 import {
   MAX_TOTAL_FILE_CONTEXT_CHARACTERS,
   getContextItemById,
 } from "../context/contextItems";
-import { getAutomaticFileContextItems } from "../context/automaticContextItems";
-import { loadFileList } from "../fileListLoader";
-import { readGitDiff } from "../git/gitDiff";
+import {
+  getAutomaticFileContextItems,
+  getAmbientLlmContextItems,
+  getAutomaticContextBlockName,
+} from "../context/automaticContextItems";
 import type { ContextItem, LlmFileContext } from "../../types";
 import { defaultSystemPrompt, renderPrompt } from "./prompts";
+import type { LlmContext, LlmTool, LlmUserMessage } from "./types";
 
 export { MAX_FILE_CONTEXT_CHARACTERS } from "../context/contextItems";
-export const MAX_DIFF_CONTEXT_CHARACTERS = 120_000;
-export const MAX_DIRECTORY_TREE_ENTRIES = 1_000;
+export {
+  MAX_DIFF_CONTEXT_CHARACTERS,
+  MAX_DIRECTORY_TREE_ENTRIES,
+} from "../context/automaticContextItems";
 
 export type BuildLlmContextOptions = {
+  ambientContextItems?: readonly ContextItem[];
   contextItems: readonly ContextItem[];
   focusedContextItemId?: string | null;
   question: string;
   root?: string;
   systemPrompt?: string;
-  tools?: Tool[];
+  tools?: LlmTool[];
 };
 
 export type { LlmFileContext } from "../../types";
 
 export type BuiltLlmContext = {
-  context: Context;
+  context: LlmContext;
   files: LlmFileContext[];
 };
 
@@ -64,6 +69,7 @@ export function assembleLlmContextInput({
 }
 
 export async function buildLlmContext({
+  ambientContextItems = getAmbientLlmContextItems(),
   contextItems,
   focusedContextItemId = null,
   question,
@@ -76,29 +82,62 @@ export async function buildLlmContext({
     focusedContextItemId,
     root,
   });
-  const automaticContext = await buildAutomaticContext({ root });
+  const automaticContext = await formatAutomaticContextFromItems({
+    ambientContextItems,
+    root,
+  });
 
   return {
     context: {
       systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: formatUserMessage({
-            automaticContext,
-            focusedContextItem:
-              focusedContextItemId === null
-                ? null
-                : getContextItemById(contextItems, focusedContextItemId),
-            question,
-            selectedContextText: selectedContext.text,
-          }),
-          timestamp: Date.now(),
-        },
-      ],
+      messages: buildUserMessages({
+        automaticContext,
+        focusedContextItem:
+          focusedContextItemId === null
+            ? null
+            : getContextItemById(contextItems, focusedContextItemId),
+        question,
+        selectedContextMessages: selectedContext.messages,
+      }),
       tools,
     },
     files: selectedContext.files,
+  };
+}
+
+function buildUserMessages({
+  automaticContext,
+  focusedContextItem,
+  question,
+  selectedContextMessages,
+}: {
+  automaticContext: readonly AutomaticContextBlock[];
+  focusedContextItem: ContextItem | null;
+  question: string;
+  selectedContextMessages: readonly string[];
+}): LlmUserMessage[] {
+  const timestamp = Date.now();
+  return [
+    userTextMessage(
+      formatAutomaticContextReferenceMessage(automaticContext),
+      timestamp,
+    ),
+    ...selectedContextMessages.map((content) =>
+      userTextMessage(content, timestamp),
+    ),
+    userTextMessage(
+      formatSelectedContextItemMessage(focusedContextItem),
+      timestamp,
+    ),
+    userTextMessage(formatUserRequestMessage(question), timestamp),
+  ];
+}
+
+function userTextMessage(content: string, timestamp: number): LlmUserMessage {
+  return {
+    content,
+    role: "user",
+    timestamp,
   };
 }
 
@@ -110,13 +149,13 @@ async function formatSelectedContextItems({
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
   root: string;
-}): Promise<{ files: LlmFileContext[]; text: string }> {
+}): Promise<{ files: LlmFileContext[]; messages: string[] }> {
   if (contextItems.length === 0) {
-    return { files: [], text: "No selected context items." };
+    return { files: [], messages: [] };
   }
 
   const files: LlmFileContext[] = [];
-  const formattedItems: string[] = [];
+  const messages: string[] = [];
   let remainingFileCharacters = MAX_TOTAL_FILE_CONTEXT_CHARACTERS;
 
   for (const item of contextItems) {
@@ -126,42 +165,57 @@ async function formatSelectedContextItems({
       root,
     });
 
-    formattedItems.push(formatted.text);
+    messages.push(formatted.text);
     remainingFileCharacters -= formatted.consumedFileCharacters;
     if (formatted.file !== undefined) {
       files.push(formatted.file);
     }
   }
 
-  return { files, text: formattedItems.join("\n\n") };
+  return { files, messages };
 }
 
-function formatUserMessage({
-  automaticContext,
-  focusedContextItem,
-  question,
-  selectedContextText,
-}: {
-  automaticContext: readonly AutomaticContextBlock[];
-  focusedContextItem: ContextItem | null;
-  question: string;
-  selectedContextText: string;
-}): string {
+function formatAutomaticContextReferenceMessage(
+  automaticContext: readonly AutomaticContextBlock[],
+): string {
   const automaticContextText =
     automaticContext.length === 0
       ? "No automatic context available."
       : formatAutomaticContext(automaticContext);
-  const focusedContextText =
-    focusedContextItem === null
-      ? "No focused context item."
-      : focusedContextItem.getListLabel();
 
-  return renderPrompt("context/user-message.md", {
+  return renderPrompt("context/automatic-context-reference.md", {
     automaticContext: automaticContextText,
-    focusedContextItem: focusedContextText,
-    question,
-    selectedContext: selectedContextText,
   });
+}
+
+function formatSelectedContextItemMessage(
+  selectedContextItem: ContextItem | null,
+): string {
+  const selectedContextItemText =
+    selectedContextItem === null
+      ? "No selected context item."
+      : selectedContextItem.getListLabel();
+
+  return renderPrompt("context/selected-context-item.md", {
+    selectedContextItem: selectedContextItemText,
+  });
+}
+
+function formatUserRequestMessage(question: string): string {
+  return renderPrompt("context/user-request.md", { question });
+}
+
+export function joinTextUserMessages(context: LlmContext): string {
+  return context.messages
+    .map((message) => {
+      if (message.role !== "user" || typeof message.content !== "string") {
+        return null;
+      }
+
+      return message.content;
+    })
+    .filter((content): content is string => content !== null)
+    .join("\n\n");
 }
 
 type AutomaticContextBlock = {
@@ -169,71 +223,37 @@ type AutomaticContextBlock = {
   name: string;
 };
 
-async function buildAutomaticContext({
+async function formatAutomaticContextFromItems({
+  ambientContextItems,
   root,
 }: {
+  ambientContextItems: readonly ContextItem[];
   root: string;
 }): Promise<AutomaticContextBlock[]> {
-  const [diff, directoryTree] = await Promise.all([
-    readOptionalCurrentDiffContext({ root }),
-    readDirectoryTreeContext({ root }),
-  ]);
+  const blocks: AutomaticContextBlock[] = [];
 
-  return [diff, directoryTree].filter(
-    (block): block is AutomaticContextBlock => block !== null,
-  );
-}
-
-async function readOptionalCurrentDiffContext({
-  root,
-}: {
-  root: string;
-}): Promise<AutomaticContextBlock | null> {
-  try {
-    const stdout = await readGitDiff({
-      includeStaged: true,
-      maxBuffer: MAX_DIFF_CONTEXT_CHARACTERS * 2,
-      root,
-    }).catch(() =>
-      readGitDiff({
-        includeStaged: false,
-        maxBuffer: MAX_DIFF_CONTEXT_CHARACTERS * 2,
-        root,
-      }),
-    );
-    if (stdout.trim().length === 0) {
-      return null;
+  for (const item of ambientContextItems) {
+    const blockName = getAutomaticContextBlockName(item.type);
+    if (blockName === null) {
+      continue;
     }
 
-    return {
-      name: "current_diff",
-      content: truncateContent(stdout, MAX_DIFF_CONTEXT_CHARACTERS),
-    };
-  } catch {
-    return null;
-  }
-}
+    const formatted = await item.formatForLlm({
+      focused: false,
+      remainingFileCharacters: Number.POSITIVE_INFINITY,
+      root,
+    });
+    if (formatted.text.trim().length === 0) {
+      continue;
+    }
 
-async function readDirectoryTreeContext({
-  root,
-}: {
-  root: string;
-}): Promise<AutomaticContextBlock | null> {
-  const filePaths = await loadFileList({ root });
-  if (filePaths.length === 0) {
-    return null;
+    blocks.push({
+      content: formatted.text,
+      name: blockName,
+    });
   }
 
-  const visibleFilePaths = filePaths.slice(0, MAX_DIRECTORY_TREE_ENTRIES);
-  const truncatedNote =
-    filePaths.length > visibleFilePaths.length
-      ? `\n[Directory tree truncated after ${visibleFilePaths.length} of ${filePaths.length} files.]`
-      : "";
-
-  return {
-    name: "directory_tree",
-    content: `${visibleFilePaths.join("\n")}${truncatedNote}`,
-  };
+  return blocks;
 }
 
 function formatAutomaticContext(
@@ -245,12 +265,4 @@ function formatAutomaticContext(
         `<automatic_context name=${JSON.stringify(block.name)}>\n${block.content}\n</automatic_context>`,
     )
     .join("\n\n");
-}
-
-function truncateContent(content: string, maxCharacters: number): string {
-  if (content.length <= maxCharacters) {
-    return content;
-  }
-
-  return `${content.slice(0, maxCharacters)}\n[Context truncated.]`;
 }

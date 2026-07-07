@@ -18,7 +18,6 @@ export const CLUTCH_CONFIG_DIR_ENV = "CLUTCH_CONFIG_DIR";
 
 export const SUPPORTED_CLUTCH_LLM_PROVIDERS = [
   { id: "cerebras", label: "Cerebras" },
-  { id: "cursor", label: "Cursor" },
   { id: "google", label: "Google Gemini" },
   { id: "openai", label: "OpenAI" },
   { id: "openai-codex", label: "OpenAI subscription" },
@@ -195,8 +194,6 @@ export function resolveConfiguredLlmModel(
       `Clutch ${role} model "${selection.model}" for provider "${selection.provider}" is missing dynamic model metadata. Run /config to re-select it.`,
     );
   }
-  assertProviderSupportsModelRole(selection.provider, role);
-
   const credential = auth[selection.provider];
   if (!hasUsableCredential(credential)) {
     throw new Error(
@@ -389,7 +386,7 @@ export function createDefaultClutchConfigDraft(
   return {
     agent: getExistingOrEmptyModelSelection({
       model: settings.models?.agent ?? settings.models?.primary,
-      provider: modelRoleProviderOrDefault(agentProvider, "agent"),
+      provider: agentProvider,
     }),
     configuredProviders: SUPPORTED_CLUTCH_LLM_PROVIDERS.map(
       (candidate) => candidate.id,
@@ -400,10 +397,7 @@ export function createDefaultClutchConfigDraft(
     }),
     summarization: getExistingOrEmptyModelSelection({
       model: settings.models?.summarization,
-      provider: modelRoleProviderOrDefault(
-        summarizationProvider,
-        "summarization",
-      ),
+      provider: summarizationProvider,
     }),
   };
 }
@@ -639,27 +633,6 @@ function assertUsableModelSelection(
       `Clutch ${role} model "${selection.model}" for provider "${selection.provider}" is missing dynamic model metadata.`,
     );
   }
-  assertProviderSupportsModelRole(selection.provider, role);
-}
-
-function assertProviderSupportsModelRole(
-  provider: SupportedClutchLlmProvider,
-  role: ClutchModelRole,
-) {
-  if (provider === "cursor" && role !== "primary") {
-    throw new Error(
-      "Cursor Composer is only supported for the Clutch primary model.",
-    );
-  }
-}
-
-function modelRoleProviderOrDefault(
-  provider: SupportedClutchLlmProvider,
-  role: ClutchModelRole,
-): SupportedClutchLlmProvider {
-  return provider === "cursor" && role !== "primary"
-    ? DEFAULT_PROVIDER
-    : provider;
 }
 
 function assertConfiguredProviderCredential(

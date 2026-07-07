@@ -12,17 +12,16 @@ export const CREATE_FILE_TOOL_NAME = "create_file";
 export const createFileTool: Tool = {
   name: CREATE_FILE_TOOL_NAME,
   description:
-    "Propose a new file for the user to review before it is created. This only proposes creation; it does not write files.",
+    "Propose one new file for review. Does not write files.",
   parameters: Type.Object({
     summary: Type.String({
-      description: "A concise summary of the proposed new file.",
+      description: "Concise file purpose.",
     }),
     path: Type.String({
-      description:
-        "Path for the new file, relative to the working directory. Must not already exist.",
+      description: "New project-relative path.",
     }),
     content: Type.String({
-      description: "The full contents to write to the new file.",
+      description: "Full file contents.",
     }),
   }),
 };

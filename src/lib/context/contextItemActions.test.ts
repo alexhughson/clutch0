@@ -3,7 +3,9 @@ import { expect, test } from "bun:test";
 import type { ContextItemAction } from "../../types";
 import {
   formatContextItemAction,
+  formatPaneActionHints,
   getContextItemActionForKeyEvent,
+  getContextItemActionForPaneKeyEvent,
 } from "./contextItemActions";
 
 const rerunAction: ContextItemAction = {
@@ -31,6 +33,30 @@ test("matches context item actions by exact shortcut modifiers", () => {
 
 test("formats context item action shortcuts", () => {
   expect(formatContextItemAction(rerunAction)).toBe("Ctrl+r rerun");
+});
+
+test("matches pane shortcuts without modifier keys", () => {
+  const applyAction: ContextItemAction = {
+    id: "apply",
+    label: "apply",
+    paneShortcut: { display: "a", name: "a" },
+    shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
+    run: () => {},
+  };
+
+  expect(
+    getContextItemActionForPaneKeyEvent({
+      actions: [applyAction],
+      event: keyEvent({ name: "a" }),
+    }),
+  ).toBe(applyAction);
+  expect(
+    getContextItemActionForPaneKeyEvent({
+      actions: [applyAction],
+      event: keyEvent({ ctrl: true, name: "y" }),
+    }),
+  ).toBeNull();
+  expect(formatPaneActionHints([applyAction, rerunAction])).toBe("a apply");
 });
 
 function keyEvent(event: Partial<KeyEvent> & { name: string }): KeyEvent {

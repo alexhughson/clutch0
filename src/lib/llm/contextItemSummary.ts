@@ -1,20 +1,12 @@
-import {
-  complete,
-  completeSimple,
-  type AssistantMessage,
-  type Context,
-  type TextContent,
-} from "@earendil-works/pi-ai";
 import type {
   ContextItemSummarizationInput,
   GeneratedContextItemSummary,
 } from "../../types";
 import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
 import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
-import {
-  configuredLlmRequestOptions,
-  usesProviderSpecificRequestOptions,
-} from "./requestOptions";
+import { configuredLlmRequestOptions } from "./requestOptions";
+import { completeDirectLlmResponse } from "./directLlmClient";
+import type { LlmContext } from "./types";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;
 const MAX_ONE_LINE_CHARACTERS = 100;
@@ -41,11 +33,13 @@ export async function generateContextItemSummary(
       },
     ],
     systemPrompt: contextItemSummarySystemPrompt,
-  } satisfies Context;
+  } satisfies LlmContext;
   const requestOptions = configuredLlmRequestOptions(request);
-  const message = await (usesProviderSpecificRequestOptions(request)
-    ? complete(request.model, context, requestOptions)
-    : completeSimple(request.model, context, requestOptions));
+  const message = await completeDirectLlmResponse(
+    request.model,
+    context,
+    requestOptions,
+  );
 
   const parsed = parseSummaryResponse(getAssistantText(message));
   return {
@@ -100,9 +94,11 @@ function truncateSummaryText(text: string, maxCharacters: number): string {
   return `${normalized.slice(0, maxCharacters - 1)}…`;
 }
 
-function getAssistantText(message: AssistantMessage): string {
+function getAssistantText(message: {
+  content: readonly { text?: string; type: string }[];
+}): string {
   return message.content
-    .filter((block): block is TextContent => block.type === "text")
-    .map((block) => block.text)
+    .filter((block) => block.type === "text")
+    .map((block) => block.text ?? "")
     .join("\n");
 }

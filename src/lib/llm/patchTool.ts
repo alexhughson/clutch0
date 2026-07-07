@@ -7,11 +7,11 @@ export const APPLY_PATCH_TOOL_NAME = "apply_patch";
 export const applyPatchTool: Tool = {
   name: APPLY_PATCH_TOOL_NAME,
   description:
-    "Use a Codex apply_patch patch to edit files. The patch must be complete and ready to apply.",
+    "Edit files with one complete Codex apply_patch patch.",
   parameters: Type.Object({
     input: Type.String({
       description:
-        "The complete raw Codex patch body. It must start with *** Begin Patch and end with *** End Patch.",
+        "Raw patch body from *** Begin Patch through *** End Patch.",
     }),
   }),
 };

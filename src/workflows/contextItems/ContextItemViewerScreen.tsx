@@ -2,6 +2,7 @@ import type { KeyEvent, TextareaRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextItemViewerTaskState } from "../../app/appTypes";
+import { isOpenFocusedContextItemKey } from "../../lib/keymap";
 import { AgentOutputLog } from "../../components/AgentOutputLog";
 import {
   HighlightedCode,
@@ -10,16 +11,14 @@ import {
 } from "../../components/SyntaxHighlightedContent";
 import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import {
-  PiAgentContextItem,
-  UserTextContextItem,
-} from "../../lib/context/contextItems";
-import { isEnterKey } from "../../lib/keymap";
+  formatContextItemAction,
+  formatPaneActionHints,
+  getContextItemActionForKeyEvent,
+  getContextItemActionForPaneKeyEvent,
+} from "../../lib/context/contextItemActions";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
-import {
-  saveAgentSandboxDiffToContext,
-  sendAgentAskMessage,
-} from "../agentAsk/agentAskSessionRegistry";
+import { AgentSessionFollowUp } from "../agentAsk/AgentSessionFollowUp";
 import { runContextItemAction } from "./contextItemActionRunner";
 
 export function ContextItemViewerScreen({
@@ -35,27 +34,33 @@ export function ContextItemViewerScreen({
       state.workspace.automaticContextItems,
     ),
   );
-  const [detail, setDetail] = useState<ContextItemDetailView | null>(null);
-  const liveAgentDetail =
-    item instanceof PiAgentContextItem ? item.getLiveDetailView() : null;
-  const editableTextDetail =
-    item instanceof UserTextContextItem ? item.getEditableDetailView() : null;
-  const visibleDetail = liveAgentDetail ?? editableTextDetail ?? detail;
-  const isAgentDetail = visibleDetail?.kind === "agent-output";
+  const [staticDetail, setStaticDetail] = useState<ContextItemDetailView | null>(
+    null,
+  );
+  const liveDetail = item?.getLiveDetailView?.() ?? null;
+  const detail = liveDetail ?? staticDetail;
+  const isAgentDetail = detail?.kind === "agent-output";
   const canAct = screen.applyStatus !== "applying";
-  const canRunItemActions =
-    canAct && !isAgentDetail && visibleDetail?.kind !== "editable-text";
   const itemActions = useMemo(
     () => item?.getActions().filter((action) => action.id !== "open") ?? [],
     [item],
   );
+  const canRunShortcutActions =
+    canAct && detail !== null && detail.kind !== "editable-text";
+  const canRunPaneActions =
+    canRunShortcutActions && detail.kind !== "agent-output";
   const title = isAgentDetail
     ? undefined
     : (detail?.title ?? item?.getListLabel() ?? "Context item");
   const bottomTitle = isAgentDetail
-    ? undefined
-    : canRunItemActions
-      ? getBottomTitle(itemActions)
+    ? formatAgentShortcutHints(itemActions)
+    : canRunPaneActions
+      ? [
+          formatPaneActionHints(itemActions),
+          screen.rejectComposer === undefined ? "Esc back" : "Esc edit prompt",
+        ]
+          .filter((part) => part.length > 0)
+          .join(" · ")
       : canAct
         ? screen.rejectComposer === undefined
           ? "Esc back"
@@ -63,19 +68,15 @@ export function ContextItemViewerScreen({
         : undefined;
 
   useEffect(() => {
-    let cancelled = false;
-    setDetail(null);
-    if (
-      item === null ||
-      item instanceof PiAgentContextItem ||
-      item instanceof UserTextContextItem
-    ) {
+    if (item === null || item.getLiveDetailView !== undefined) {
       return;
     }
 
+    let cancelled = false;
+    setStaticDetail(null);
     void item.getDetailView({ root: process.cwd() }).then((nextDetail) => {
       if (!cancelled) {
-        setDetail(nextDetail);
+        setStaticDetail(nextDetail);
       }
     });
 
@@ -115,18 +116,37 @@ export function ContextItemViewerScreen({
       return;
     }
 
-    if (!canRunItemActions) {
+    if (canRunShortcutActions) {
+      const shortcutAction = getContextItemActionForKeyEvent({
+        actions: itemActions,
+        event,
+      });
+      if (shortcutAction !== null) {
+        event.preventDefault();
+        event.stopPropagation();
+        runContextItemAction({
+          action: shortcutAction,
+          closeAfterRemove: true,
+        });
+        return;
+      }
+    }
+
+    if (!canRunPaneActions) {
       return;
     }
 
-    const action = getViewerActionForKey(event.name, itemActions);
-    if (action === null) {
+    const paneAction = getContextItemActionForPaneKeyEvent({
+      actions: itemActions,
+      event,
+    });
+    if (paneAction === null) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    runContextItemAction({ action, closeAfterRemove: true });
+    runContextItemAction({ action: paneAction, closeAfterRemove: true });
   });
 
   return (
@@ -154,16 +174,20 @@ export function ContextItemViewerScreen({
       )}
       {item === null ? (
         <text style={{ fg: "red" }}>Context item no longer exists.</text>
-      ) : visibleDetail === null ? (
+      ) : detail === null ? (
         <text>Loading...</text>
       ) : (
-        <DetailView detail={visibleDetail} />
+        <ContextItemDetailViewRenderer detail={detail} />
       )}
     </box>
   );
 }
 
-function DetailView({ detail }: { detail: ContextItemDetailView }) {
+function ContextItemDetailViewRenderer({
+  detail,
+}: {
+  detail: ContextItemDetailView;
+}) {
   if (detail.kind === "agent-output") {
     return <AgentDetailView detail={detail} />;
   }
@@ -274,8 +298,6 @@ function AgentDetailView({
 }: {
   detail: Extract<ContextItemDetailView, { kind: "agent-output" }>;
 }) {
-  const [message, setMessage] = useState("");
-
   return (
     <box
       style={{ flexDirection: "column", flexGrow: 1, gap: 1, height: "100%" }}
@@ -296,40 +318,7 @@ function AgentDetailView({
       )}
       <AgentOutputLog blocks={detail.blocks} />
       {detail.sessionAvailability === "live" ? (
-        <box style={{ height: 1 }}>
-          <input
-            value={message}
-            placeholder="Send a follow-up to this agent session"
-            focused
-            onInput={setMessage}
-            onKeyDown={(event: KeyEvent) => {
-              if (event.ctrl && event.name === "d") {
-                event.preventDefault();
-                event.stopPropagation();
-                void saveAgentSandboxDiffToContext(detail.itemId);
-                return;
-              }
-
-              if (!isEnterKey(event.name)) {
-                return;
-              }
-
-              const nextMessage = message.trim();
-              if (nextMessage.length === 0) {
-                return;
-              }
-
-              event.preventDefault();
-              event.stopPropagation();
-              setMessage("");
-              void sendAgentAskMessage({
-                itemId: detail.itemId,
-                message: nextMessage,
-              });
-            }}
-            style={{ width: "100%" }}
-          />
-        </box>
+        <AgentSessionFollowUp itemId={detail.itemId} />
       ) : null}
     </box>
   );
@@ -399,45 +388,14 @@ function formatSandboxDiffStatus(
   return sandbox.diffStatus;
 }
 
-function isOpenFocusedContextItemKey(event: KeyEvent): boolean {
-  return (
-    event.name === "o" &&
-    event.ctrl &&
-    !event.shift &&
-    !event.meta &&
-    !event.option &&
-    !event.super &&
-    !event.hyper
-  );
-}
-
-function getViewerActionForKey(
-  keyName: string,
+function formatAgentShortcutHints(
   actions: readonly ContextItemAction[],
-): ContextItemAction | null {
-  const actionId =
-    keyName === "a"
-      ? "apply"
-      : keyName === "r"
-        ? "rerun"
-        : keyName === "x"
-          ? "remove"
-          : null;
-
-  if (actionId === null) {
-    return null;
-  }
-
-  return actions.find((action) => action.id === actionId) ?? null;
-}
-
-function getBottomTitle(actions: readonly ContextItemAction[]): string {
-  return [
-    actions.some((action) => action.id === "apply") ? "a apply" : null,
-    actions.some((action) => action.id === "rerun") ? "r rerun" : null,
-    actions.some((action) => action.id === "remove") ? "x remove" : null,
-    "Esc back",
-  ]
-    .filter((item): item is string => item !== null)
-    .join(" · ");
+): string | undefined {
+  const hints = actions
+    .filter(
+      (action) =>
+        action.shortcut !== undefined && action.paneShortcut === undefined,
+    )
+    .map(formatContextItemAction);
+  return hints.length === 0 ? undefined : hints.join(" · ");
 }

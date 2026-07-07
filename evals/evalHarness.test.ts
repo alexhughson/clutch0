@@ -8,6 +8,7 @@ import {
   prepareEvalCase,
   renderEvalCasePromptMarkdown,
 } from "./lib/evalCases";
+import { joinTextUserMessages } from "../src/lib/llm/context";
 import { writeEvalPatchArtifacts } from "./lib/evalArtifacts";
 import { normalizeAssistantMessage, parseEvalModelSpec } from "./lib/liveEval";
 import type { EvalCaseRunResult } from "./lib/liveEval";
@@ -136,7 +137,7 @@ test("renders prompts through real Clutch context and tools", async () => {
   expect(prompt).toContain("<file");
   expect(prompt).toContain("src/count.ts");
   expect(prompt).toContain("apply_patch");
-  expect(prompt).toContain("User request:");
+  expect(prompt).toContain("<user_request>");
 });
 
 test(
@@ -149,16 +150,19 @@ test(
     expect(evalCase).toBeDefined();
 
     const prepared = await prepareEvalCase(evalCase!);
-    const userMessage = String(prepared.context.messages[0]?.content ?? "");
+    const automaticMessage = String(prepared.context.messages[0]?.content ?? "");
+    const userMessages = joinTextUserMessages(prepared.context);
 
-    expect(userMessage.length).toBeGreaterThan(250_000);
-    expect(userMessage).toContain('<automatic_context name="current_diff">');
-    expect(userMessage).toContain('<automatic_context name="directory_tree">');
-    expect(userMessage).toContain("[Context truncated.]");
-    expect(userMessage).toContain(
+    expect(userMessages.length).toBeGreaterThan(250_000);
+    expect(automaticMessage).toContain('<automatic_context name="current_diff">');
+    expect(automaticMessage).toContain(
+      '<automatic_context name="directory_tree">',
+    );
+    expect(automaticMessage).toContain("[Context truncated.]");
+    expect(automaticMessage).toContain(
       "synthetic/project/packages/very-long-generated-eval-run-output-path-0000",
     );
-    expect(userMessage).toContain('<file path="AGENTS.md" focused="true">');
+    expect(userMessages).toContain('<file path="AGENTS.md" focused="true">');
     expect(prepared.context.tools?.map((tool) => tool.name)).toEqual([
       "apply_patch",
     ]);

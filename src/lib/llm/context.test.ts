@@ -16,6 +16,7 @@ import { createAutomaticContextItems } from "../context/automaticContextItems";
 import {
   assembleLlmContextInput,
   buildLlmContext,
+  joinTextUserMessages,
   MAX_FILE_CONTEXT_CHARACTERS,
 } from "./context";
 
@@ -56,9 +57,20 @@ test("builds LLM context from selected file contents on disk", async () => {
       truncated: false,
     },
   ]);
-  expect(getUserContent(context)).toContain("What is the answer?");
-  expect(getUserContent(context)).toContain('<file path="example.ts">');
-  expect(getUserContent(context)).toContain("export const answer = 42;");
+  expect(context.messages).toHaveLength(4);
+  expect(getTextUserContent(context, 0)).toContain(
+    "<automatic_context_reference>",
+  );
+  expect(getTextUserContent(context, 1)).toContain('<file path="example.ts">');
+  expect(getTextUserContent(context, 1)).toContain(
+    "export const answer = 42;",
+  );
+  expect(getTextUserContent(context, 2)).toContain(
+    "The selected context item is:",
+  );
+  expect(getTextUserContent(context, 3)).toBe(
+    "<user_request>\nWhat is the answer?\n</user_request>",
+  );
 });
 
 test("marks focused context item for the LLM", async () => {
@@ -73,10 +85,10 @@ test("marks focused context item for the LLM", async () => {
     root,
   });
 
-  expect(getUserContent(context)).toContain(
-    "Focused context item (edit target unless the request says otherwise):\n@example.ts",
+  expect(getTextUserContent(context, 2)).toContain(
+    "<selected_context_item>\n@example.ts\n</selected_context_item>",
   );
-  expect(getUserContent(context)).toContain(
+  expect(getTextUserContent(context, 1)).toContain(
     '<file path="example.ts" focused="true">',
   );
 });
@@ -92,14 +104,17 @@ test("adds directory automatic context without making it selected context", asyn
     root,
   });
 
-  expect(getUserContent(context)).toContain("No selected context items.");
-  expect(getUserContent(context)).not.toContain(
+  expect(context.messages).toHaveLength(3);
+  expect(getTextUserContent(context, 1)).toContain(
+    "<selected_context_item>\nNo selected context item.\n</selected_context_item>",
+  );
+  expect(joinTextUserMessages(context)).not.toContain(
     '<automatic_context name="AGENTS.md">',
   );
-  expect(getUserContent(context)).toContain(
+  expect(getTextUserContent(context, 0)).toContain(
     '<automatic_context name="directory_tree">',
   );
-  expect(getUserContent(context)).toContain("example.ts");
+  expect(getTextUserContent(context, 0)).toContain("example.ts");
 });
 
 test("adds untracked files to automatic current diff context", async () => {
@@ -115,7 +130,7 @@ test("adds untracked files to automatic current diff context", async () => {
     root,
   });
 
-  const userContent = getUserContent(context);
+  const userContent = joinTextUserMessages(context);
   expect(userContent).toContain('<automatic_context name="current_diff">');
   expect(userContent).toContain("diff --git a/new.ts b/new.ts");
   expect(userContent).toContain("+export const fresh = true;");
@@ -132,8 +147,8 @@ test("includes AGENTS.md through normal selected file context", async () => {
     root,
   });
 
-  expect(getUserContent(context)).toContain('<file path="AGENTS.md">');
-  expect(getUserContent(context)).toContain("Follow the project rules.");
+  expect(getTextUserContent(context, 1)).toContain('<file path="AGENTS.md">');
+  expect(getTextUserContent(context, 1)).toContain("Follow the project rules.");
 });
 
 test("builds LLM context from saved responses and diffs", async () => {
@@ -166,10 +181,17 @@ test("builds LLM context from saved responses and diffs", async () => {
     root,
   });
 
-  expect(getUserContent(context)).toContain("<llm_response");
-  expect(getUserContent(context)).toContain("The answer is 42.");
-  expect(getUserContent(context)).toContain("<saved_diff");
-  expect(getUserContent(context)).toContain("Update answer");
+  expect(context.messages).toHaveLength(5);
+  expect(getTextUserContent(context, 1)).toContain("<answer");
+  expect(getTextUserContent(context, 1)).toContain(
+    "<question>\nWhat is the answer?\n</question>",
+  );
+  expect(getTextUserContent(context, 1)).toContain("The answer is 42.");
+  expect(getTextUserContent(context, 2)).toContain("<saved_diff");
+  expect(getTextUserContent(context, 2)).toContain(
+    "<question>\nChange the answer\n</question>",
+  );
+  expect(getTextUserContent(context, 2)).toContain("Update answer");
 });
 
 test("builds LLM context from user text context items", async () => {
@@ -187,12 +209,12 @@ test("builds LLM context from user text context items", async () => {
     root,
   });
 
-  expect(getUserContent(context)).toContain(
-    "Focused context item (edit target unless the request says otherwise):\nUser text:",
+  expect(getTextUserContent(context, 2)).toContain(
+    "<selected_context_item>\nUser text:",
   );
-  expect(getUserContent(context)).toContain("<user_text");
-  expect(getUserContent(context)).toContain('focused="true"');
-  expect(getUserContent(context)).toContain(
+  expect(getTextUserContent(context, 1)).toContain("<note");
+  expect(getTextUserContent(context, 1)).toContain('focused="true"');
+  expect(getTextUserContent(context, 1)).toContain(
     "Remember to preserve the narrow layout.",
   );
 });
@@ -254,15 +276,41 @@ test("agent session context includes only the latest assistant message", async (
     root,
   });
 
-  const userContent = getUserContent(context);
-  expect(userContent).toContain("<prompt>\nInvestigate routing\n</prompt>");
+  const userContent = joinTextUserMessages(context);
   expect(userContent).toContain(
-    "<latest_agent_message>\nLatest answer.\n</latest_agent_message>",
+    "<question>\nInvestigate routing\n</question>",
+  );
+  expect(userContent).toContain(
+    "<response>\nLatest answer.\n</response>",
   );
   expect(userContent).not.toContain("First answer.");
   expect(userContent).not.toContain("Private reasoning");
   expect(userContent).not.toContain("read src/index.ts");
   expect(userContent).not.toContain("pi: thinking");
+});
+
+test("places the current user request after all context", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
+  await writeFile(join(root, "example.ts"), "export const answer = 42;\n");
+
+  const { context } = await buildLlmContext({
+    contextItems: [createFileContextItem("example.ts")],
+    question: "What is last?",
+    root,
+  });
+
+  expect(context.messages).toHaveLength(4);
+  expect(
+    getTextUserContent(context, 0).startsWith(
+      "<automatic_context_reference>",
+    ),
+  ).toBe(true);
+  expect(getTextUserContent(context, 1)).toContain("<file");
+  expect(getTextUserContent(context, 2)).toContain("<selected_context_item>");
+  expect(getTextUserContent(context, 3)).toContain("<user_request>");
+  expect(
+    getTextUserContent(context, 3).trimEnd().endsWith("</user_request>"),
+  ).toBe(true);
 });
 
 test("skips paths outside the root", async () => {
@@ -299,13 +347,14 @@ test("truncates large selected files", async () => {
     truncated: true,
   });
   expect(files[0]?.content).toHaveLength(MAX_FILE_CONTEXT_CHARACTERS);
-  expect(getUserContent(context)).toContain("File truncated");
+  expect(joinTextUserMessages(context)).toContain("File truncated");
 });
 
-function getUserContent(
+function getTextUserContent(
   context: Awaited<ReturnType<typeof buildLlmContext>>["context"],
+  index: number,
 ): string {
-  const content = context.messages[0]?.content;
+  const content = context.messages[index]?.content;
   if (typeof content !== "string") {
     throw new Error("Expected string user content");
   }

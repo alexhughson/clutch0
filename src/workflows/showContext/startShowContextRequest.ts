@@ -1,5 +1,6 @@
 import type { ComposerState } from "../../app/appTypes";
-import { buildLlmContext } from "../../lib/llm/context";
+import { assembleLlmContextInput, buildLlmContext } from "../../lib/llm/context";
+import { getAmbientLlmContextItems } from "../../lib/context/automaticContextItems";
 import { buildPatchAwareSystemPrompt } from "../../lib/llm/prompts";
 import { getLlmWorkflowTools } from "../llmTools/toolRegistry";
 import { useAppStore } from "../../store/appStore";
@@ -17,11 +18,17 @@ export function startShowContextRequest(
     return;
   }
 
-  const contextItems = currentState.workspace.contextItems;
-  const focusedContextItemId = currentState.workspace.focusedContextItemId;
+  const { contextItems, focusedContextItemId } = assembleLlmContextInput({
+    automaticContextItems: currentState.workspace.automaticContextItems,
+    contextItems: currentState.workspace.contextItems,
+    focusedContextItemId: currentState.workspace.focusedContextItemId,
+  });
   const tools = getLlmWorkflowTools();
 
   void buildLlmContext({
+    ambientContextItems: getAmbientLlmContextItems(
+      currentState.workspace.automaticContextItems,
+    ),
     contextItems,
     focusedContextItemId,
     question: question.length === 0 ? "(no question)" : question,

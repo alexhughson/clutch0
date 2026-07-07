@@ -6,7 +6,6 @@ export type SessionShutdownController = {
 
 export type SessionShutdownResources = {
   abortRuntimeWork: () => void;
-  closeMcpWorkflowResources: () => Promise<void> | void;
   closeRecorder: (options: { status: SessionShutdownStatus }) => Promise<void>;
   destroyRenderer: () => void;
   disposeAgentSessions: () => Promise<void> | void;
@@ -48,7 +47,6 @@ async function runShutdown({
     const cleanupResult = await withTimeout(
       Promise.allSettled([
         runCleanupTask(() => resources.disposeAgentSessions()),
-        runCleanupTask(() => resources.closeMcpWorkflowResources()),
         runCleanupTask(() => resources.closeRecorder({ status })),
       ]),
       timeoutMs,

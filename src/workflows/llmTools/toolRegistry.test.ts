@@ -3,22 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
 import type { ToolCall } from "@earendil-works/pi-ai";
-import type { SessionRecorder } from "../../lib/session/sessionRecorder";
-import { setSessionRecorder } from "../../store/appStore";
 import { APPLY_PATCH_TOOL_NAME } from "../../lib/llm/patchTool";
 import { ADD_CONTEXT_FILES_TOOL_NAME } from "../addFiles/addFilesWorkflowTool";
 import { FIND_RELEVANT_FILES_TOOL_NAME } from "../findFiles/findFilesTool";
 import { CREATE_FILE_TOOL_NAME } from "../createFile/createFileWorkflowTool";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "./shellCommandWorkflowTool";
-import type { McpToolRuntime } from "../../lib/mcp/mcpTypes";
-import { createMcpWorkflowResources } from "../mcp/mcpWorkflowTool";
 import {
   getLlmSlashCommands,
   getLlmWorkflowTools,
   parseLlmSlashCommandInvocation,
   routeLlmWorkflowToolCalls,
   setAgentAskSkillSlashCommands,
-  setMcpWorkflowResources,
 } from "./toolRegistry";
 
 test("routes add context files tool calls to the add files workflow", async () => {
@@ -486,8 +481,8 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
   });
   expect(parseLlmSlashCommandInvocation("/config")).toMatchObject({
     command: {
+      allowsEmptyInput: true,
       name: "config",
-      taskKind: "config",
     },
     input: "",
   });
@@ -495,175 +490,12 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
     parseLlmSlashCommandInvocation("/say keep this in mind"),
   ).toMatchObject({
     command: {
+      allowsEmptyInput: true,
       name: "say",
-      taskKind: "say",
     },
     input: "keep this in mind",
   });
   expect(parseLlmSlashCommandInvocation("/wat auth routing")).toBeNull();
-});
-
-test("routes direct MCP tool calls and exposes MCP slash commands", async () => {
-  const calls: unknown[] = [];
-  const controller = new AbortController();
-  const runtime: McpToolRuntime = {
-    async callTool(options) {
-      calls.push(options);
-      return {
-        arguments: options.arguments,
-        contentText: "repo results",
-        isError: false,
-        rawResult: { content: [{ text: "repo results", type: "text" }] },
-        serverName: options.serverName,
-        toolName: options.toolName,
-      };
-    },
-    async listTools() {
-      throw new Error("listTools should not be used in this test.");
-    },
-  };
-  const resources = createMcpWorkflowResources({
-    runtime,
-    tools: [
-      {
-        description: "Search GitHub repositories.",
-        inputSchema: {
-          properties: { query: { type: "string" } },
-          required: ["query"],
-          type: "object",
-        },
-        name: "search_repositories",
-        serverName: "github",
-        slashCommandName: "mcp:github",
-        slashToolName: "mcp:github:search_repositories",
-        toolName: "mcp_github_search_repositories",
-      },
-    ],
-  });
-  setMcpWorkflowResources(resources);
-
-  try {
-    expect(getLlmWorkflowTools().map((tool) => tool.name)).toContain(
-      "mcp_github_search_repositories",
-    );
-    expect(
-      parseLlmSlashCommandInvocation("/mcp:github find react"),
-    ).toMatchObject({
-      command: {
-        allowedToolNames: ["mcp_github_search_repositories"],
-        name: "mcp:github",
-      },
-      input: "find react",
-    });
-    expect(
-      parseLlmSlashCommandInvocation(
-        "/mcp:github:search_repositories find react",
-      ),
-    ).toMatchObject({
-      command: {
-        allowedToolNames: ["mcp_github_search_repositories"],
-        name: "mcp:github:search_repositories",
-      },
-      input: "find react",
-    });
-
-    const result = await routeLlmWorkflowToolCalls({
-      allowedToolNames: ["mcp_github_search_repositories"],
-      signal: controller.signal,
-      toolCalls: [
-        {
-          arguments: { query: "react" },
-          id: "tool-1",
-          name: "mcp_github_search_repositories",
-          type: "toolCall",
-        } satisfies ToolCall,
-      ],
-    });
-
-    expect(result).toMatchObject({
-      kind: "mcp-tool-output",
-      output: {
-        contentText: "repo results",
-        serverName: "github",
-        toolName: "search_repositories",
-      },
-    });
-    expect(calls).toEqual([
-      {
-        arguments: { query: "react" },
-        serverName: "github",
-        signal: controller.signal,
-        toolName: "search_repositories",
-      },
-    ]);
-  } finally {
-    setMcpWorkflowResources({ slashCommands: [], toolControllers: [] });
-  }
-});
-
-test("MCP workflow routing records runtime lifecycle events", async () => {
-  const runtimeEvents: Record<string, unknown>[] = [];
-  const recorder: SessionRecorder = {
-    close: async () => {},
-    flush: async () => {},
-    recordRuntimeEvent: (event) => {
-      runtimeEvents.push(event);
-    },
-    recordStateChange: () => {},
-  };
-  const runtime: McpToolRuntime = {
-    async callTool(options) {
-      return {
-        arguments: options.arguments,
-        contentText: "ok",
-        isError: false,
-        rawResult: { content: [{ text: "ok", type: "text" }] },
-        serverName: options.serverName,
-        toolName: options.toolName,
-      };
-    },
-    async listTools() {
-      throw new Error("listTools should not be used in this test.");
-    },
-  };
-  setSessionRecorder(recorder);
-  setMcpWorkflowResources(
-    createMcpWorkflowResources({
-      runtime,
-      tools: [
-        {
-          inputSchema: { type: "object" },
-          name: "ping",
-          serverName: "server",
-          slashCommandName: "mcp:server",
-          slashToolName: "mcp:server:ping",
-          toolName: "mcp_server_ping",
-        },
-      ],
-    }),
-  );
-
-  try {
-    await routeLlmWorkflowToolCalls({
-      allowedToolNames: ["mcp_server_ping"],
-      toolCalls: [
-        {
-          arguments: {},
-          id: "tool-1",
-          name: "mcp_server_ping",
-          type: "toolCall",
-        } satisfies ToolCall,
-      ],
-    });
-  } finally {
-    setSessionRecorder(null);
-    setMcpWorkflowResources({ slashCommands: [], toolControllers: [] });
-  }
-
-  expect(runtimeEvents.map((event) => event.kind)).toEqual([
-    "mcp-tool.started",
-    "mcp-tool.finished",
-  ]);
 });
 
 test("parses agent skill slash commands", () => {
@@ -673,7 +505,6 @@ test("parses agent skill slash commands", () => {
       description: "Use project review instructions.",
       name: "skill:project-review",
       promptDirective: "",
-      taskKind: "agent-skill",
       title: "Skill: project-review",
     },
   ]);
@@ -682,8 +513,8 @@ test("parses agent skill slash commands", () => {
     parseLlmSlashCommandInvocation("/skill:project-review auth routing"),
   ).toMatchObject({
     command: {
+      allowsEmptyInput: true,
       name: "skill:project-review",
-      taskKind: "agent-skill",
     },
     input: "auth routing",
   });

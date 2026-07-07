@@ -1,12 +1,12 @@
 import type { AppActions } from "../../app/appTypes";
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
+import type { SlashCommandRunner } from "../slashCommands/slashCommandRunners";
 import type { CreateFileValidationResult } from "../../lib/createFile/createFile";
 import type {
   PatchReviewState,
   PatchValidationResult,
 } from "../../lib/patch/types";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
-import type { McpToolOutput } from "../../lib/mcp/mcpTypes";
 
 export type PatchToolMode = "apply" | "review";
 
@@ -32,33 +32,29 @@ export type LlmWorkflowToolResult =
   | {
       kind: "create-file";
       validation: CreateFileValidationResult;
-    }
-  | {
-      kind: "mcp-tool-output";
-      output: McpToolOutput;
     };
 
 export type LlmSlashCommand = {
   readonly allowedToolNames: readonly string[];
+  readonly allowsEmptyInput?: boolean;
   readonly description: string;
   readonly name: string;
   readonly patchToolMode?: PatchToolMode;
   readonly promptDirective: string;
-  readonly taskKind?:
-    | "agent-ask"
-    | "agent-edit"
-    | "agent-skill"
-    | "config"
-    | "say"
-    | "shell-command"
-    | "show-context";
+  readonly run: SlashCommandRunner;
   readonly title: string;
 };
+
+export type PendingLlmSlashCommand = Omit<LlmSlashCommand, "run">;
 
 export interface LlmWorkflowToolController {
   readonly enabledByDefault?: boolean;
   readonly resultKind: LlmWorkflowToolResult["kind"];
-  readonly slashCommand?: Omit<LlmSlashCommand, "allowedToolNames">;
+  readonly runSlashCommand?: SlashCommandRunner;
+  readonly slashCommand?: Omit<
+    LlmSlashCommand,
+    "allowedToolNames" | "run"
+  >;
   readonly tool: Tool;
   handleResult(options: {
     actions: AppActions;

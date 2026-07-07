@@ -1,5 +1,4 @@
 import type { KeyEvent } from "@opentui/core";
-import type { ComposerState } from "../../app/appTypes";
 import { getContextItemActionForKeyEvent } from "../../lib/context/contextItemActions";
 import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
@@ -8,16 +7,11 @@ import {
   NoSlashCommandSelector,
   type SlashCommandSelectorMatch,
 } from "../../lib/inputLineParser";
-import { assertNever } from "../../lib/invariant";
-import {
-  startAgentAskRequest,
-  startAgentEditRequest,
-  startAgentSkillRequest,
-} from "../../workflows/agentAsk/startAgentAskRequest";
 import { runContextItemAction } from "../../workflows/contextItems/contextItemActionRunner";
-import { startLlmRequest } from "../../workflows/llmRequest/startLlmRequest";
-import { startShellCommandRequest } from "../../workflows/shellCommand/startShellCommandRequest";
-import { startShowContextRequest } from "../../workflows/showContext/startShowContextRequest";
+import {
+  canSubmitMessage,
+  runSubmittedMessage,
+} from "../../workflows/slashCommands/runSlashCommand";
 import { removeStringRange } from "../../lib/stringRange";
 import { useAppStore } from "../../store/appStore";
 import type {
@@ -27,10 +21,6 @@ import type {
   HighlightedFilePath,
 } from "../../types";
 import { getMessageComposerKeyAction } from "./messageComposerKeymap";
-import {
-  getSubmissionIntent,
-  type SubmissionIntent,
-} from "./messageSubmission";
 import {
   getCommandSuggestionStateFromComposeScreen,
   getCursorPositionAfterInput,
@@ -372,79 +362,20 @@ function submitQuestion(event: KeyEvent) {
     return;
   }
 
+  const message = currentState.workspace.composer.message;
+  if (!canSubmitMessage(message)) {
+    return;
+  }
+
   event.preventDefault();
   event.stopPropagation();
 
-  const intent = getSubmissionIntent(currentState.workspace.composer.message);
-  if (intent !== null) {
-    const submittedComposer = currentState.workspace.composer;
-    currentState.actions.compose.setComposerState({
-      cursorPosition: 0,
-      message: "",
-    });
-    runSubmissionIntent(intent, submittedComposer);
-  }
-}
-
-function runSubmissionIntent(
-  intent: SubmissionIntent,
-  submittedComposer: ComposerState,
-) {
-  if (intent.kind === "show-context") {
-    startShowContextRequest(intent.question, {
-      rejectComposer: submittedComposer,
-    });
-    return;
-  }
-
-  if (intent.kind === "config") {
-    useAppStore.getState().actions.config.openSettings();
-    return;
-  }
-
-  if (intent.kind === "say") {
-    useAppStore.getState().actions.say.addToContext({ text: intent.text });
-    return;
-  }
-
-  if (intent.kind === "agent-ask") {
-    startAgentAskRequest(intent.prompt, { rejectComposer: submittedComposer });
-    return;
-  }
-
-  if (intent.kind === "agent-edit") {
-    startAgentEditRequest(intent.prompt, { rejectComposer: submittedComposer });
-    return;
-  }
-
-  if (intent.kind === "agent-skill") {
-    startAgentSkillRequest({
-      prompt: intent.prompt,
-      rejectComposer: submittedComposer,
-      skillName: intent.skillName,
-    });
-    return;
-  }
-
-  if (intent.kind === "shell-command") {
-    startShellCommandRequest(intent.prompt, {
-      commandDirective: intent.commandDirective,
-      rejectComposer: submittedComposer,
-    });
-    return;
-  }
-
-  if (intent.kind === "llm-request") {
-    startLlmRequest(intent.question, {
-      allowedToolNames: intent.allowedToolNames,
-      commandDirective: intent.commandDirective,
-      patchToolMode: intent.patchToolMode,
-      rejectComposer: submittedComposer,
-    });
-    return;
-  }
-
-  assertNever(intent, "Unhandled submission intent");
+  const submittedComposer = currentState.workspace.composer;
+  currentState.actions.compose.setComposerState({
+    cursorPosition: 0,
+    message: "",
+  });
+  void runSubmittedMessage(message, submittedComposer);
 }
 
 function runFocusedContextItemActionForKey(event: KeyEvent) {

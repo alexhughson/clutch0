@@ -47,6 +47,7 @@ export interface ContextItem<
   getDetailView(
     options: GetContextItemDetailViewOptions,
   ): Promise<ContextItemDetailView | null>;
+  getLiveDetailView?(): ContextItemDetailView | null;
   getHistoryEvents(previous: ContextItem | null): readonly SessionEvent[];
   getListLabel(): string;
   getPersistence(): ContextItemPersistence<State>;
@@ -158,13 +159,16 @@ export type ContextItemActionShortcut = {
 export type ContextItemAction = {
   id: string;
   label: string;
+  paneShortcut?: {
+    display: string;
+    name: string;
+  };
   shortcut?: ContextItemActionShortcut;
   run: (context: ContextItemActionContext) => Promise<void> | void;
 };
 
 export type ContextItemActionContext = {
-  applyAgentSandboxDiff: (itemId: string) => void;
-  applySavedDiff: (itemId: string) => void;
+  applyDiff: (itemId: string) => void;
   openContextItem: (itemId: string) => void;
   removeContextItem: (itemId: string) => void;
   rerunPrompt: (options: {

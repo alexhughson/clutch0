@@ -4,7 +4,6 @@ import {
   PiAgentContextItem,
   createFileContextItem,
   createLiveLlmResponseContextItem,
-  createMcpToolOutputContextItem,
   createPiAgentContextItem,
   createSavedAgentSandboxDiffContextItem,
   createSavedDiffContextItem,
@@ -38,19 +37,6 @@ test("persistent context items own durable state and round-trip through restore"
         truncated: false,
       },
       sourceRequestId: 2,
-    }),
-    createMcpToolOutputContextItem({
-      createdAt: 3,
-      id: "mcp:3",
-      output: {
-        arguments: { query: "clutch" },
-        contentText: "result",
-        isError: false,
-        rawResult: { ok: true },
-        serverName: "github",
-        toolName: "search",
-      },
-      sourceRequestId: 3,
     }),
     createUserTextContextItem({
       createdAt: 4,
@@ -146,26 +132,6 @@ test("restore normalizes pending summary state to missing", () => {
   });
 
   expect(restored.getSummaryState()).toEqual({ status: "missing" });
-});
-
-test("MCP state normalizes unknown payloads into JSON-safe values", () => {
-  const item = createMcpToolOutputContextItem({
-    createdAt: 1,
-    id: "mcp:1",
-    output: {
-      arguments: { query: "clutch" },
-      contentText: "ok",
-      isError: false,
-      rawResult: 1n,
-      serverName: "server",
-      structuredContent: { value: 1n },
-      toolName: "tool",
-    },
-    sourceRequestId: 1,
-  });
-
-  expect(() => JSON.stringify(item.state)).not.toThrow();
-  expect(item.output.rawResult).toBe("1");
 });
 
 test("restored agent and live response states can be detached or errored", () => {
@@ -315,27 +281,6 @@ test("diff and shell context items emit focused update events", () => {
   });
   expect(nextShell.getHistoryEvents(shell)).toEqual([
     expect.objectContaining({ kind: "shell-command-output.result-updated" }),
-  ]);
-
-  const mcp = createMcpToolOutputContextItem({
-    createdAt: 1,
-    id: "mcp:1",
-    output: {
-      arguments: {},
-      contentText: "before",
-      isError: false,
-      rawResult: { ok: true },
-      serverName: "server",
-      toolName: "tool",
-    },
-    sourceRequestId: 1,
-  });
-  const nextMcp = createMcpToolOutputContextItem({
-    ...mcp.state,
-    output: { ...mcp.output, contentText: "after" },
-  });
-  expect(nextMcp.getHistoryEvents(mcp)).toEqual([
-    expect.objectContaining({ kind: "mcp-tool-output.result-updated" }),
   ]);
 
   const diff = createSavedDiffContextItem({

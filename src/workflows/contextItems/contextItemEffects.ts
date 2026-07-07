@@ -15,7 +15,9 @@ export async function applySavedDiffContextItem(itemId: string) {
     !(item instanceof SavedDiffContextItem) &&
     !(item instanceof SavedAgentSandboxDiffContextItem)
   ) {
-    return;
+    throw new Error(
+      `Cannot apply diff for context item ${itemId}: item is not a saved diff.`,
+    );
   }
 
   useAppStore.getState().actions.contextItems.startSavedDiffApply({ itemId });

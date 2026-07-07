@@ -89,8 +89,7 @@ async function main() {
       { createSessionShutdownController },
       { hydrateAppStore, setSessionRecorder, useAppStore },
       { loadAgentAskSkillSlashCommands },
-      { loadMcpWorkflowResources },
-      { setAgentAskSkillSlashCommands, setMcpWorkflowResources },
+      { setAgentAskSkillSlashCommands },
       { abortRuntimeWork },
       { disposeAllAgentAskSessions },
     ] = await Promise.all([
@@ -103,7 +102,6 @@ async function main() {
       import("./lib/session/sessionShutdown"),
       import("./store/appStore"),
       import("./workflows/agentAsk/agentAskResources"),
-      import("./workflows/mcp/mcpWorkflowTool"),
       import("./workflows/llmTools/toolRegistry"),
       import("./lib/session/runtimeInterrupts"),
       import("./workflows/agentAsk/agentAskSessionRegistry"),
@@ -131,16 +129,12 @@ async function main() {
       await recorder.close({ status: "interrupted" });
     };
 
-    let closeMcpWorkflowResources: (() => Promise<void> | void) | null = null;
     let renderer: Awaited<ReturnType<typeof createCliRenderer>> | null = null;
     let root: ReturnType<typeof createRoot> | null = null;
 
     const shutdownController = createSessionShutdownController({
       resources: {
         abortRuntimeWork,
-        closeMcpWorkflowResources: async () => {
-          await closeMcpWorkflowResources?.();
-        },
         closeRecorder: async ({ status }) => {
           setSessionRecorder(null);
           await recorder.close({ status });
@@ -194,28 +188,6 @@ async function main() {
       return;
     }
     setAgentAskSkillSlashCommands(agentAskSkillSlashCommands);
-    let mcpWorkflowResources: Awaited<
-      ReturnType<typeof loadMcpWorkflowResources>
-    >;
-    try {
-      mcpWorkflowResources = await loadMcpWorkflowResources({
-        onCloseReady: (close) => {
-          closeMcpWorkflowResources = close;
-        },
-        root: session.metadata.workspaceRoot,
-      });
-    } catch (error) {
-      if (shutdownStarted) {
-        return;
-      }
-      throw error;
-    }
-    if (shutdownStarted) {
-      await mcpWorkflowResources.close?.();
-      return;
-    }
-    closeMcpWorkflowResources = mcpWorkflowResources.close ?? null;
-    setMcpWorkflowResources(mcpWorkflowResources);
     const filePaths = await loadFileList({
       root: session.metadata.workspaceRoot,
     });

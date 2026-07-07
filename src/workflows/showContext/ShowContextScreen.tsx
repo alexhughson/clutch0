@@ -1,4 +1,3 @@
-import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { ShowContextTaskState } from "../../app/appTypes";
 import { isEnterKey } from "../../lib/keymap";
@@ -8,20 +7,34 @@ type ShowContextScreenProps = {
   task: ShowContextTaskState;
 };
 
-type AppActions = ReturnType<typeof useAppStore.getState>["actions"];
-
 export function ShowContextScreen({ task }: ShowContextScreenProps) {
   const actions = useAppStore((state) => state.actions);
+  const canNavigate = task.status !== "loading";
 
   useKeyboard((event) => {
-    handleShowContextKey({ actions, event, task });
+    if (!canNavigate) {
+      return;
+    }
+
+    if (event.name === "escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.navigation.rejectToEdit();
+      return;
+    }
+
+    if (isEnterKey(event.name)) {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.navigation.acceptAndClose();
+    }
   });
 
   return (
     <box
       title={`Rendered LLM context (${task.status})`}
       bottomTitle={
-        task.status === "loading" ? undefined : "Enter clear · Esc edit prompt"
+        canNavigate ? "Enter clear · Esc edit prompt" : undefined
       }
       bottomTitleAlignment="right"
       borderStyle="rounded"
@@ -52,31 +65,4 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
       </box>
     </box>
   );
-}
-
-function handleShowContextKey({
-  actions,
-  event,
-  task,
-}: {
-  actions: AppActions;
-  event: KeyEvent;
-  task: ShowContextTaskState;
-}) {
-  if (task.status === "loading") {
-    return;
-  }
-
-  if (event.name === "escape") {
-    event.preventDefault();
-    event.stopPropagation();
-    actions.navigation.rejectToEdit();
-    return;
-  }
-
-  if (isEnterKey(event.name)) {
-    event.preventDefault();
-    event.stopPropagation();
-    actions.navigation.acceptAndClose();
-  }
 }

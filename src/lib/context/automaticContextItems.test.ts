@@ -11,9 +11,9 @@ import {
 
 const execFileAsync = promisify(execFile);
 
-test("shows automatic unstaged changes in the visible context list", () => {
+test("shows automatic current changes in the visible context list", () => {
   expect(getVisibleContextItems([]).map((item) => item.getListLabel())).toEqual(
-    ["@AGENTS.md", "Unstaged changes", "File list"],
+    ["@AGENTS.md", "Current changes", "File list"],
   );
 });
 
@@ -59,14 +59,58 @@ test("unstaged changes detail includes untracked non-ignored files", async () =>
   );
 });
 
-test("unstaged changes detail truncates large working tree diffs", async () => {
+test("unstaged changes detail matches LLM context text", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "tracked.txt"), "before\n");
+  await git(root, ["add", "tracked.txt"]);
+  await writeFile(join(root, "tracked.txt"), "after\n");
+  await writeFile(join(root, "untracked.txt"), "new file\n");
+
+  const item = getUnstagedChangesItem();
+  const detail = await item.getDetailView({ root });
+  const summaryInput = await item.getSummarizationInput({ root });
+  const formatted = await item.formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
+
+  expect(detail?.kind).toBe("diff");
+  if (detail?.kind !== "diff") {
+    throw new Error("Expected diff detail view.");
+  }
+
+  expect(detail.diffText).toBe(formatted.text);
+  expect(summaryInput?.content).toBe(`Current changes\n\n${detail.diffText}`);
+  expect(detail.diffText).toContain("+after");
+  expect(detail.diffText).toContain("+new file");
+});
+
+test("unstaged changes detail shows the full large working tree diff", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
   await git(root, ["init"]);
   await writeFile(join(root, "large.txt"), repeatLines("before", 30_000));
   await git(root, ["add", "large.txt"]);
+  await git(root, [
+    "-c",
+    "user.email=test@example.com",
+    "-c",
+    "user.name=Test",
+    "commit",
+    "-m",
+    "initial",
+  ]);
   await writeFile(join(root, "large.txt"), repeatLines("after", 30_000));
 
-  const detail = await getUnstagedChangesItem().getDetailView({ root });
+  const item = getUnstagedChangesItem();
+  const detail = await item.getDetailView({ root });
+  const summaryInput = await item.getSummarizationInput({ root });
+  const formatted = await item.formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
 
   expect(detail?.kind).toBe("diff");
   if (detail?.kind !== "diff") {
@@ -74,8 +118,39 @@ test("unstaged changes detail truncates large working tree diffs", async () => {
   }
 
   expect(detail.diffText).toContain("--- a/large.txt");
-  expect(detail.diffText).toContain("[Context truncated.]");
-  expect(detail.diffText.length).toBeLessThan(130_000);
+  expect(detail.diffText).toContain("after 29999");
+  expect(detail.diffText).not.toContain("[Context truncated.]");
+  expect(detail.diffText.length).toBeGreaterThan(formatted.text.length);
+  expect(formatted.text).toContain("[Context truncated.]");
+  expect(summaryInput?.content).toBe(`Current changes\n\n${formatted.text}`);
+});
+
+test("current changes detail shows the full large staged diff", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "large-staged.txt"), repeatLines("staged", 30_000));
+  await git(root, ["add", "large-staged.txt"]);
+
+  const item = getUnstagedChangesItem();
+  const detail = await item.getDetailView({ root });
+  const summaryInput = await item.getSummarizationInput({ root });
+  const formatted = await item.formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
+
+  expect(detail?.kind).toBe("diff");
+  if (detail?.kind !== "diff") {
+    throw new Error("Expected diff detail view.");
+  }
+
+  expect(detail.diffText).toContain("large-staged.txt");
+  expect(detail.diffText).toContain("staged 29999");
+  expect(detail.diffText).not.toContain("[Context truncated.]");
+  expect(detail.diffText.length).toBeGreaterThan(formatted.text.length);
+  expect(formatted.text).toContain("[Context truncated.]");
+  expect(summaryInput?.content).toBe(`Current changes\n\n${formatted.text}`);
 });
 
 test("unstaged changes detail shows an empty state when the tree is clean", async () => {
@@ -85,22 +160,42 @@ test("unstaged changes detail shows an empty state when the tree is clean", asyn
   const detail = await getUnstagedChangesItem().getDetailView({ root });
 
   expect(detail).toEqual({
-    content: "No unstaged changes.",
+    content: "No current changes.",
     kind: "text",
-    title: "Unstaged changes",
+    title: "Current changes",
   });
 });
 
-test("unstaged changes detail is empty outside git repositories", async () => {
+test("current changes detail is empty outside git repositories", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
 
-  const detail = await getUnstagedChangesItem().getDetailView({ root });
+  const item = getUnstagedChangesItem();
+  const detail = await item.getDetailView({ root });
+  const summaryInput = await item.getSummarizationInput({ root });
+  const formatted = await item.formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
 
   expect(detail).toEqual({
-    content: "No unstaged changes.",
+    content: "No current changes.",
     kind: "text",
-    title: "Unstaged changes",
+    title: "Current changes",
   });
+  expect(summaryInput).toBeNull();
+  expect(formatted.text).toBe("");
+});
+
+test("current changes detail fails loudly for unexpected git errors", async () => {
+  const root = join(
+    await mkdtemp(join(tmpdir(), "clutch-unstaged-context-")),
+    "missing",
+  );
+
+  await expect(
+    getUnstagedChangesItem().getDetailView({ root }),
+  ).rejects.toThrow();
 });
 
 function getUnstagedChangesItem() {

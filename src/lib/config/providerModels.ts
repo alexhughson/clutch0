@@ -4,7 +4,6 @@ import {
   type Api,
   type Model,
 } from "@earendil-works/pi-ai";
-import { Cursor, type ModelSelection, type SDKModel } from "@cursor/sdk";
 import type {
   ClutchConfigPaths,
   SupportedClutchLlmProvider,
@@ -24,16 +23,10 @@ type ProviderModelApiProfile = {
 };
 
 type FetchModelOptions = {
-  cursorListModels?: (options: { apiKey?: string }) => Promise<SDKModel[]>;
   fetchImpl?: typeof fetch;
   paths?: ClutchConfigPaths;
   signal?: AbortSignal;
 };
-
-const CURSOR_AGENT_API = "cursor-agent";
-const CURSOR_AGENT_BASE_URL = "cursor-sdk://agent";
-const CURSOR_DEFAULT_CONTEXT_WINDOW = 128_000;
-const CURSOR_DEFAULT_MAX_TOKENS = 32_000;
 
 const PROVIDER_MODEL_API_PROFILES: Record<
   SupportedClutchLlmProvider,
@@ -44,12 +37,6 @@ const PROVIDER_MODEL_API_PROFILES: Record<
     baseUrl: "https://api.cerebras.ai/v1",
     defaultContextWindow: 128_000,
     defaultMaxTokens: 4_096,
-  },
-  cursor: {
-    api: CURSOR_AGENT_API,
-    baseUrl: CURSOR_AGENT_BASE_URL,
-    defaultContextWindow: CURSOR_DEFAULT_CONTEXT_WINDOW,
-    defaultMaxTokens: CURSOR_DEFAULT_MAX_TOKENS,
   },
   google: {
     api: "google-generative-ai",
@@ -96,7 +83,6 @@ const PROVIDER_MODEL_API_PROFILES: Record<
 };
 
 export async function fetchClutchProviderModels({
-  cursorListModels = Cursor.models.list,
   fetchImpl = fetch,
   paths = getClutchConfigPaths(),
   provider,
@@ -121,12 +107,6 @@ export async function fetchClutchProviderModels({
     );
   }
 
-  if (provider === "cursor") {
-    return modelsFromCursorSdkModels(
-      await cursorListModels({ apiKey: credential.key }),
-    );
-  }
-
   const profile = providerModelApiProfile(provider);
   const response = await fetchImpl(`${profile.baseUrl}/models`, {
     headers: {
@@ -147,45 +127,6 @@ export async function fetchClutchProviderModels({
     provider,
     responseJson: await response.json(),
   });
-}
-
-export function modelsFromCursorSdkModels(
-  sdkModels: readonly SDKModel[],
-): Model<Api>[] {
-  const models = sdkModels.flatMap((sdkModel) => {
-    if (sdkModel.variants === undefined || sdkModel.variants.length === 0) {
-      return [
-        cursorModelFromSdkModel({
-          idSuffix: null,
-          sdkModel,
-          selection: cursorModelSelectionFromSdkModel(sdkModel),
-          variantName: null,
-        }),
-      ];
-    }
-
-    const usedSuffixes = new Set<string>();
-    return sdkModel.variants.map((variant) => {
-      const variantName = cursorVariantName({ sdkModel, variant });
-      const idSuffix = uniqueCursorVariantSuffix({
-        fallbackParams: variant.params,
-        usedSuffixes,
-        variantName,
-      });
-
-      return cursorModelFromSdkModel({
-        idSuffix,
-        sdkModel,
-        selection: {
-          id: sdkModel.id,
-          params: variant.params,
-        },
-        variantName,
-      });
-    });
-  });
-
-  return models.sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function modelsFromProviderResponse({
@@ -331,184 +272,6 @@ function getKnownProviderModels(
   return readModels(provider)
     .map((model) => normalizeClutchModelMetadata({ ...model }))
     .sort((a, b) => a.id.localeCompare(b.id));
-}
-
-function cursorModelFromSdkModel({
-  idSuffix,
-  sdkModel,
-  selection,
-  variantName,
-}: {
-  idSuffix: string | null;
-  sdkModel: SDKModel;
-  selection: ModelSelection;
-  variantName: string | null;
-}): Model<Api> {
-  return {
-    id: idSuffix === null ? selection.id : `${selection.id}:${idSuffix}`,
-    name:
-      variantName === null
-        ? sdkModel.displayName
-        : `${sdkModel.displayName} (${variantName})`,
-    api: CURSOR_AGENT_API,
-    provider: "cursor",
-    baseUrl: CURSOR_AGENT_BASE_URL,
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: CURSOR_DEFAULT_CONTEXT_WINDOW,
-    maxTokens: CURSOR_DEFAULT_MAX_TOKENS,
-    compat: {
-      cursorModelSelection: selection,
-    },
-  } as Model<Api>;
-}
-
-function cursorModelSelectionFromSdkModel(sdkModel: SDKModel): ModelSelection {
-  const model = nestedRecord(
-    (sdkModel as unknown as Record<string, unknown>).model,
-  );
-  if (model === undefined) {
-    return { id: sdkModel.id };
-  }
-
-  const id = model.id;
-  if (typeof id !== "string" || id.trim().length === 0) {
-    throw new Error("Cursor SDK model selection id must be a string.");
-  }
-
-  return {
-    id,
-    params: parseCursorModelParams(model.params),
-  };
-}
-
-function parseCursorModelParams(
-  rawParams: unknown,
-): ModelSelection["params"] | undefined {
-  if (rawParams === undefined) {
-    return undefined;
-  }
-  if (!Array.isArray(rawParams)) {
-    throw new Error("Cursor SDK model selection params must be an array.");
-  }
-
-  return rawParams.map((param, index) => {
-    if (param === null || typeof param !== "object" || Array.isArray(param)) {
-      throw new Error(
-        `Cursor SDK model selection params[${index}] must be an object.`,
-      );
-    }
-
-    const id = (param as Record<string, unknown>).id;
-    const value = (param as Record<string, unknown>).value;
-    if (typeof id !== "string" || typeof value !== "string") {
-      throw new Error(
-        `Cursor SDK model selection params[${index}] must include id and value strings.`,
-      );
-    }
-
-    return { id, value };
-  });
-}
-
-function cursorVariantName({
-  sdkModel,
-  variant,
-}: {
-  sdkModel: SDKModel;
-  variant: NonNullable<SDKModel["variants"]>[number];
-}): string {
-  const variantDisplayName = variant.displayName.trim();
-  if (
-    variantDisplayName.length > 0 &&
-    variantDisplayName !== sdkModel.displayName.trim()
-  ) {
-    return variantDisplayName;
-  }
-
-  const fastParam = variant.params.find((param) => param.id === "fast");
-  if (fastParam?.value === "true") {
-    return "Fast";
-  }
-  if (fastParam?.value === "false") {
-    return "Standard";
-  }
-
-  const parameterLabels = variant.params.map((param) =>
-    cursorVariantParameterLabel({ param, sdkModel }),
-  );
-  if (parameterLabels.length > 0) {
-    return parameterLabels.join(", ");
-  }
-
-  if (variantDisplayName.length === 0) {
-    throw new Error("Cursor SDK model variant display name must be a string.");
-  }
-  return variantDisplayName;
-}
-
-function cursorVariantParameterLabel({
-  param,
-  sdkModel,
-}: {
-  param: NonNullable<ModelSelection["params"]>[number];
-  sdkModel: SDKModel;
-}): string {
-  const parameter = sdkModel.parameters?.find(
-    (candidate) => candidate.id === param.id,
-  );
-  const value = parameter?.values.find(
-    (candidate) => candidate.value === param.value,
-  );
-  if (value?.displayName !== undefined && value.displayName.trim().length > 0) {
-    return value.displayName;
-  }
-
-  const parameterName =
-    parameter?.displayName !== undefined &&
-    parameter.displayName.trim().length > 0
-      ? parameter.displayName
-      : param.id;
-  return `${parameterName} ${param.value}`;
-}
-
-function uniqueCursorVariantSuffix({
-  fallbackParams,
-  usedSuffixes,
-  variantName,
-}: {
-  fallbackParams: readonly NonNullable<ModelSelection["params"]>[number][];
-  usedSuffixes: Set<string>;
-  variantName: string;
-}): string {
-  const baseSuffix = slugFromCursorVariantLabel(variantName);
-  const fallbackSuffix = slugFromCursorVariantLabel(
-    fallbackParams.map((param) => `${param.id}-${param.value}`).join("-"),
-  );
-  let suffix = baseSuffix;
-  if (usedSuffixes.has(suffix)) {
-    suffix = `${baseSuffix}-${fallbackSuffix}`;
-  }
-  if (usedSuffixes.has(suffix)) {
-    throw new Error(`Duplicate Cursor SDK model variant id suffix: ${suffix}`);
-  }
-
-  usedSuffixes.add(suffix);
-  return suffix;
-}
-
-function slugFromCursorVariantLabel(label: string): string {
-  const slug = label
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  if (slug.length === 0) {
-    throw new Error("Cursor SDK model variant label must be sluggable.");
-  }
-  return slug;
 }
 
 function isOpenCodeResponsesModelId(id: string): boolean {

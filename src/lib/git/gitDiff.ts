@@ -27,7 +27,8 @@ export async function readGitDiff({
 
 export function isNotGitRepositoryError(error: unknown): boolean {
   return [getErrorMessage(error), getErrorStderr(error)].some((text) =>
-    text.toLowerCase().includes("not a git repository"),
+    text.toLowerCase().includes("not a git repository") ||
+    text.includes("Could not access 'HEAD'"),
   );
 }
 

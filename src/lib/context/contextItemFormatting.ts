@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 import type { AgentOutputBlock } from "../agentOutput/agentOutputTypes";
-import type { McpToolOutput } from "../mcp/mcpTypes";
 import type { ShellCommandResult } from "../shell/shellCommand";
 import type { ContextItemSummaryState, LlmFileContext } from "../../types";
 
@@ -40,55 +39,6 @@ export function formatAgentOutputBlocks(
       return `${block.streamKind}: ${block.text}`;
     })
     .join("\n");
-}
-
-export function formatMcpToolOutputForDisplay(output: McpToolOutput): string {
-  return [
-    "# MCP tool output",
-    "",
-    `Server: \`${output.serverName}\``,
-    `Tool: \`${output.toolName}\``,
-    `Status: ${output.isError ? "tool returned an error" : "ok"}`,
-    "",
-    "## Arguments",
-    "```json",
-    truncateContent(
-      safeJsonStringify(output.arguments),
-      MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
-    ),
-    "```",
-    "",
-    "## Content",
-    output.contentText.trim().length === 0
-      ? "(none)"
-      : truncateContent(output.contentText, MAX_CONTEXT_ITEM_DETAIL_CHARACTERS),
-    "",
-    "## Structured content",
-    output.structuredContent === undefined
-      ? "(none)"
-      : `\`\`\`json\n${truncateContent(safeJsonStringify(output.structuredContent), MAX_CONTEXT_ITEM_DETAIL_CHARACTERS)}\n\`\`\``,
-    "",
-    "## Raw result",
-    "```json",
-    truncateContent(
-      safeJsonStringify(output.rawResult),
-      MAX_CONTEXT_ITEM_DETAIL_CHARACTERS,
-    ),
-    "```",
-  ].join("\n");
-}
-
-export function formatMcpToolOutputForLlm(output: McpToolOutput): string {
-  return [
-    output.isError ? "MCP tool returned an error." : "MCP tool succeeded.",
-    "",
-    output.contentText.trim().length === 0
-      ? "(no text content)"
-      : output.contentText,
-    output.structuredContent === undefined
-      ? ""
-      : `\nStructured content:\n${safeJsonStringify(output.structuredContent)}`,
-  ].join("\n");
 }
 
 export function safeJsonStringify(value: unknown): string {

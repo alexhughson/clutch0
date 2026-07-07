@@ -1,9 +1,6 @@
 import {
-  complete,
-  completeSimple,
   type Api,
   type AssistantMessage,
-  type Context,
   type Model,
   type TextContent,
   type ToolCall,
@@ -23,8 +20,9 @@ import { patchProposalFromToolCall } from "../../src/lib/llm/patchTool";
 import { renderPrompt } from "../../src/lib/llm/prompts";
 import {
   configuredLlmRequestOptions,
-  usesProviderSpecificRequestOptions,
 } from "../../src/lib/llm/requestOptions";
+import { completeDirectLlmResponse } from "../../src/lib/llm/directLlmClient";
+import type { LlmContext } from "../../src/lib/llm/types";
 import {
   getPatchProposalPaths,
   parseCodexPatch,
@@ -137,13 +135,15 @@ export async function completeEvalRequest({
   context,
   request,
 }: {
-  context: Context;
+  context: LlmContext;
   request: EvalModelRequest;
 }): Promise<AssistantMessage> {
   const options = configuredLlmRequestOptions(request);
-  return await (usesProviderSpecificRequestOptions(request)
-    ? complete(request.model, context, options)
-    : completeSimple(request.model, context, options));
+  return (await completeDirectLlmResponse(
+    request.model as never,
+    context,
+    options,
+  )) as unknown as AssistantMessage;
 }
 
 export async function runPreparedEvalCase({

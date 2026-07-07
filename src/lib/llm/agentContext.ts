@@ -1,6 +1,6 @@
 import type { ContextItem } from "../../types";
 import { invariant } from "../invariant";
-import { buildLlmContext } from "./context";
+import { buildLlmContext, joinTextUserMessages } from "./context";
 import { renderPrompt } from "./prompts";
 
 const AGENT_CONTEXT_SNAPSHOT_QUESTION =
@@ -44,15 +44,8 @@ export async function buildAgentContextSnapshot({
     question: AGENT_CONTEXT_SNAPSHOT_QUESTION,
     root,
   });
-  const message = built.context.messages[0];
-  invariant(
-    message !== undefined,
-    "Agent context snapshot has no user message.",
-  );
-  invariant(
-    message.role === "user" && typeof message.content === "string",
-    "Agent context snapshot user message must be text.",
-  );
+  const message = joinTextUserMessages(built.context);
+  invariant(message.length > 0, "Agent context snapshot has no user content.");
 
-  return message.content;
+  return message;
 }

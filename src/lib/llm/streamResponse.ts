@@ -1,27 +1,9 @@
-import {
-  stream,
-  streamSimple,
-  type AssistantMessage,
-  type AssistantMessageEventStream,
-  type Context,
-  type TextContent,
-  type ToolCall,
-  type ToolResultMessage,
-} from "@earendil-works/pi-ai";
 import type { ContextItem } from "../../types";
 import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
 import { buildLlmInteractionContext } from "./interactionContext";
-import {
-  configuredLlmRequestOptions,
-  usesProviderSpecificRequestOptions,
-} from "./requestOptions";
-import {
-  canUseOpenAiResponsesCustomTools,
-  streamOpenAiResponsesWithCustomTools,
-} from "./openAiResponsesCustomTools";
+import { configuredLlmRequestOptions } from "./requestOptions";
+import { streamDirectLlmResponse } from "./directLlmClient";
 import { APPLY_PATCH_TOOL_NAME, patchProposalFromToolCall } from "./patchTool";
-import { isCursorAgentModel, streamCursorCompletion } from "./cursorCompletion";
-import { routeLlmWorkflowToolCalls } from "../../workflows/llmTools/toolRegistry";
 import type {
   LlmWorkflowToolResult,
   PatchToolMode,
@@ -29,6 +11,14 @@ import type {
 import { applyPatchProposalWithRuntimeEvents } from "../../workflows/patch/patchApplyRuntime";
 import { buildPatchValidationFailureToolOutput } from "../patch/patchToolOutput";
 import type { PatchProgressState } from "../patch/types";
+import type {
+  AssistantMessageEventStream,
+  LlmAssistantMessage,
+  LlmContext,
+  LlmTextContent,
+  LlmToolCall,
+  LlmToolResultMessage,
+} from "./types";
 
 type ConfiguredLlmRequest = Awaited<
   ReturnType<typeof resolveConfiguredLlmRequest>
@@ -77,8 +67,8 @@ export type LlmToolContinuationOutput = {
 };
 
 export type StreamLlmToolContinuationResult = {
-  assistantMessage: AssistantMessage;
-  context: Context;
+  assistantMessage: LlmAssistantMessage;
+  context: LlmContext;
   responseText: string;
 };
 
@@ -103,14 +93,14 @@ export function buildLlmToolContinuationContext({
   toolOutput,
   toolOutputs,
 }: {
-  assistantMessage: AssistantMessage;
-  context: Context;
+  assistantMessage: LlmAssistantMessage;
+  context: LlmContext;
   timestamp?: number;
   toolOutput?: LlmToolContinuationOutput;
   toolOutputs?: readonly LlmToolContinuationOutput[];
-}): Context {
+}): LlmContext {
   const outputs = normalizeToolOutputs({ toolOutput, toolOutputs });
-  const toolResults: ToolResultMessage[] = outputs.map((output) => ({
+  const toolResults: LlmToolResultMessage[] = outputs.map((output) => ({
     content: [{ text: output.content, type: "text" }],
     isError: output.isError ?? false,
     role: "toolResult",
@@ -135,8 +125,8 @@ export async function streamLlmToolContinuation({
   toolOutput,
   toolOutputs,
 }: {
-  assistantMessage: AssistantMessage;
-  context: Context;
+  assistantMessage: LlmAssistantMessage;
+  context: LlmContext;
   onCompletionLatency?: (stats: LlmCompletionLatencyStats) => void;
   onDelta?: (delta: string) => void;
   onPatchProgress?: (progress: PatchProgressState) => void;
@@ -151,12 +141,6 @@ export async function streamLlmToolContinuation({
     toolOutputs,
   });
   const request = await resolveConfiguredLlmRequest("primary");
-  if (isCursorAgentModel(request.model)) {
-    throw new Error(
-      "Cursor Composer completions do not support tool-result continuation.",
-    );
-  }
-
   const requestOptions = configuredLlmRequestOptions({
     ...request,
     signal,
@@ -204,49 +188,18 @@ export async function streamLlmInteraction({
     focusedContextItemId,
     root,
   });
-  const request = await resolveConfiguredLlmRequest("primary");
-  if (isCursorAgentModel(request.model)) {
-    if (request.serviceTier !== "default") {
-      throw new Error(
-        "Cursor Composer completions do not support Clutch service tiers. Use the default service tier.",
-      );
-    }
-
-    const latencyTracker = createCompletionLatencyTracker(onCompletionLatency);
-    const cursorResult = await streamCursorCompletion({
-      apiKey: request.apiKey,
-      context,
-      model: request.model,
-      onDelta: (delta) => {
-        latencyTracker.recordToken();
-        onDelta?.(delta);
-      },
+  const routeWorkflowToolCalls = async (toolCalls: readonly LlmToolCall[]) => {
+    const { routeLlmWorkflowToolCalls } = await import(
+      "../../workflows/llmTools/toolRegistry"
+    );
+    return await routeLlmWorkflowToolCalls({
+      allowedToolNames,
       root,
       signal,
-    }).finally(() => {
-      latencyTracker.finish();
+      toolCalls,
     });
-    if (cursorResult.kind === "toolCalls") {
-      const workflowResult = await routeLlmWorkflowToolCalls({
-        allowedToolNames,
-        root,
-        signal,
-        toolCalls: cursorResult.toolCalls,
-      });
-      if (workflowResult !== null) {
-        return {
-          ...workflowResult,
-          responseText: cursorResult.responseText,
-        };
-      }
-    }
-
-    return {
-      kind: "text",
-      responseText: cursorResult.responseText,
-    };
-  }
-
+  };
+  const request = await resolveConfiguredLlmRequest("primary");
   const requestOptions = configuredLlmRequestOptions({
     ...request,
     signal,
@@ -273,12 +226,7 @@ export async function streamLlmInteraction({
       requestId,
       root,
       routeAssistantMessageToolCalls: (assistantMessage) =>
-        routeLlmWorkflowToolCalls({
-          allowedToolNames,
-          root,
-          signal,
-          toolCalls: getAssistantToolCalls(assistantMessage),
-        }),
+        routeWorkflowToolCalls(getAssistantToolCalls(assistantMessage)),
       streamContinuation: ({ assistantMessage, context, toolOutputs }) =>
         streamLlmToolContinuation({
           assistantMessage,
@@ -288,16 +236,17 @@ export async function streamLlmInteraction({
           onPatchProgress,
           signal,
           toolOutputs,
-        }),
+      }),
     });
   }
+  if (toolCalls.length === 0) {
+    return {
+      kind: "text",
+      responseText,
+    };
+  }
 
-  const workflowResult = await routeLlmWorkflowToolCalls({
-    allowedToolNames,
-    root,
-    signal,
-    toolCalls,
-  });
+  const workflowResult = await routeWorkflowToolCalls(toolCalls);
 
   if (workflowResult !== null) {
     return await continuePatchToolCalls({
@@ -308,12 +257,7 @@ export async function streamLlmInteraction({
       patchToolMode,
       requestId,
       routeAssistantMessageToolCalls: (assistantMessage) =>
-        routeLlmWorkflowToolCalls({
-          allowedToolNames,
-          root,
-          signal,
-          toolCalls: getAssistantToolCalls(assistantMessage),
-        }),
+        routeWorkflowToolCalls(getAssistantToolCalls(assistantMessage)),
       root,
       streamContinuation: ({ assistantMessage, context, toolOutput }) =>
         streamLlmToolContinuation({
@@ -347,8 +291,8 @@ export async function continuePatchToolCalls({
   routeAssistantMessageToolCalls,
   streamContinuation,
 }: {
-  context: Context;
-  firstAssistantMessage: AssistantMessage;
+  context: LlmContext;
+  firstAssistantMessage: LlmAssistantMessage;
   firstResponseText: string;
   firstWorkflowResult: LlmWorkflowToolResult;
   maxInvalidPatchRetries?: number;
@@ -357,11 +301,11 @@ export async function continuePatchToolCalls({
   requestId?: number;
   root?: string;
   routeAssistantMessageToolCalls: (
-    assistantMessage: AssistantMessage,
+    assistantMessage: LlmAssistantMessage,
   ) => Promise<LlmWorkflowToolResult | null>;
   streamContinuation: (options: {
-    assistantMessage: AssistantMessage;
-    context: Context;
+    assistantMessage: LlmAssistantMessage;
+    context: LlmContext;
     toolOutput: LlmToolContinuationOutput;
   }) => Promise<StreamLlmToolContinuationResult>;
 }): Promise<StreamLlmInteractionResult> {
@@ -499,18 +443,18 @@ export async function continueApplyPatchToolCalls({
   routeAssistantMessageToolCalls,
   streamContinuation,
 }: {
-  context: Context;
-  firstAssistantMessage: AssistantMessage;
+  context: LlmContext;
+  firstAssistantMessage: LlmAssistantMessage;
   firstResponseText: string;
   maxToolContinuations?: number;
   requestId?: number;
   root?: string;
   routeAssistantMessageToolCalls: (
-    assistantMessage: AssistantMessage,
+    assistantMessage: LlmAssistantMessage,
   ) => Promise<LlmWorkflowToolResult | null>;
   streamContinuation: (options: {
-    assistantMessage: AssistantMessage;
-    context: Context;
+    assistantMessage: LlmAssistantMessage;
+    context: LlmContext;
     toolOutputs: readonly LlmToolContinuationOutput[];
   }) => Promise<StreamLlmToolContinuationResult>;
 }): Promise<StreamLlmInteractionResult> {
@@ -593,30 +537,15 @@ export async function continueApplyPatchToolCalls({
 
 function createConfiguredEventStream({
   context,
-  onPatchProgress,
   request,
   requestOptions,
 }: {
-  context: Context;
+  context: LlmContext;
   onPatchProgress?: (progress: PatchProgressState) => void;
   request: ConfiguredLlmRequest;
   requestOptions: ConfiguredLlmRequestOptions;
 }): AssistantMessageEventStream {
-  if (
-    canUseOpenAiResponsesCustomTools({
-      context,
-      model: request.model,
-    })
-  ) {
-    return streamOpenAiResponsesWithCustomTools(request.model, context, {
-      ...requestOptions,
-      ...(onPatchProgress === undefined ? {} : { onPatchProgress }),
-    });
-  }
-
-  return usesProviderSpecificRequestOptions(request)
-    ? stream(request.model, context, requestOptions)
-    : streamSimple(request.model, context, requestOptions);
+  return streamDirectLlmResponse(request.model, context, requestOptions);
 }
 
 async function collectAssistantMessage({
@@ -629,14 +558,14 @@ async function collectAssistantMessage({
   eventStream: AssistantMessageEventStream;
   onCompletionLatency?: (stats: LlmCompletionLatencyStats) => void;
   onDelta?: (delta: string) => void;
-}): Promise<{ finalMessage: AssistantMessage; responseText: string }> {
+}): Promise<{ finalMessage: LlmAssistantMessage; responseText: string }> {
   const latencyTracker = createCompletionLatencyTracker(
     onCompletionLatency,
     completionStartedAtMs,
   );
   let streamedText = "";
 
-  let finalMessage: AssistantMessage;
+  let finalMessage: LlmAssistantMessage;
   try {
     for await (const event of eventStream) {
       if (event.type === "text_delta") {
@@ -715,7 +644,7 @@ function formatCompletionFailureOutput({
   error,
   streamedText,
 }: {
-  assistantMessage?: AssistantMessage;
+  assistantMessage?: LlmAssistantMessage;
   error: unknown;
   streamedText: string;
 }): string {
@@ -761,20 +690,20 @@ function safeJsonStringify(value: unknown): string {
   }
 }
 
-function getAssistantText(message: AssistantMessage): string {
+function getAssistantText(message: LlmAssistantMessage): string {
   return message.content
-    .filter((block): block is TextContent => block.type === "text")
+    .filter((block): block is LlmTextContent => block.type === "text")
     .map((block) => block.text)
     .join("\n");
 }
 
-function getAssistantToolCalls(message: AssistantMessage): ToolCall[] {
+function getAssistantToolCalls(message: LlmAssistantMessage): LlmToolCall[] {
   return message.content.filter(
-    (block): block is ToolCall => block.type === "toolCall",
+    (block): block is LlmToolCall => block.type === "toolCall",
   );
 }
 
-function areOnlyApplyPatchToolCalls(toolCalls: readonly ToolCall[]): boolean {
+function areOnlyApplyPatchToolCalls(toolCalls: readonly LlmToolCall[]): boolean {
   return (
     toolCalls.length > 0 &&
     toolCalls.every((toolCall) => toolCall.name === APPLY_PATCH_TOOL_NAME)

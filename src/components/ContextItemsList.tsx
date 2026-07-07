@@ -140,7 +140,7 @@ function ContextFolderHeader({
   );
 }
 
-function ContextItemRow({
+export function ContextItemRow({
   depth,
   focused,
   label,
@@ -165,7 +165,7 @@ function ContextItemRow({
         {`${indent}${marker}${label}`}
       </text>
       {shortSummary === null ? null : (
-        <text truncate wrapMode="none" style={{ fg: "gray" }}>
+        <text wrapMode="word" style={{ fg: "gray", height: 2 }}>
           {`${indent}    ${shortSummary}`}
         </text>
       )}

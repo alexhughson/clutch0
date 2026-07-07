@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 import type { AppTask } from "./appTypes";
-import { getWorkspaceLayout, getWorkspaceLayoutMode } from "./layout";
+import {
+  getWorkspaceLayout,
+  getWorkspaceLayoutMode,
+  getWorkspaceStackLayout,
+} from "./layout";
 import {
   canUseContextListKeyboardWithPane,
   isWorkspacePaneTask,
@@ -56,6 +60,24 @@ test("only passive panes share context-list keyboard navigation", () => {
   ).toBe(false);
 });
 
+test("workspace stack heights fit supported small layouts", () => {
+  expect(stackTotal("medium", 24, false)).toBeLessThanOrEqual(24);
+  expect(stackTotal("medium", 25, true)).toBeLessThanOrEqual(25);
+  expect(stackTotal("compact", 20, false)).toBeLessThanOrEqual(20);
+  expect(stackTotal("compact", 20, true)).toBeLessThanOrEqual(20);
+  expect(stackTotal("compact", 19, true)).toBeLessThanOrEqual(19);
+  expect(stackTotal("compact", 14, true)).toBeLessThanOrEqual(14);
+  expect(stackTotal("compact", 14, false)).toBeLessThanOrEqual(14);
+});
+
+test("workspace stack keeps enough context rows for one summarized item", () => {
+  expect(stack("medium", 24, false).contextHeight).toBe(4);
+  expect(stack("medium", 25, true).contextHeight).toBe(4);
+  expect(stack("compact", 20, false).contextHeight).toBe(4);
+  expect(stack("compact", 20, true).contextHeight).toBe(4);
+  expect(stack("compact", 19, true).contextHeight).toBe(4);
+});
+
 function configTask(mode: "first-run" | "settings"): AppTask {
   return {
     agent: { model: "gpt-test", provider: "openai" },
@@ -65,4 +87,35 @@ function configTask(mode: "first-run" | "settings"): AppTask {
     primary: { model: "gpt-test", provider: "openai" },
     summarization: { model: "gpt-test", provider: "openai" },
   };
+}
+
+function stack(
+  mode: "compact" | "medium",
+  terminalHeight: number,
+  composerHasSuggestions: boolean,
+) {
+  return getWorkspaceStackLayout({
+    composerHasSuggestions,
+    hasPaneTask: false,
+    mode,
+    terminalHeight,
+  });
+}
+
+function stackTotal(
+  mode: "compact" | "medium",
+  terminalHeight: number,
+  composerHasSuggestions: boolean,
+): number {
+  const layout = stack(mode, terminalHeight, composerHasSuggestions);
+  const suggestionRows =
+    layout.suggestionHeight === undefined ? 0 : layout.suggestionHeight + 1;
+
+  return (
+    8 +
+    layout.contextHeight +
+    layout.summaryHeight +
+    layout.inputHeight +
+    suggestionRows
+  );
 }

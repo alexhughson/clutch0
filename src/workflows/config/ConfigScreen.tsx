@@ -1377,19 +1377,8 @@ function isSubscriptionProvider(provider: SupportedClutchLlmProvider): boolean {
 }
 
 function modelProvidersForEntry(entry: ModelEntry) {
-  return SUPPORTED_CLUTCH_LLM_PROVIDERS.filter((provider) =>
-    isProviderSupportedForModelEntry({ entry, provider: provider.id }),
-  );
-}
-
-function isProviderSupportedForModelEntry({
-  entry,
-  provider,
-}: {
-  entry: ModelEntry;
-  provider: SupportedClutchLlmProvider;
-}): boolean {
-  return provider !== "cursor" || entry === "primary";
+  void entry;
+  return SUPPORTED_CLUTCH_LLM_PROVIDERS;
 }
 
 function modelChoiceStatusLabel({

@@ -1,15 +1,9 @@
 import type {
-  Api,
-  Model,
-  ProviderStreamOptions,
-  SimpleStreamOptions,
-  ThinkingLevel,
-} from "@earendil-works/pi-ai";
-import type {
   ClutchModelEffortLevel,
   ClutchModelServiceTier,
   ResolvedConfiguredLlmRequest,
 } from "../config/clutchConfig";
+import type { LlmModel, LlmThinkingLevel } from "./types";
 
 const CEREBRAS_MAX_OUTPUT_TOKENS = 4_096;
 const PRIORITY_SERVICE_TIER = "priority";
@@ -30,13 +24,21 @@ type OpenRouterReasoning = {
   exclude: true;
 };
 
-type ConfiguredLlmRequestOptions = SimpleStreamOptions &
-  ProviderStreamOptions & {
-    reasoningEffort?: ThinkingLevel;
-    serviceTier?: typeof PRIORITY_SERVICE_TIER;
-  };
+export type ConfiguredLlmRequestOptions = {
+  apiKey: string;
+  headers?: Record<string, string>;
+  maxTokens?: number;
+  onPayload?: (
+    payload: unknown,
+    model: LlmModel,
+  ) => unknown | undefined | Promise<unknown | undefined>;
+  reasoning?: LlmThinkingLevel;
+  reasoningEffort?: LlmThinkingLevel;
+  serviceTier?: typeof PRIORITY_SERVICE_TIER;
+  signal?: AbortSignal;
+};
 
-export function maxOutputTokensForModel(model: Model<Api>): number | undefined {
+export function maxOutputTokensForModel(model: LlmModel): number | undefined {
   if (model.provider === "cerebras") {
     return Math.min(model.maxTokens, CEREBRAS_MAX_OUTPUT_TOKENS);
   }
@@ -46,7 +48,7 @@ export function maxOutputTokensForModel(model: Model<Api>): number | undefined {
 
 export function reasoningForEffortLevel(
   effortLevel: ClutchModelEffortLevel,
-): ThinkingLevel | undefined {
+): LlmThinkingLevel | undefined {
   return effortLevel === "off" ? undefined : effortLevel;
 }
 
@@ -54,7 +56,7 @@ export function serviceTierForRequest({
   model,
   serviceTier,
 }: {
-  model: Model<Api>;
+  model: LlmModel;
   serviceTier: ClutchModelServiceTier;
 }): typeof PRIORITY_SERVICE_TIER | undefined {
   if (serviceTier === "default") {
@@ -77,7 +79,7 @@ export function usesProviderSpecificRequestOptions({
   model,
   serviceTier,
 }: {
-  model: Model<Api>;
+  model: LlmModel;
   serviceTier: ClutchModelServiceTier;
 }): boolean {
   return (
@@ -121,11 +123,11 @@ export function configuredLlmRequestOptions({
   };
 }
 
-function isOpenAiResponsesPriorityModel(model: Model<Api>): boolean {
+function isOpenAiResponsesPriorityModel(model: LlmModel): boolean {
   return model.provider === "openai" && model.api === "openai-responses";
 }
 
-function isOpenRouterPriorityModel(model: Model<Api>): boolean {
+function isOpenRouterPriorityModel(model: LlmModel): boolean {
   return (
     model.provider === "openrouter" &&
     model.api === "openai-completions" &&
@@ -135,17 +137,17 @@ function isOpenRouterPriorityModel(model: Model<Api>): boolean {
   );
 }
 
-function isOpenRouterChatCompletionsModel(model: Model<Api>): boolean {
+function isOpenRouterChatCompletionsModel(model: LlmModel): boolean {
   return model.provider === "openrouter" && model.api === "openai-completions";
 }
 
-function isOpenRouterGeminiReasoningModel(model: Model<Api>): boolean {
+function isOpenRouterGeminiReasoningModel(model: LlmModel): boolean {
   return model.id
     .toLowerCase()
     .startsWith(OPENROUTER_GEMINI_REASONING_MODEL_PREFIX);
 }
 
-function isOpenRouterOpenAiReasoningModel(model: Model<Api>): boolean {
+function isOpenRouterOpenAiReasoningModel(model: LlmModel): boolean {
   const modelId = model.id.toLowerCase();
   return OPENROUTER_OPENAI_REASONING_MODEL_PREFIXES.some((prefix) =>
     modelId.startsWith(prefix),
@@ -157,7 +159,7 @@ function openRouterReasoningForRequest({
   model,
 }: {
   effortLevel: ClutchModelEffortLevel;
-  model: Model<Api>;
+  model: LlmModel;
 }): OpenRouterReasoning | undefined {
   if (!isOpenRouterChatCompletionsModel(model)) {
     return undefined;
@@ -189,7 +191,7 @@ function mappedOpenRouterReasoningEffort({
   model,
 }: {
   effortLevel: Exclude<ClutchModelEffortLevel, "off">;
-  model: Model<Api>;
+  model: LlmModel;
 }): string {
   const effort = model.thinkingLevelMap?.[effortLevel] ?? effortLevel;
   if (effort === null) {
@@ -206,9 +208,9 @@ function openRouterPayloadOptionsForRequest({
   serviceTier,
 }: {
   effortLevel: ClutchModelEffortLevel;
-  model: Model<Api>;
+  model: LlmModel;
   serviceTier: typeof PRIORITY_SERVICE_TIER | undefined;
-}): ProviderStreamOptions["onPayload"] | undefined {
+}): ConfiguredLlmRequestOptions["onPayload"] | undefined {
   if (!isOpenRouterChatCompletionsModel(model)) {
     return undefined;
   }

@@ -6,8 +6,10 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { invariant } from "../../lib/invariant";
 import type { AgentAskMode } from "../../types";
-import type { LlmSlashCommand } from "../llmTools/types";
+import type { PendingLlmSlashCommand } from "../llmTools/types";
 import { formatAgentSkillSlashCommandName } from "./agentSkillCommand";
+
+export type AgentAskSkillSlashCommand = PendingLlmSlashCommand;
 
 const AGENT_ASK_READ_ONLY_BUILTIN_TOOLS = [
   "read",
@@ -43,7 +45,7 @@ export async function loadAgentAskSkillSlashCommands({
 }: {
   agentDir?: string;
   root?: string;
-} = {}): Promise<LlmSlashCommand[]> {
+} = {}): Promise<AgentAskSkillSlashCommand[]> {
   const resourceLoader = await createAgentAskResourceLoader({
     agentDir,
     noExtensions: true,
@@ -55,7 +57,6 @@ export async function loadAgentAskSkillSlashCommands({
     description: skill.description,
     name: formatAgentSkillSlashCommandName(skill.name),
     promptDirective: "",
-    taskKind: "agent-skill" as const,
     title: `Skill: ${skill.name}`,
   }));
 }

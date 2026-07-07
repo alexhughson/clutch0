@@ -15,11 +15,10 @@ export const RUN_SHELL_COMMAND_TOOL_NAME = "run_shell_command";
 export const runShellCommandTool: Tool = {
   name: RUN_SHELL_COMMAND_TOOL_NAME,
   description:
-    "Run a shell command in the project root and save stdout/stderr as context for later use. Prefer read-only commands unless the user explicitly asks for a command with side effects.",
+    "Run one project-root shell command and save stdout/stderr as context.",
   parameters: Type.Object({
     command: Type.String({
-      description:
-        "The shell command to run from the project root. Use one concise command.",
+      description: "One concise command.",
     }),
   }),
 };
@@ -31,7 +30,6 @@ export const shellCommandWorkflowTool: LlmWorkflowToolController = {
       "Ask the LLM to choose and run a shell command, then save the output as context.",
     name: "cmd",
     promptDirective: shellCommandPromptDirective,
-    taskKind: "shell-command",
     title: "Run shell command",
   },
   enabledByDefault: true,

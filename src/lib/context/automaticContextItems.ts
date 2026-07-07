@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { loadFileList } from "../fileListLoader";
 import { isNotGitRepositoryError, readGitDiff } from "../git/gitDiff";
+import { getGeneratedSummaryView } from "./contextItemFormatting";
+import { openContextItemAction } from "./contextItemActions";
 import {
   createFileContextItem,
   FileContextItem,
@@ -23,9 +25,70 @@ export const AGENTS_CONTEXT_ITEM_ID = getFileContextItemId("AGENTS.md");
 export const FILE_LIST_CONTEXT_ITEM_ID = "builtin:file-list";
 export const UNSTAGED_CHANGES_CONTEXT_ITEM_ID = "builtin:unstaged-changes";
 
-const MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS = 120_000;
+export const MAX_DIFF_CONTEXT_CHARACTERS = 120_000;
+export const MAX_DIRECTORY_TREE_ENTRIES = 1_000;
 
-let automaticContextItems: readonly ContextItem[] | null = null;
+export async function readCurrentDiffForLlm({
+  root,
+}: {
+  root: string;
+}): Promise<string | null> {
+  try {
+    const diffText = await readCurrentDiffForContext({ root });
+    if (diffText.trim().length === 0) {
+      return null;
+    }
+
+    return diffText;
+  } catch (error) {
+    if (isNotGitRepositoryError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function readFileListForLlm({
+  root,
+}: {
+  root: string;
+}): Promise<string | null> {
+  const filePaths = await loadFileList({ root });
+  if (filePaths.length === 0) {
+    return null;
+  }
+
+  const visibleFilePaths = filePaths.slice(0, MAX_DIRECTORY_TREE_ENTRIES);
+  const truncatedNote =
+    filePaths.length > visibleFilePaths.length
+      ? `\n[Directory tree truncated after ${visibleFilePaths.length} of ${filePaths.length} files.]`
+      : "";
+
+  return `${visibleFilePaths.join("\n")}${truncatedNote}`;
+}
+
+export function getAmbientLlmContextItems(
+  automaticContextItems: readonly ContextItem[] = createAutomaticContextItems(),
+): ContextItem[] {
+  return automaticContextItems.filter(
+    (item) =>
+      item.type === "automatic-unstaged-changes" ||
+      item.type === "automatic-file-list",
+  );
+}
+
+export function getAutomaticContextBlockName(type: string): string | null {
+  if (type === "automatic-unstaged-changes") {
+    return "current_diff";
+  }
+
+  if (type === "automatic-file-list") {
+    return "directory_tree";
+  }
+
+  return null;
+}
 
 export function createAutomaticContextItems(): ContextItem[] {
   return [
@@ -36,8 +99,7 @@ export function createAutomaticContextItems(): ContextItem[] {
 }
 
 export function getAutomaticContextItems(): readonly ContextItem[] {
-  automaticContextItems ??= createAutomaticContextItems();
-  return automaticContextItems;
+  return createAutomaticContextItems();
 }
 
 export function getVisibleContextItems(
@@ -107,39 +169,42 @@ class UnstagedChangesContextItem implements ContextItem {
   }): Promise<ContextItemDetailView> {
     let diffText: string;
     try {
-      diffText = await readUnstagedChanges({ root });
+      diffText = await readCurrentDiff({
+        maxBuffer: Number.MAX_SAFE_INTEGER,
+        root,
+      });
     } catch (error) {
       if (isNotGitRepositoryError(error)) {
         diffText = "";
       } else {
-        return gitDiffErrorDetail(error);
+        throw error;
       }
     }
 
     if (diffText.trim().length === 0) {
       return {
-        content: "No unstaged changes.",
+        content: "No current changes.",
         kind: "text",
-        title: "Unstaged changes",
+        title: "Current changes",
       };
     }
 
     return {
       diffText,
       kind: "diff",
-      summary: "Unstaged working tree diff.",
-      title: "Unstaged changes",
+      summary: "Current working tree diff.",
+      title: "Current changes",
     };
   }
 
   getListLabel(): string {
-    return "Unstaged changes";
+    return "Current changes";
   }
 
   async getSummarizationInput({ root }: { root: string }) {
     let diffText: string;
     try {
-      diffText = await readUnstagedChanges({ root });
+      diffText = await readCurrentDiffForContext({ root });
     } catch (error) {
       if (isNotGitRepositoryError(error)) {
         return null;
@@ -152,11 +217,11 @@ class UnstagedChangesContextItem implements ContextItem {
       return null;
     }
 
-    const sourceText = `Unstaged changes\n\n${diffText}`;
+    const sourceText = `Current changes\n\n${diffText}`;
     return {
       content: sourceText,
       itemId: this.id,
-      label: "Unstaged changes",
+      label: "Current changes",
       sourceHash: hashContent(sourceText),
       type: this.type,
     };
@@ -167,16 +232,23 @@ class UnstagedChangesContextItem implements ContextItem {
   }
 
   getSummaryView() {
-    return getAutomaticSummaryView(this.summaryState, {
-      detail: "Git unstaged changes automatically included in LLM requests.",
-      title: "Unstaged changes",
+    return getGeneratedSummaryView(this.summaryState, {
+      detail: "Git current changes automatically included in LLM requests.",
+      title: "Current changes",
     });
   }
 
-  async formatForLlm(): Promise<FormattedContextItem> {
+  async formatForLlm({
+    root,
+  }: {
+    focused: boolean;
+    remainingFileCharacters: number;
+    root: string;
+  }): Promise<FormattedContextItem> {
+    const diffText = await readCurrentDiffForLlm({ root });
     return {
       consumedFileCharacters: 0,
-      text: "",
+      text: diffText ?? "",
     };
   }
 
@@ -187,7 +259,7 @@ class UnstagedChangesContextItem implements ContextItem {
   getPersistence(): ContextItemPersistence {
     return {
       kind: "ephemeral",
-      reason: "Unstaged changes are read from the current workspace.",
+      reason: "Current changes are read from the current workspace.",
     };
   }
 
@@ -260,16 +332,23 @@ class FileListContextItem implements ContextItem {
   }
 
   getSummaryView() {
-    return getAutomaticSummaryView(this.summaryState, {
+    return getGeneratedSummaryView(this.summaryState, {
       detail: "Git-aware file list automatically included in LLM requests.",
       title: "File list",
     });
   }
 
-  async formatForLlm(): Promise<FormattedContextItem> {
+  async formatForLlm({
+    root,
+  }: {
+    focused: boolean;
+    remainingFileCharacters: number;
+    root: string;
+  }): Promise<FormattedContextItem> {
+    const fileListText = await readFileListForLlm({ root });
     return {
       consumedFileCharacters: 0,
-      text: "",
+      text: fileListText ?? "",
     };
   }
 
@@ -289,84 +368,47 @@ class FileListContextItem implements ContextItem {
   }
 }
 
-function getAutomaticSummaryView(
-  summaryState: ContextItemSummaryState,
-  fallback: { detail: string; title: string },
-) {
-  if (summaryState.status === "ready") {
-    return {
-      detail: summaryState.summary.details,
-      label: fallback.title,
-      status: summaryState.status,
-      title: summaryState.summary.oneLine,
-    };
-  }
-
-  if (summaryState.status === "pending") {
-    return {
-      detail: "Summarizing…",
-      label: fallback.title,
-      status: summaryState.status,
-      title: fallback.title,
-    };
-  }
-
-  if (summaryState.status === "error") {
-    return {
-      detail: `Summary unavailable: ${summaryState.errorMessage}`,
-      label: fallback.title,
-      status: summaryState.status,
-      title: fallback.title,
-    };
-  }
-
-  return {
-    ...fallback,
-    label: fallback.title,
-    status: summaryState.status,
-  };
-}
-
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
-async function readUnstagedChanges({
+async function readCurrentDiff({
+  maxBuffer,
+  root,
+}: {
+  maxBuffer: number;
+  root: string;
+}): Promise<string> {
+  return await readGitDiff({
+    includeStaged: true,
+    maxBuffer,
+    root,
+  });
+}
+
+async function readCurrentDiffForContext({
   root,
 }: {
   root: string;
 }): Promise<string> {
   try {
     return truncateContent(
-      await readGitDiff({
-        includeStaged: false,
-        maxBuffer: MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS * 2,
+      await readCurrentDiff({
+        maxBuffer: MAX_DIFF_CONTEXT_CHARACTERS * 2,
         root,
       }),
-      MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS,
+      MAX_DIFF_CONTEXT_CHARACTERS,
     );
   } catch (error) {
-    if (!isMaxBufferError(error)) {
-      throw error;
+    if (isMaxBufferError(error)) {
+      return truncateContent(
+        getErrorStdout(error),
+        MAX_DIFF_CONTEXT_CHARACTERS,
+      );
     }
 
-    return truncateContent(
-      getErrorStdout(error),
-      MAX_UNSTAGED_CHANGES_DETAIL_CHARACTERS,
-    );
+    throw error;
   }
-}
-
-function gitDiffErrorDetail(error: unknown): ContextItemDetailView {
-  return {
-    content: `Unable to read unstaged changes.\n\n${formatUnknownError(error)}`,
-    kind: "text",
-    title: "Unstaged changes",
-  };
-}
-
-function formatUnknownError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function isMaxBufferError(error: unknown): boolean {
@@ -393,21 +435,4 @@ function truncateContent(content: string, maxCharacters: number): string {
   }
 
   return `${content.slice(0, maxCharacters)}\n[Context truncated.]`;
-}
-
-function openContextItemAction(itemId: string): ContextItemAction {
-  return {
-    id: "open",
-    label: "open",
-    shortcut: { ctrl: true, display: "Ctrl+o", name: "o" },
-    run: (context) => context.openContextItem(itemId),
-  };
-}
-
-function isFileNotFoundError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === "ENOENT"
-  );
 }

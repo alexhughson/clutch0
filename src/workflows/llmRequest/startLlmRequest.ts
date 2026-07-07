@@ -161,12 +161,6 @@ function runtimeDetailsForWorkflowResult(
       };
     case "find-files":
       return { goal: result.goal, hintCount: result.hints.length };
-    case "mcp-tool-output":
-      return {
-        isError: result.output.isError,
-        serverName: result.output.serverName,
-        toolName: result.output.toolName,
-      };
     case "patch":
       return {
         editCount: getPatchProposalPaths(result.patch.proposal).length,

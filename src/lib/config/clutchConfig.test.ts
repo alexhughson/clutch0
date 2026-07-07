@@ -33,14 +33,9 @@ function modelFixture({
           api: "openai-codex-responses" as const,
           baseUrl: "https://chatgpt.com/backend-api",
         }
-      : provider === "cursor"
+      : provider === "google"
         ? {
-            api: "cursor-agent" as const,
-            baseUrl: "cursor-sdk://agent",
-          }
-        : provider === "google"
-          ? {
-              api: "google-generative-ai" as const,
+            api: "google-generative-ai" as const,
               baseUrl: "https://generativelanguage.googleapis.com/v1beta",
             }
           : provider === "openai"
@@ -263,119 +258,6 @@ test("supports Google Gemini API key credentials", async () => {
     type: "api_key",
   });
   expect(isClutchConfigured(paths)).toBe(true);
-});
-
-test("supports Cursor Composer as the primary model only", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "cursor-token", paths, provider: "cursor" });
-  saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" });
-  const primary = {
-    metadata: {
-      ...modelFixture({ id: "composer-2.5:fast", provider: "cursor" }),
-      compat: {
-        cursorModelSelection: {
-          id: "composer-2.5",
-          params: [{ id: "speed", value: "fast" }],
-        },
-      },
-      name: "Composer 2.5 (Fast)",
-    } as Model<Api>,
-    model: "composer-2.5:fast",
-    provider: "cursor" as const,
-  };
-  const summarization = {
-    metadata: modelFixture({ id: "gpt-live-summary" }),
-    model: "gpt-live-summary",
-    provider: "openai" as const,
-  };
-  const agent = {
-    metadata: modelFixture({ id: "gpt-live-agent" }),
-    model: "gpt-live-agent",
-    provider: "openai" as const,
-  };
-
-  saveClutchModelConfiguration({
-    agent,
-    paths,
-    primary,
-    summarization,
-  });
-
-  await expect(resolveConfiguredLlmRequest("primary", paths)).resolves.toEqual({
-    apiKey: "cursor-token",
-    effortLevel: "low",
-    model: primary.metadata,
-    serviceTier: "default",
-  });
-  await expect(resolveConfiguredLlmRequest("agent", paths)).resolves.toEqual({
-    apiKey: "openai-token",
-    effortLevel: "low",
-    model: agent.metadata,
-    serviceTier: "default",
-  });
-  expect(isClutchConfigured(paths)).toBe(true);
-});
-
-test("rejects Cursor Composer for agent and summarization model roles", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "cursor-token", paths, provider: "cursor" });
-  saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" });
-  const cursorSelection = {
-    metadata: modelFixture({ id: "composer-2.5:fast", provider: "cursor" }),
-    model: "composer-2.5:fast",
-    provider: "cursor" as const,
-  };
-  const openAiSelection = {
-    metadata: modelFixture({ id: "gpt-live-primary" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
-  };
-
-  expect(() =>
-    saveClutchModelConfiguration({
-      agent: cursorSelection,
-      paths,
-      primary: openAiSelection,
-      summarization: openAiSelection,
-    }),
-  ).toThrow("Cursor Composer is only supported for the Clutch primary model.");
-  expect(() =>
-    saveClutchModelConfiguration({
-      agent: openAiSelection,
-      paths,
-      primary: openAiSelection,
-      summarization: cursorSelection,
-    }),
-  ).toThrow("Cursor Composer is only supported for the Clutch primary model.");
-});
-
-test("defaults non-primary model drafts away from Cursor Composer", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "cursor-token", paths, provider: "cursor" });
-  await writeFile(
-    paths.settingsPath,
-    JSON.stringify({
-      models: {
-        primary: {
-          effortLevel: "low",
-          metadata: modelFixture({
-            id: "composer-2.5:fast",
-            provider: "cursor",
-          }),
-          model: "composer-2.5:fast",
-          provider: "cursor",
-          serviceTier: "default",
-        },
-      },
-    }),
-    "utf-8",
-  );
-
-  const draft = createDefaultClutchConfigDraft(paths);
-
-  expect(draft.primary.provider).toBe("cursor");
-  expect(draft.agent).toMatchObject({ model: "", provider: "openai" });
-  expect(draft.summarization).toMatchObject({ model: "", provider: "openai" });
 });
 
 test("normalizes saved OpenCode DeepSeek V4 metadata on resolve", async () => {

@@ -8,16 +8,14 @@ export const FIND_RELEVANT_FILES_TOOL_NAME = "find_relevant_files";
 export const findRelevantFilesTool: Tool = {
   name: FIND_RELEVANT_FILES_TOOL_NAME,
   description:
-    "Ask Clutch to search the project for files relevant to the user's request. Use this for discovery, stack traces, missing source, unrelated/truncated context, or code questions without enough selected files. This opens an interactive file-picking workflow; do not answer with guessed file names.",
+    "Find project files for discovery, stack traces, missing source, or insufficient selected context.",
   parameters: Type.Object({
     goal: Type.String({
-      description:
-        "What the file search agent should look for, phrased as a concrete code-navigation goal.",
+      description: "Concrete code-navigation goal.",
     }),
     hints: Type.Optional(
       Type.Array(Type.String(), {
-        description:
-          "Optional symbols, directories, error messages, or feature names that may help find relevant files.",
+        description: "Symbols, paths, errors, or feature names.",
       }),
     ),
   }),

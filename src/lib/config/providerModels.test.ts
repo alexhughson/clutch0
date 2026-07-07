@@ -9,7 +9,6 @@ import {
 } from "./clutchConfig";
 import {
   fetchClutchProviderModels,
-  modelsFromCursorSdkModels,
   modelsFromProviderResponse,
 } from "./providerModels";
 
@@ -151,101 +150,6 @@ test("loads Google Gemini models from pi catalog", async () => {
       reasoning: true,
     },
   );
-});
-
-test("maps Cursor SDK model variants to stored Composer selections", () => {
-  const models = modelsFromCursorSdkModels([
-    {
-      displayName: "Composer 2.5",
-      id: "composer-2.5",
-      parameters: [
-        {
-          displayName: "Fast",
-          id: "fast",
-          values: [{ value: "false" }, { displayName: "Fast", value: "true" }],
-        },
-      ],
-      variants: [
-        {
-          displayName: "Composer 2.5",
-          isDefault: true,
-          params: [{ id: "fast", value: "true" }],
-        },
-        {
-          displayName: "Composer 2.5",
-          params: [{ id: "fast", value: "false" }],
-        },
-      ],
-    },
-  ]);
-
-  expect(models.map((model) => model.id)).toEqual([
-    "composer-2.5:fast",
-    "composer-2.5:standard",
-  ]);
-  expect(models[0]).toMatchObject({
-    api: "cursor-agent",
-    baseUrl: "cursor-sdk://agent",
-    id: "composer-2.5:fast",
-    name: "Composer 2.5 (Fast)",
-    provider: "cursor",
-    compat: {
-      cursorModelSelection: {
-        id: "composer-2.5",
-        params: [{ id: "fast", value: "true" }],
-      },
-    },
-  });
-  expect(models[1]).toMatchObject({
-    id: "composer-2.5:standard",
-    name: "Composer 2.5 (Standard)",
-    compat: {
-      cursorModelSelection: {
-        id: "composer-2.5",
-        params: [{ id: "fast", value: "false" }],
-      },
-    },
-  });
-});
-
-test("loads Cursor models through the SDK with configured API key", async () => {
-  const paths = getClutchConfigPaths(
-    await mkdtemp(join(tmpdir(), "clutch-provider-models-")),
-  );
-  saveClutchApiKey({
-    apiKey: "cursor-token",
-    paths,
-    provider: "cursor",
-  });
-
-  const models = await fetchClutchProviderModels({
-    cursorListModels: async ({ apiKey }) => {
-      expect(apiKey).toBe("cursor-token");
-      return [
-        {
-          displayName: "Composer 2.5",
-          id: "composer-2.5",
-          variants: [
-            {
-              displayName: "Fast",
-              params: [{ id: "fast", value: "true" }],
-            },
-          ],
-        },
-      ];
-    },
-    fetchImpl: (async () => {
-      throw new Error("Cursor model lookup should use the SDK");
-    }) as unknown as typeof fetch,
-    paths,
-    provider: "cursor",
-  });
-
-  expect(models[0]).toMatchObject({
-    api: "cursor-agent",
-    id: "composer-2.5:fast",
-    provider: "cursor",
-  });
 });
 
 test("keeps OpenCode Zen chat-completions metadata for compatible models", () => {

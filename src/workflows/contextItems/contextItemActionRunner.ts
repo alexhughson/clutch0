@@ -16,10 +16,7 @@ export function runContextItemAction({
   closeAfterRemove: boolean;
 }) {
   void action.run({
-    applyAgentSandboxDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    applySavedDiff: (itemId) => {
+    applyDiff: (itemId) => {
       void applySavedDiffContextItem(itemId);
     },
     openContextItem: (itemId) => {
