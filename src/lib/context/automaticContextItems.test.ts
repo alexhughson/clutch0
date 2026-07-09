@@ -153,6 +153,95 @@ test("current changes detail shows the full large staged diff", async () => {
   expect(summaryInput?.content).toBe(`Current changes\n\n${formatted.text}`);
 });
 
+test("current changes LLM context marks byte-truncated multibyte diffs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "large-cjk.txt"), repeatLine("漢字漢字", 20_000));
+  await git(root, ["add", "large-cjk.txt"]);
+
+  const item = getUnstagedChangesItem();
+  const detail = await item.getDetailView({ root });
+  const summaryInput = await item.getSummarizationInput({ root });
+  const formatted = await item.formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
+
+  expect(detail?.kind).toBe("diff");
+  if (detail?.kind !== "diff") {
+    throw new Error("Expected diff detail view.");
+  }
+
+  expect(detail.diffText).not.toContain("[Context truncated.]");
+  expect(formatted.text).toContain("[Context truncated.]");
+  expect(summaryInput?.content).toStartWith("Current changes\n\n");
+  expect(summaryInput?.content).toContain("[Context truncated.]");
+});
+
+test("current changes LLM context keeps staged diff when untracked diff byte-truncates", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "staged.txt"), "small staged marker\n");
+  await git(root, ["add", "staged.txt"]);
+  await writeFile(join(root, "large-untracked.txt"), repeatLine("漢字漢字", 20_000));
+
+  const formatted = await getUnstagedChangesItem().formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
+
+  expect(formatted.text).toContain("small staged marker");
+  expect(formatted.text).toContain("large-untracked.txt");
+  expect(formatted.text).toContain("[Context truncated.]");
+});
+
+test("current changes LLM context keeps cached diff when unborn working tree diff byte-truncates", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "small-staged.txt"), "small staged marker\n");
+  await git(root, ["add", "small-staged.txt"]);
+  await writeFile(join(root, "large.txt"), "staged large marker\n");
+  await git(root, ["add", "large.txt"]);
+  await writeFile(join(root, "large.txt"), repeatLine("漢字漢字", 20_000));
+
+  const formatted = await getUnstagedChangesItem().formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
+
+  expect(formatted.text).toContain("small-staged.txt");
+  expect(formatted.text).toContain("small staged marker");
+  expect(formatted.text).toContain("large.txt");
+  expect(formatted.text).toContain("[Context truncated.]");
+});
+
+test("current changes LLM context does not treat an oversized untracked path list as diff text", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
+  await git(root, ["init"]);
+  await writeFile(join(root, "staged.txt"), "small staged marker\n");
+  await git(root, ["add", "staged.txt"]);
+  for (let index = 0; index < 1_600; index += 1) {
+    await writeFile(
+      join(root, `rawpathmarker-${index}-${"x".repeat(180)}.txt`),
+      "untracked\n",
+    );
+  }
+
+  const formatted = await getUnstagedChangesItem().formatForLlm({
+    focused: false,
+    remainingFileCharacters: Number.POSITIVE_INFINITY,
+    root,
+  });
+
+  expect(formatted.text).toContain("small staged marker");
+  expect(formatted.text).toContain("[Context truncated.]");
+  expect(formatted.text).not.toContain("rawpathmarker");
+  expect(formatted.text).not.toContain("\0");
+});
+
 test("unstaged changes detail shows an empty state when the tree is clean", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
   await git(root, ["init"]);
@@ -218,4 +307,8 @@ function repeatLines(prefix: string, count: number): string {
     { length: count },
     (_, index) => `${prefix} ${index}\n`,
   ).join("");
+}
+
+function repeatLine(line: string, count: number): string {
+  return Array.from({ length: count }, () => `${line}\n`).join("");
 }

@@ -13,9 +13,11 @@ import {
   getSupportedClutchProviderLabel,
   getClutchModelEffortLevel,
   getClutchModelServiceTier,
+  saveClutchAgentBackendConfiguration,
   saveClutchApiKey,
   saveClutchModelConfiguration,
   SUPPORTED_CLUTCH_LLM_PROVIDERS,
+  type ClutchAgentBackendConfig,
   type ClutchModelEffortLevel,
   type ClutchModelSelection,
   type ClutchModelServiceTier,
@@ -33,6 +35,7 @@ type ConfigScreenProps = {
 };
 
 type ConfigStage =
+  | "agent-backend"
   | "model-effort"
   | "model-model"
   | "model-provider"
@@ -45,6 +48,13 @@ type ModelEntry = "agent" | "primary" | "summarization";
 type ModelSettingsRow =
   | { entry: ModelEntry; kind: "effort" | "model" | "service-tier" }
   | { kind: "done" };
+type AgentBackendField = "args" | "command" | "env";
+type AgentBackendRow = AgentBackendField | "save";
+type AgentBackendForm = {
+  argsJson: string;
+  command: string;
+  envJson: string;
+};
 type ModelLoadState =
   | {
       models: Model<Api>[];
@@ -79,6 +89,12 @@ const MODEL_SETTINGS_ROWS: ModelSettingsRow[] = [
   { entry: "summarization", kind: "service-tier" },
   { kind: "done" },
 ];
+const AGENT_BACKEND_ROWS: AgentBackendRow[] = [
+  "command",
+  "args",
+  "env",
+  "save",
+];
 const VISIBLE_MODEL_COUNT = 10;
 
 export function ConfigScreen({ task }: ConfigScreenProps) {
@@ -101,6 +117,10 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const [modelServiceTierIndex, setModelServiceTierIndex] = useState(0);
   const [modelIndex, setModelIndex] = useState(0);
   const [modelFilter, setModelFilter] = useState("");
+  const [agentBackendForm, setAgentBackendForm] = useState(
+    agentBackendFormFromConfig(task.agentBackend),
+  );
+  const [agentBackendRowIndex, setAgentBackendRowIndex] = useState(0);
   const [agent, setAgent] = useState(task.agent);
   const [primary, setPrimary] = useState(task.primary);
   const [summarization, setSummarization] = useState(task.summarization);
@@ -157,16 +177,29 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   }, [activeSelection.model, activeSelection.provider, stage]);
 
   usePaste((event) => {
-    if (stage !== "token") {
+    if (stage !== "token" && stage !== "agent-backend") {
       return;
     }
 
-    const pastedToken = sanitizeTokenInput(decodePasteBytes(event.bytes));
+    const pastedToken = sanitizeLineInput(decodePasteBytes(event.bytes));
     if (pastedToken.length === 0) {
       return;
     }
 
-    setToken((currentToken) => `${currentToken}${pastedToken}`);
+    if (stage === "token") {
+      setToken((currentToken) => `${currentToken}${pastedToken}`);
+    } else {
+      const row = AGENT_BACKEND_ROWS[agentBackendRowIndex];
+      if (row !== undefined && row !== "save") {
+        setAgentBackendForm((form) =>
+          updateAgentBackendField(
+            form,
+            row,
+            (value) => `${value}${pastedToken}`,
+          ),
+        );
+      }
+    }
     setMessage(null);
     event.preventDefault();
     event.stopPropagation();
@@ -176,8 +209,10 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
     if (stage === "providers") {
       handleProvidersKey({
         actions,
+        configuredProviders,
         event,
         providerIndex,
+        agentBackendConfigured: agentBackendForm.command.trim().length > 0,
         setMessage,
         setProviderIndex,
         setSubscriptionLogin,
@@ -185,6 +220,19 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         setToken,
         setTokenProvider,
         task,
+      });
+      return;
+    }
+
+    if (stage === "agent-backend") {
+      handleAgentBackendKey({
+        agentBackendForm,
+        agentBackendRowIndex,
+        event,
+        setAgentBackendForm,
+        setAgentBackendRowIndex,
+        setMessage,
+        setStage,
       });
       return;
     }
@@ -335,6 +383,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       >
         {stage === "providers" ? (
           <ProvidersStep
+            agentBackendConfigured={agentBackendForm.command.trim().length > 0}
             configuredProviders={configuredProviders}
             message={message}
             providerIndex={providerIndex}
@@ -346,6 +395,13 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         ) : null}
         {stage === "subscription-login" ? (
           <SubscriptionLoginStep login={subscriptionLogin} />
+        ) : null}
+        {stage === "agent-backend" ? (
+          <AgentBackendStep
+            form={agentBackendForm}
+            message={message}
+            rowIndex={agentBackendRowIndex}
+          />
         ) : null}
         {stage === "model-settings" ? (
           <ModelSettingsStep
@@ -395,11 +451,13 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
 }
 
 function ProvidersStep({
+  agentBackendConfigured,
   configuredProviders,
   message,
   providerIndex,
   task,
 }: {
+  agentBackendConfigured: boolean;
   configuredProviders: readonly SupportedClutchLlmProvider[];
   message: string | null;
   providerIndex: number;
@@ -409,10 +467,13 @@ function ProvidersStep({
     <>
       <text>
         {task.mode === "first-run"
-          ? "Add provider credentials, then configure models."
+          ? "Add provider credentials, then configure models and ACP."
           : "Provider credentials"}
       </text>
-      {providerRows(configuredProviders).map((row, index) => (
+      {providerRows({
+        agentBackendConfigured,
+        configuredProviders,
+      }).map((row, index) => (
         <text
           key={row.key}
           style={index === providerIndex ? selectedStyle : undefined}
@@ -423,6 +484,28 @@ function ProvidersStep({
       {message === null ? null : (
         <text style={{ fg: "yellow" }}>{message}</text>
       )}
+    </>
+  );
+}
+
+function AgentBackendStep({
+  form,
+  message,
+  rowIndex,
+}: {
+  form: AgentBackendForm;
+  message: string | null;
+  rowIndex: number;
+}) {
+  return (
+    <>
+      <text>ACP backend</text>
+      {AGENT_BACKEND_ROWS.map((row, index) => (
+        <text key={row} style={index === rowIndex ? selectedStyle : undefined}>
+          {`${index === rowIndex ? ">" : " "} ${agentBackendRowLabel({ form, row })}`}
+        </text>
+      ))}
+      {message === null ? null : <text style={{ fg: "red" }}>{message}</text>}
     </>
   );
 }
@@ -643,6 +726,8 @@ function ModelChoiceStep({
 
 function handleProvidersKey({
   actions,
+  agentBackendConfigured,
+  configuredProviders,
   event,
   providerIndex,
   setMessage,
@@ -654,6 +739,8 @@ function handleProvidersKey({
   task,
 }: {
   actions: AppActions;
+  agentBackendConfigured: boolean;
+  configuredProviders: readonly SupportedClutchLlmProvider[];
   event: KeyEvent;
   providerIndex: number;
   setMessage: (message: string | null) => void;
@@ -670,7 +757,10 @@ function handleProvidersKey({
     return;
   }
 
-  const rows = providerRows([]);
+  const rows = providerRows({
+    agentBackendConfigured,
+    configuredProviders,
+  });
   if (event.name === "up" || event.name === "down") {
     setProviderIndex(
       cycleIndex(providerIndex, rows.length, event.name === "down" ? 1 : -1),
@@ -696,6 +786,13 @@ function handleProvidersKey({
     return;
   }
 
+  if (row.kind === "agent-backend") {
+    setStage("agent-backend");
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
   if (row.kind === "subscription-provider") {
     setSubscriptionLogin({ status: "idle" });
     setStage("subscription-login");
@@ -709,6 +806,100 @@ function handleProvidersKey({
   setStage("token");
   setMessage(null);
   prevent(event);
+}
+
+function handleAgentBackendKey({
+  agentBackendForm,
+  agentBackendRowIndex,
+  event,
+  setAgentBackendForm,
+  setAgentBackendRowIndex,
+  setMessage,
+  setStage,
+}: {
+  agentBackendForm: AgentBackendForm;
+  agentBackendRowIndex: number;
+  event: KeyEvent;
+  setAgentBackendForm: (form: AgentBackendForm) => void;
+  setAgentBackendRowIndex: (index: number) => void;
+  setMessage: (message: string | null) => void;
+  setStage: (stage: ConfigStage) => void;
+}) {
+  if (event.name === "escape") {
+    setStage("providers");
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  if (event.name === "up" || event.name === "down") {
+    setAgentBackendRowIndex(
+      cycleIndex(
+        agentBackendRowIndex,
+        AGENT_BACKEND_ROWS.length,
+        event.name === "down" ? 1 : -1,
+      ),
+    );
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  const row = AGENT_BACKEND_ROWS[agentBackendRowIndex];
+  if (row === undefined) {
+    throw new Error(`Invalid ACP backend row index: ${agentBackendRowIndex}`);
+  }
+
+  if (event.name === "return" || (event.ctrl && event.name === "s")) {
+    if (row === "save" || event.ctrl) {
+      try {
+        const backend = agentBackendFromForm(agentBackendForm);
+        saveClutchAgentBackendConfiguration({
+          backend,
+        });
+        setAgentBackendForm(agentBackendFormFromConfig(backend));
+        setStage("providers");
+        setMessage("Saved ACP backend.");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : String(error));
+      }
+    }
+    prevent(event);
+    return;
+  }
+
+  if (row === "save") {
+    return;
+  }
+
+  if (event.ctrl && event.name === "u") {
+    setAgentBackendForm(
+      updateAgentBackendField(agentBackendForm, row, () => ""),
+    );
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  if (event.name === "backspace") {
+    setAgentBackendForm(
+      updateAgentBackendField(agentBackendForm, row, (value) =>
+        value.slice(0, -1),
+      ),
+    );
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  const input = getPrintableInput(event);
+  if (input !== null) {
+    setAgentBackendForm(
+      updateAgentBackendField(agentBackendForm, row, (value) => value + input),
+    );
+    setMessage(null);
+    prevent(event);
+  }
 }
 
 function handleTokenKey({
@@ -769,7 +960,7 @@ function handleTokenKey({
 
   const tokenInput = getPrintableInput(event);
   if (tokenInput !== null) {
-    setToken(`${token}${sanitizeTokenInput(tokenInput)}`);
+    setToken(`${token}${sanitizeLineInput(tokenInput).trim()}`);
     setMessage(null);
     prevent(event);
   }
@@ -1349,9 +1540,13 @@ function modelSettingsRowKey(row: ModelSettingsRow): string {
   return row.kind === "done" ? "done" : `${row.entry}-${row.kind}`;
 }
 
-function providerRows(
-  configuredProviders: readonly SupportedClutchLlmProvider[],
-) {
+function providerRows({
+  agentBackendConfigured,
+  configuredProviders,
+}: {
+  agentBackendConfigured: boolean;
+  configuredProviders: readonly SupportedClutchLlmProvider[];
+}) {
   return [
     ...SUPPORTED_CLUTCH_LLM_PROVIDERS.map((provider) => {
       const configured = configuredProviders.includes(provider.id);
@@ -1369,7 +1564,110 @@ function providerRows(
       kind: "models" as const,
       label: "Configure models",
     },
+    {
+      key: "agent-backend",
+      kind: "agent-backend" as const,
+      label: `Configure ACP backend${agentBackendConfigured ? " ✓" : ""}`,
+    },
   ];
+}
+
+function agentBackendFormFromConfig(
+  backend: ClutchAgentBackendConfig | undefined,
+): AgentBackendForm {
+  return {
+    argsJson: JSON.stringify(backend?.args ?? []),
+    command: backend?.command ?? "",
+    envJson: JSON.stringify(backend?.env ?? {}),
+  };
+}
+
+function agentBackendFromForm(
+  form: AgentBackendForm,
+): ClutchAgentBackendConfig {
+  const args = parseJsonStringArray(
+    form.argsJson,
+    'ACP backend args must be a JSON string array, for example ["acp"].',
+  );
+  const env = parseJsonStringRecord(
+    form.envJson,
+    'ACP backend env must be a JSON object of strings, for example {"KEY":"VALUE"}.',
+  );
+
+  return {
+    ...(args.length === 0 ? {} : { args }),
+    command: form.command.trim(),
+    ...(Object.keys(env).length === 0 ? {} : { env }),
+  };
+}
+
+function parseJsonStringArray(value: string, message: string): string[] {
+  const parsed = parseJsonValue(value.length === 0 ? "[]" : value, message);
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((item) => typeof item === "string")
+  ) {
+    throw new Error(message);
+  }
+  return parsed;
+}
+
+function parseJsonStringRecord(
+  value: string,
+  message: string,
+): Record<string, string> {
+  const parsed = parseJsonValue(value.length === 0 ? "{}" : value, message);
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
+    !Object.values(parsed).every((item) => typeof item === "string")
+  ) {
+    throw new Error(message);
+  }
+  return parsed as Record<string, string>;
+}
+
+function parseJsonValue(value: string, message: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw new Error(message);
+  }
+}
+
+function agentBackendRowLabel({
+  form,
+  row,
+}: {
+  form: AgentBackendForm;
+  row: AgentBackendRow;
+}): string {
+  switch (row) {
+    case "command":
+      return `Command: ${form.command}`;
+    case "args":
+      return `Args JSON: ${form.argsJson}`;
+    case "env":
+      return `Env JSON: ${form.envJson}`;
+    case "save":
+      return "Save ACP backend";
+  }
+}
+
+function updateAgentBackendField(
+  form: AgentBackendForm,
+  field: AgentBackendField,
+  update: (value: string) => string,
+): AgentBackendForm {
+  switch (field) {
+    case "command":
+      return { ...form, command: update(form.command) };
+    case "args":
+      return { ...form, argsJson: update(form.argsJson) };
+    case "env":
+      return { ...form, envJson: update(form.envJson) };
+  }
 }
 
 function isSubscriptionProvider(provider: SupportedClutchLlmProvider): boolean {
@@ -1537,6 +1835,8 @@ function stageTitle({
   task: ConfigTaskState;
 }): string {
   switch (stage) {
+    case "agent-backend":
+      return "ACP backend";
     case "providers":
       return task.mode === "first-run" ? "Setup providers" : "Providers";
     case "token":
@@ -1558,6 +1858,8 @@ function stageTitle({
 
 function hotkeysForStage(stage: ConfigStage, task: ConfigTaskState): string {
   switch (stage) {
+    case "agent-backend":
+      return "Esc providers · ↑/↓ field · type edit · Ctrl+u clear · Ctrl+s save";
     case "providers":
       return `${task.mode === "settings" ? "Esc return · " : ""}↑/↓ select · Enter open`;
     case "token":
@@ -1601,7 +1903,7 @@ function getPrintableInput(event: KeyEvent): string | null {
   return sanitized;
 }
 
-function sanitizeTokenInput(input: string): string {
+function sanitizeLineInput(input: string): string {
   return stripAnsiSequences(input)
     .replace(/[\n\r]/g, "")
     .trim();

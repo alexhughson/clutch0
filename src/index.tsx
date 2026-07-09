@@ -88,8 +88,6 @@ async function main() {
       { restoreAppStateFromSnapshot },
       { createSessionShutdownController },
       { hydrateAppStore, setSessionRecorder, useAppStore },
-      { loadAgentAskSkillSlashCommands },
-      { setAgentAskSkillSlashCommands },
       { abortRuntimeWork },
       { disposeAllAgentAskSessions },
     ] = await Promise.all([
@@ -101,8 +99,6 @@ async function main() {
       import("./lib/session/sessionSnapshot"),
       import("./lib/session/sessionShutdown"),
       import("./store/appStore"),
-      import("./workflows/agentAsk/agentAskResources"),
-      import("./workflows/llmTools/toolRegistry"),
       import("./lib/session/runtimeInterrupts"),
       import("./workflows/agentAsk/agentAskSessionRegistry"),
     ]);
@@ -181,13 +177,6 @@ async function main() {
       return;
     }
 
-    const agentAskSkillSlashCommands = await loadAgentAskSkillSlashCommands({
-      root: session.metadata.workspaceRoot,
-    });
-    if (shutdownStarted) {
-      return;
-    }
-    setAgentAskSkillSlashCommands(agentAskSkillSlashCommands);
     const filePaths = await loadFileList({
       root: session.metadata.workspaceRoot,
     });
@@ -337,6 +326,8 @@ async function recordStartupFailureSession({
 try {
   await main();
 } catch (error) {
-  console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
+  console.error(
+    error instanceof Error ? (error.stack ?? error.message) : String(error),
+  );
   process.exitCode = 1;
 }

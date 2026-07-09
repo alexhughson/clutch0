@@ -8,8 +8,11 @@ import {
   getClutchConfigPaths,
   isClutchConfigured,
   loadClutchAuth,
+  loadClutchSettings,
+  resolveConfiguredAgentBackend,
   resolveConfiguredLlmModel,
   resolveConfiguredLlmRequest,
+  saveClutchAgentBackendConfiguration,
   saveClutchApiKey,
   saveClutchConfiguration,
   saveClutchModelConfiguration,
@@ -36,17 +39,17 @@ function modelFixture({
       : provider === "google"
         ? {
             api: "google-generative-ai" as const,
-              baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+            baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          }
+        : provider === "openai"
+          ? {
+              api: "openai-responses" as const,
+              baseUrl: "https://api.openai.com/v1",
             }
-          : provider === "openai"
-            ? {
-                api: "openai-responses" as const,
-                baseUrl: "https://api.openai.com/v1",
-              }
-            : {
-                api: "openai-completions" as const,
-                baseUrl: "https://openrouter.ai/api/v1",
-              };
+          : {
+              api: "openai-completions" as const,
+              baseUrl: "https://openrouter.ai/api/v1",
+            };
 
   return {
     api: profile.api,
@@ -175,6 +178,156 @@ test("agent model falls back to primary for legacy settings", async () => {
     primary.model,
   );
   expect(isClutchConfigured(paths)).toBe(true);
+});
+
+test("uses cursor agent as the default ACP backend", async () => {
+  const paths = await createTempConfigPaths();
+
+  expect(resolveConfiguredAgentBackend(paths)).toEqual({
+    args: ["acp"],
+    command: "cursor-agent",
+  });
+  expect(createDefaultClutchConfigDraft(paths).agentBackend).toEqual({
+    args: ["acp"],
+    command: "cursor-agent",
+  });
+});
+
+test("parses explicit ACP agent backend settings", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      agentBackend: {
+        args: ["--stdio", "--profile", "work"],
+        command: "custom-acp-agent",
+        env: { CURSOR_AGENT_LOG: "1" },
+      },
+    }),
+    "utf-8",
+  );
+
+  expect(resolveConfiguredAgentBackend(paths)).toEqual({
+    args: ["--stdio", "--profile", "work"],
+    command: "custom-acp-agent",
+    env: { CURSOR_AGENT_LOG: "1" },
+  });
+});
+
+test("saves ACP agent backend settings while preserving models", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" });
+  const primary = {
+    metadata: modelFixture({ id: "gpt-live-primary" }),
+    model: "gpt-live-primary",
+    provider: "openai" as const,
+  };
+  saveClutchModelConfiguration({
+    paths,
+    primary,
+    summarization: primary,
+  });
+
+  saveClutchAgentBackendConfiguration({
+    backend: {
+      args: ["--acp"],
+      command: "custom-agent",
+      env: { ACP_PROFILE: "work" },
+    },
+    paths,
+  });
+
+  expect(resolveConfiguredAgentBackend(paths)).toEqual({
+    args: ["--acp"],
+    command: "custom-agent",
+    env: { ACP_PROFILE: "work" },
+  });
+  expect(resolveConfiguredLlmModel("primary", paths).model.id).toBe(
+    "gpt-live-primary",
+  );
+});
+
+test("saves command-only ACP agent backend without empty args or env", async () => {
+  const paths = await createTempConfigPaths();
+
+  saveClutchAgentBackendConfiguration({
+    backend: {
+      command: "acp-agent",
+    },
+    paths,
+  });
+
+  expect(loadClutchSettings(paths).agentBackend).toEqual({
+    command: "acp-agent",
+  });
+});
+
+test("config draft includes ACP agent backend", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      agentBackend: {
+        args: ["--stdio"],
+        command: "acp-agent",
+      },
+    }),
+    "utf-8",
+  );
+
+  expect(createDefaultClutchConfigDraft(paths).agentBackend).toEqual({
+    args: ["--stdio"],
+    command: "acp-agent",
+  });
+});
+
+test("rejects malformed ACP agent backend settings", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      agentBackend: {
+        command: "cursor-agent",
+        env: { CURSOR_AGENT_LOG: 1 },
+      },
+    }),
+    "utf-8",
+  );
+
+  expect(() => resolveConfiguredAgentBackend(paths)).toThrow(
+    "Clutch agentBackend.env must be an object of strings.",
+  );
+});
+
+test("preserves ACP agent backend when saving model settings", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      agentBackend: {
+        args: ["--acp"],
+        command: "custom-agent",
+      },
+    }),
+    "utf-8",
+  );
+  saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" });
+  const primary = {
+    metadata: modelFixture({ id: "gpt-live-primary" }),
+    model: "gpt-live-primary",
+    provider: "openai" as const,
+  };
+
+  saveClutchModelConfiguration({
+    paths,
+    primary,
+    summarization: primary,
+  });
+
+  expect(loadClutchSettings(paths).agentBackend).toEqual({
+    args: ["--acp"],
+    command: "custom-agent",
+  });
 });
 
 test("supports different providers for primary and summarization models", async () => {

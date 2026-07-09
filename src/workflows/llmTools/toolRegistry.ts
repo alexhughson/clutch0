@@ -6,7 +6,6 @@ import { findFilesWorkflowTool } from "../findFiles/findFilesTool";
 import { invariant } from "../../lib/invariant";
 import { askCommandPromptDirective } from "../../lib/llm/prompts";
 import {
-  attachAgentSkillRunner,
   runAgentAskSlashCommand,
   runAgentEditSlashCommand,
   runConfigSlashCommand,
@@ -23,7 +22,6 @@ import type {
   LlmSlashCommand,
   LlmWorkflowToolController,
   LlmWorkflowToolResult,
-  PendingLlmSlashCommand,
 } from "./types";
 
 export type LlmSlashCommandInvocation = {
@@ -39,26 +37,23 @@ const workflowToolControllers = createWorkflowToolControllers([
   shellCommandWorkflowTool,
 ]);
 
-let agentAskSkillSlashCommands: readonly LlmSlashCommand[] = [];
-
 const agentAskSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
-  description:
-    "Ask a long-running read-only pi sub-agent and save its session as context.",
+  description: "Ask a long-running ACP agent and save its session as context.",
   name: "agent-ask",
   promptDirective: "",
   run: runAgentAskSlashCommand,
-  title: "Ask pi agent",
+  title: "Ask agent",
 };
 
 const agentEditSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
   description:
-    "Ask a writable pi sub-agent to edit a sandbox copy and save its diff as context.",
+    "Ask a writable ACP agent to edit a sandbox copy and save its diff as context.",
   name: "agent-edit",
   promptDirective: "",
   run: runAgentEditSlashCommand,
-  title: "Edit in pi agent sandbox",
+  title: "Edit in agent sandbox",
 };
 
 const askSlashCommand: LlmSlashCommand = {
@@ -110,22 +105,11 @@ export function getLlmWorkflowTools({
   );
 }
 
-export function setAgentAskSkillSlashCommands(
-  commands: readonly PendingLlmSlashCommand[],
-) {
-  const slashCommands = commands.map(attachAgentSkillRunner);
-  assertNoSlashCommandNameCollisions(slashCommands, [
-    ...getBaseLlmSlashCommands(),
-  ]);
-  agentAskSkillSlashCommands = slashCommands;
-}
-
 export function getLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
     agentAskSlashCommand,
     agentEditSlashCommand,
-    ...agentAskSkillSlashCommands,
     configSlashCommand,
     showContextSlashCommand,
     saySlashCommand,
@@ -205,9 +189,9 @@ export function handleLlmWorkflowResult({
   requestId: number;
   result: LlmWorkflowToolResult & { responseText: string };
 }) {
-  const controller = [
-    ...workflowToolControllers,
-  ].find((candidate) => candidate.resultKind === result.kind);
+  const controller = [...workflowToolControllers].find(
+    (candidate) => candidate.resultKind === result.kind,
+  );
   invariant(
     controller !== undefined,
     `No workflow tool controller handles result kind: ${result.kind}`,
@@ -244,23 +228,6 @@ function getLlmWorkflowToolControllers({
   });
 }
 
-function assertNoSlashCommandNameCollisions(
-  commands: readonly LlmSlashCommand[],
-  existingCommands: readonly LlmSlashCommand[],
-) {
-  const existingNames = new Set(
-    existingCommands.map((command) => command.name),
-  );
-
-  for (const command of commands) {
-    invariant(
-      !existingNames.has(command.name),
-      `Duplicate slash command name: ${command.name}`,
-    );
-    existingNames.add(command.name);
-  }
-}
-
 function assertNoWorkflowToolNameCollisions(
   controllers: readonly LlmWorkflowToolController[],
 ) {
@@ -280,22 +247,6 @@ function assertNoWorkflowToolNameCollisions(
     );
     newNames.add(controller.tool.name);
   }
-}
-
-function getBaseLlmSlashCommands(): LlmSlashCommand[] {
-  return [
-    askSlashCommand,
-    agentAskSlashCommand,
-    agentEditSlashCommand,
-    configSlashCommand,
-    showContextSlashCommand,
-    saySlashCommand,
-    ...workflowToolControllers.flatMap((controller) =>
-      controller.slashCommand === undefined
-        ? []
-        : [slashCommandFromController(controller)],
-    ),
-  ];
 }
 
 function createWorkflowToolControllers(

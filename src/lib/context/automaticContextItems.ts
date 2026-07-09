@@ -401,9 +401,8 @@ async function readCurrentDiffForContext({
     );
   } catch (error) {
     if (isMaxBufferError(error)) {
-      return truncateContent(
-        getErrorStdout(error),
-        MAX_DIFF_CONTEXT_CHARACTERS,
+      return markTruncatedContent(
+        truncateContent(getErrorStdout(error), MAX_DIFF_CONTEXT_CHARACTERS),
       );
     }
 
@@ -434,5 +433,13 @@ function truncateContent(content: string, maxCharacters: number): string {
     return content;
   }
 
-  return `${content.slice(0, maxCharacters)}\n[Context truncated.]`;
+  return markTruncatedContent(content.slice(0, maxCharacters));
+}
+
+function markTruncatedContent(content: string): string {
+  if (content.endsWith("[Context truncated.]")) {
+    return content;
+  }
+
+  return `${content}\n[Context truncated.]`;
 }

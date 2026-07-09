@@ -11,23 +11,26 @@ import {
   recordFindFilesStartedRuntimeEvent,
 } from "./findFilesRuntimeEvents";
 import {
-  runPiFileSearchAgent,
-  type RunPiFileSearchAgentOptions,
-} from "./piFileSearchAgent";
+  runDirectFileSearch,
+  type RunDirectFileSearchOptions,
+} from "./directFileSearch";
 
 export function startFindFilesSearch({
   actions,
   createAbortHandle = createRuntimeAbortHandle,
   getState = useAppStore.getState,
-  runSearch = runPiFileSearchAgent,
+  runSearch = runDirectFileSearch,
   screen,
 }: {
-  actions: Pick<AppActions["findFiles"], "fail" | "finish" | "recordAgentOutput">;
+  actions: Pick<
+    AppActions["findFiles"],
+    "fail" | "finish" | "recordAgentOutput"
+  >;
   createAbortHandle?: () => RuntimeAbortHandle;
   getState?: typeof useAppStore.getState;
   runSearch?: (
-    options: RunPiFileSearchAgentOptions,
-  ) => ReturnType<typeof runPiFileSearchAgent>;
+    options: RunDirectFileSearchOptions,
+  ) => ReturnType<typeof runDirectFileSearch>;
   screen: FindFilesScreenState;
 }): () => void {
   let cancelled = false;

@@ -107,10 +107,10 @@ function SearchingView({ screen }: { screen: FindFilesScreenState }) {
   return (
     <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
       <text style={{ fg: "gray" }}>Searching</text>
-      <text>Running a read-only pi agent to find relevant files...</text>
+      <text>Running LLM file search...</text>
       <AgentOutputLog
         blocks={screen.agentOutput}
-        emptyMessage="Waiting for pi activity..."
+        emptyMessage="Waiting for file search activity..."
         height={32}
       />
     </box>

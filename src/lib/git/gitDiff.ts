@@ -17,10 +17,26 @@ export async function readGitDiff({
   const trackedDiff = includeStaged
     ? await readDiffFromHeadOrIndex({ maxBuffer, root: resolvedRoot })
     : await readWorkingTreeDiff({ maxBuffer, root: resolvedRoot });
-  const untrackedDiff = await readUntrackedFileDiffs({
-    maxBuffer,
-    root: resolvedRoot,
-  });
+  let untrackedDiff: string;
+  try {
+    untrackedDiff = await readUntrackedFileDiffs({
+      maxBuffer,
+      root: resolvedRoot,
+    });
+  } catch (error) {
+    if (isMaxBufferError(error)) {
+      const untrackedPartial = getErrorStdout(error);
+      throw withErrorStdout(
+        error,
+        joinDiffs([
+          trackedDiff,
+          untrackedPartial.includes("\0") ? "" : untrackedPartial,
+        ]),
+      );
+    }
+
+    throw error;
+  }
 
   return joinDiffs([trackedDiff, untrackedDiff]);
 }
@@ -50,14 +66,26 @@ async function readDiffFromHeadOrIndex({
       throw error;
     }
 
-    return joinDiffs([
-      await readGitStdout({
-        args: ["diff", "--no-ext-diff", "--cached", "--", "."],
-        maxBuffer,
-        root,
-      }),
-      await readWorkingTreeDiff({ maxBuffer, root }),
-    ]);
+    const cachedDiff = await readGitStdout({
+      args: ["diff", "--no-ext-diff", "--cached", "--", "."],
+      maxBuffer,
+      root,
+    });
+    try {
+      return joinDiffs([
+        cachedDiff,
+        await readWorkingTreeDiff({ maxBuffer, root }),
+      ]);
+    } catch (workingTreeError) {
+      if (isMaxBufferError(workingTreeError)) {
+        throw withErrorStdout(
+          workingTreeError,
+          joinDiffs([cachedDiff, getErrorStdout(workingTreeError)]),
+        );
+      }
+
+      throw workingTreeError;
+    }
   }
 }
 
@@ -88,9 +116,18 @@ async function readUntrackedFileDiffs({
     root,
   });
   const filePaths = stdout.split("\0").filter((path) => path.length > 0);
-  const diffs = await Promise.all(
-    filePaths.map((path) => readUntrackedFileDiff({ maxBuffer, path, root })),
-  );
+  const diffs: string[] = [];
+  for (const path of filePaths) {
+    try {
+      diffs.push(await readUntrackedFileDiff({ maxBuffer, path, root }));
+    } catch (error) {
+      if (isMaxBufferError(error)) {
+        throw withErrorStdout(error, joinDiffs([...diffs, getErrorStdout(error)]));
+      }
+
+      throw error;
+    }
+  }
 
   return joinDiffs(diffs);
 }
@@ -151,6 +188,15 @@ function isMissingHeadError(error: unknown): boolean {
   );
 }
 
+function isMaxBufferError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code ===
+      "ERR_CHILD_PROCESS_STDIO_MAXBUFFER"
+  );
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -171,6 +217,15 @@ function getErrorStdout(error: unknown): string {
 
   const stdout = (error as { stdout: unknown }).stdout;
   return typeof stdout === "string" ? stdout : "";
+}
+
+function withErrorStdout(error: unknown, stdout: string): unknown {
+  if (error !== null && typeof error === "object") {
+    (error as { stdout: string }).stdout = stdout;
+    return error;
+  }
+
+  return Object.assign(new Error(String(error)), { stdout });
 }
 
 function getErrorExitCode(error: unknown): unknown {

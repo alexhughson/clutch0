@@ -63,7 +63,14 @@ export type ClutchModelSelection = {
 };
 
 export type ClutchSettings = {
+  agentBackend?: ClutchAgentBackendConfig;
   models?: Partial<Record<ClutchModelRole, ClutchModelSelection>>;
+};
+
+export type ClutchAgentBackendConfig = {
+  args?: string[];
+  command: string;
+  env?: Record<string, string>;
 };
 
 export type ClutchApiKeyCredential = {
@@ -100,6 +107,11 @@ export type ResolvedConfiguredLlmRequest = {
   headers?: Record<string, string>;
   model: Model<Api>;
   serviceTier: ClutchModelServiceTier;
+};
+
+const DEFAULT_AGENT_BACKEND: ClutchAgentBackendConfig = {
+  args: ["acp"],
+  command: "cursor-agent",
 };
 
 const DEFAULT_PROVIDER: SupportedClutchLlmProvider = "openai";
@@ -207,6 +219,14 @@ export function resolveConfiguredLlmModel(
     model: normalizeClutchModelMetadata(selection.metadata),
     serviceTier: getClutchModelServiceTier(selection),
   };
+}
+
+export function resolveConfiguredAgentBackend(
+  paths = getClutchConfigPaths(),
+): ClutchAgentBackendConfig {
+  return normalizeAgentBackendConfig(
+    loadClutchSettings(paths).agentBackend ?? DEFAULT_AGENT_BACKEND,
+  );
 }
 
 export async function resolveConfiguredLlmRequest(
@@ -358,7 +378,11 @@ export function saveClutchModelConfiguration({
   assertConfiguredProviderCredential(auth, summarizationSelection.provider);
 
   mkdirSync(paths.configDir, { recursive: true });
+  const existingSettings = loadClutchSettings(paths);
   writeJsonFile(paths.settingsPath, {
+    ...(existingSettings.agentBackend === undefined
+      ? {}
+      : { agentBackend: existingSettings.agentBackend }),
     models: {
       agent: agentSelection,
       primary: primarySelection,
@@ -367,9 +391,26 @@ export function saveClutchModelConfiguration({
   } satisfies ClutchSettings);
 }
 
+export function saveClutchAgentBackendConfiguration({
+  backend,
+  paths = getClutchConfigPaths(),
+}: {
+  backend: ClutchAgentBackendConfig;
+  paths?: ClutchConfigPaths;
+}) {
+  const agentBackend = normalizeAgentBackendConfig(backend);
+  const existingSettings = loadClutchSettings(paths);
+  mkdirSync(paths.configDir, { recursive: true });
+  writeJsonFile(paths.settingsPath, {
+    ...existingSettings,
+    agentBackend,
+  } satisfies ClutchSettings);
+}
+
 export function createDefaultClutchConfigDraft(
   paths = getClutchConfigPaths(),
 ): {
+  agentBackend?: ClutchAgentBackendConfig;
   agent: ClutchModelSelection;
   configuredProviders: SupportedClutchLlmProvider[];
   primary: ClutchModelSelection;
@@ -384,6 +425,7 @@ export function createDefaultClutchConfigDraft(
   const agentProvider = settings.models?.agent?.provider ?? primaryProvider;
 
   return {
+    agentBackend: settings.agentBackend ?? DEFAULT_AGENT_BACKEND,
     agent: getExistingOrEmptyModelSelection({
       model: settings.models?.agent ?? settings.models?.primary,
       provider: agentProvider,
@@ -423,15 +465,56 @@ function getExistingOrEmptyModelSelection({
 
 function parseClutchSettings(raw: Record<string, unknown>): ClutchSettings {
   const models = raw.models;
-  if (models === undefined) {
-    return {};
-  }
-  if (models === null || typeof models !== "object" || Array.isArray(models)) {
+  if (
+    models !== undefined &&
+    (models === null || typeof models !== "object" || Array.isArray(models))
+  ) {
     throw new Error("Clutch settings field models must be an object.");
   }
 
   return {
-    models: parseModelSelections(models as Record<string, unknown>),
+    agentBackend: parseAgentBackendConfig(raw.agentBackend),
+    ...(models === undefined
+      ? {}
+      : { models: parseModelSelections(models as Record<string, unknown>) }),
+  };
+}
+
+function parseAgentBackendConfig(
+  raw: unknown,
+): ClutchAgentBackendConfig | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Clutch settings field agentBackend must be an object.");
+  }
+
+  return normalizeAgentBackendConfig(raw as Record<string, unknown>);
+}
+
+function normalizeAgentBackendConfig(
+  raw: ClutchAgentBackendConfig | Record<string, unknown>,
+): ClutchAgentBackendConfig {
+  const command = raw.command;
+  if (typeof command !== "string" || command.trim().length === 0) {
+    throw new Error("Clutch agentBackend.command must be a non-empty string.");
+  }
+
+  const args = raw.args;
+  if (args !== undefined && !isStringArray(args)) {
+    throw new Error("Clutch agentBackend.args must be a string array.");
+  }
+
+  const env = raw.env;
+  if (env !== undefined && !isStringRecord(env)) {
+    throw new Error("Clutch agentBackend.env must be an object of strings.");
+  }
+
+  return {
+    ...(args === undefined ? {} : { args }),
+    command,
+    ...(env === undefined ? {} : { env }),
   };
 }
 
@@ -733,6 +816,15 @@ function isClutchModelServiceTier(
 function isStringArray(value: unknown): value is string[] {
   return (
     Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.values(value).every((item) => typeof item === "string")
   );
 }
 

@@ -4,11 +4,12 @@ import { useAppStore } from "../../store/appStore";
 import {
   startAgentAskRequest,
   startAgentEditRequest,
-  startAgentSkillRequest,
 } from "../agentAsk/startAgentAskRequest";
-import { parseAgentSkillSlashCommandName } from "../agentAsk/agentSkillCommand";
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
-import type { LlmSlashCommand, PendingLlmSlashCommand } from "../llmTools/types";
+import type {
+  LlmSlashCommand,
+  PendingLlmSlashCommand,
+} from "../llmTools/types";
 import { startShellCommandRequest } from "../shellCommand/startShellCommandRequest";
 import { startShowContextRequest } from "../showContext/startShowContextRequest";
 
@@ -29,7 +30,9 @@ export function runLlmSlashCommand({
 }: SlashCommandContext): void {
   startLlmRequest(input, {
     allowedToolNames:
-      command.allowedToolNames.length > 0 ? command.allowedToolNames : undefined,
+      command.allowedToolNames.length > 0
+        ? command.allowedToolNames
+        : undefined,
     commandDirective: command.promptDirective,
     patchToolMode: command.patchToolMode,
     rejectComposer: submittedComposer,
@@ -65,18 +68,6 @@ export function runAgentEditSlashCommand({
   submittedComposer,
 }: SlashCommandContext): void {
   startAgentEditRequest(input, { rejectComposer: submittedComposer });
-}
-
-export function runAgentSkillSlashCommand({
-  command,
-  input,
-  submittedComposer,
-}: SlashCommandContext): void {
-  startAgentSkillRequest({
-    prompt: input,
-    rejectComposer: submittedComposer,
-    skillName: parseAgentSkillSlashCommandName(command.name),
-  });
 }
 
 export function runShellCommandSlashCommand({
@@ -119,16 +110,6 @@ export function runFindSlashCommand(context: SlashCommandContext): void {
   }
 
   runLlmSlashCommand(context);
-}
-
-export function attachAgentSkillRunner(
-  command: PendingLlmSlashCommand,
-): LlmSlashCommand {
-  return {
-    ...command,
-    allowsEmptyInput: true,
-    run: runAgentSkillSlashCommand,
-  };
 }
 
 export function attachLlmRunner(

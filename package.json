@@ -14,19 +14,22 @@
     "eval:llm": "bun run evals/run.ts --target cerebras:gpt-oss-120b --target openai:gpt-5.4 --judge openai:gpt-5.4-mini",
     "eval:render": "bun run evals/render.ts",
     "start": "bun run src/index.tsx",
+    "smoke:acp": "bun run src/tools/acpBackendSmokeTest.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "^1.2.0",
     "@earendil-works/pi-ai": "^0.79.1",
-    "@earendil-works/pi-coding-agent": "^0.79.1",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",
+    "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0",
     "diff": "^9.0.0",
     "fiat": "github:alexhughson/fiat#v0.1",
     "react": "^19.2.6",
+    "zod": "^4.4.3",
     "zustand": "^5.0.13"
   },
   "devDependencies": {

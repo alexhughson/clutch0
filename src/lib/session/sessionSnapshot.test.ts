@@ -209,7 +209,7 @@ test("restore normalizes interrupted active task variants before render", () => 
   }
 });
 
-test("restore detaches pi agents and marks running agents interrupted", () => {
+test("restore detaches legacy agent sessions and marks running agents interrupted", () => {
   const initial = createInitialAppState();
   const agent = createPiAgentContextItem({
     createdAt: 1,

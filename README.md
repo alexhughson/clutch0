@@ -106,12 +106,12 @@ Create a new file
 
 - ### /find-files
 
-Launch a pi session to find which files
+Ask the configured LLM to find relevant files and open the file picker.
 
 - ### /agent-ask
 
-Launch a read-only pi agent to answer a question. The final message from the agent will be the only thing included in context. The agent loop is rejoinable so you can ask follow up questions
+Launch an ACP agent to answer a question. The final message from the agent will be the only thing included in context. The agent loop is rejoinable so you can ask follow up questions
 
 - ### /agent-edit
 
-This is probably super buggy, but it launches pi in a git worktree, and tries to make the accumulated diff be the context item, which you can then apply.
+Launch an ACP agent in an edit sandbox and save the accumulated diff as a context item that you can apply.

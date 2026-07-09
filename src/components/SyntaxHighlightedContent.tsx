@@ -1,12 +1,20 @@
 import {
+  addDefaultParsers,
   getTreeSitterClient,
   pathToFiletype,
   SyntaxStyle,
+  type FiletypeParserOptions,
 } from "@opentui/core";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 let sharedSyntaxStyle: SyntaxStyle | null = null;
 let sharedTreeSitterClient: ReturnType<typeof getTreeSitterClient> | null =
   null;
+
+const require = createRequire(import.meta.url);
+
+addDefaultParsers([kotlinFiletypeParser()]);
 
 export function HighlightedCode({
   content,
@@ -73,6 +81,24 @@ export function HighlightedMarkdown({
 function getSharedTreeSitterClient(): ReturnType<typeof getTreeSitterClient> {
   sharedTreeSitterClient ??= getTreeSitterClient();
   return sharedTreeSitterClient;
+}
+
+function kotlinFiletypeParser(): FiletypeParserOptions {
+  return {
+    aliases: ["kt", "kts"],
+    filetype: "kotlin",
+    queries: {
+      highlights: [
+        fileURLToPath(
+          new URL(
+            "../assets/tree-sitter/kotlin/highlights.scm",
+            import.meta.url,
+          ),
+        ),
+      ],
+    },
+    wasm: require.resolve("@tree-sitter-grammars/tree-sitter-kotlin/tree-sitter-kotlin.wasm"),
+  };
 }
 
 function getSharedSyntaxStyle(): SyntaxStyle {

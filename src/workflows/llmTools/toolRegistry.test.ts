@@ -13,7 +13,6 @@ import {
   getLlmWorkflowTools,
   parseLlmSlashCommandInvocation,
   routeLlmWorkflowToolCalls,
-  setAgentAskSkillSlashCommands,
 } from "./toolRegistry";
 
 test("routes add context files tool calls to the add files workflow", async () => {
@@ -453,9 +452,9 @@ test("derives slash commands from workflow tools plus ask", () => {
   expect(
     commands.find((command) => command.name === "edit")?.allowedToolNames,
   ).toEqual([APPLY_PATCH_TOOL_NAME]);
-  expect(commands.find((command) => command.name === "edit")?.patchToolMode).toBe(
-    "review",
-  );
+  expect(
+    commands.find((command) => command.name === "edit")?.patchToolMode,
+  ).toBe("review");
   expect(
     commands.find((command) => command.name === "find")?.allowedToolNames,
   ).toEqual([FIND_RELEVANT_FILES_TOOL_NAME]);
@@ -496,28 +495,4 @@ test("parses known slash commands and leaves unknown commands unrestricted", () 
     input: "keep this in mind",
   });
   expect(parseLlmSlashCommandInvocation("/wat auth routing")).toBeNull();
-});
-
-test("parses agent skill slash commands", () => {
-  setAgentAskSkillSlashCommands([
-    {
-      allowedToolNames: [],
-      description: "Use project review instructions.",
-      name: "skill:project-review",
-      promptDirective: "",
-      title: "Skill: project-review",
-    },
-  ]);
-
-  expect(
-    parseLlmSlashCommandInvocation("/skill:project-review auth routing"),
-  ).toMatchObject({
-    command: {
-      allowsEmptyInput: true,
-      name: "skill:project-review",
-    },
-    input: "auth routing",
-  });
-
-  setAgentAskSkillSlashCommands([]);
 });

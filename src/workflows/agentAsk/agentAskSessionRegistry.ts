@@ -1,24 +1,14 @@
 import {
-  type AgentSession,
-  type ResourceLoader,
-  SessionManager,
-} from "@earendil-works/pi-coding-agent";
-import {
-  createAgentToolBlock,
-  createPiAgentOutputFormatter,
-  getLatestAssistantText,
-  type PiAgentOutputFormatter,
-} from "../../lib/agentOutput/piAgentOutputAdapter";
+  createAcpAgentSessionDriver,
+  type CreateAcpAgentSessionDriverOptions,
+  type AgentSessionDriver,
+} from "../../lib/agent/acpAgentSessionDriver";
+import { createAgentToolBlock } from "../../lib/agentOutput/acpAgentOutputAdapter";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
+import { resolveConfiguredAgentBackend } from "../../lib/config/clutchConfig";
 import { buildAgentPromptWithContext } from "../../lib/llm/agentContext";
-import { createConfiguredPiAgentSession } from "../../lib/llm/piAgentSession";
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
 import type { AgentAskMode, ContextItem } from "../../types";
-import {
-  activateAgentAskTools,
-  createAgentAskResourceLoader,
-} from "./agentAskResources";
-import { buildAgentSkillKickoffPrompt } from "./agentSkillKickoff";
 import {
   createAgentSandbox,
   getAgentSandboxDiff,
@@ -27,23 +17,34 @@ import {
 } from "./agentSandbox";
 
 type AgentAskHandle = {
-  outputFormatter: PiAgentOutputFormatter;
+  activePromptCount: number;
+  driver: AgentSessionDriver;
   sandbox?: AgentSandbox;
-  session: AgentSession;
-  unsubscribe: () => void;
 };
 
 type AgentAskStartupHandle = {
   abort: () => void;
   done: Promise<void>;
+  driver?: AgentSessionDriver;
   sandbox?: AgentSandbox;
-  session?: AgentSession;
-  unsubscribe?: () => void;
   registered: boolean;
 };
 
 const agentAskSessions = new Map<string, AgentAskHandle>();
 const agentAskStartups = new Map<string, AgentAskStartupHandle>();
+let createAgentSessionDriver = createAcpAgentSessionDriver;
+
+export function setCreateAgentSessionDriverForTest(
+  factory: (
+    options: CreateAcpAgentSessionDriverOptions,
+  ) => Promise<AgentSessionDriver>,
+) {
+  const previous = createAgentSessionDriver;
+  createAgentSessionDriver = factory;
+  return () => {
+    createAgentSessionDriver = previous;
+  };
+}
 
 export async function startAgentAskSession({
   itemId,
@@ -53,7 +54,6 @@ export async function startAgentAskSession({
   prompt,
   root = process.cwd(),
   signal,
-  skillName,
 }: {
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
@@ -62,7 +62,6 @@ export async function startAgentAskSession({
   prompt: string;
   root?: string;
   signal?: AbortSignal;
-  skillName?: string;
 }) {
   if (agentAskSessions.has(itemId) || agentAskStartups.has(itemId)) {
     throw new Error(`Agent session already exists for context item ${itemId}.`);
@@ -83,7 +82,6 @@ export async function startAgentAskSession({
     prompt,
     root,
     signal: abortHandle.signal,
-    skillName,
     startup,
   }).finally(() => {
     abortHandle.dispose();
@@ -100,7 +98,6 @@ async function runAgentAskSessionStartup({
   prompt,
   root,
   signal,
-  skillName,
   startup,
 }: {
   contextItems: readonly ContextItem[];
@@ -110,7 +107,6 @@ async function runAgentAskSessionStartup({
   prompt: string;
   root: string;
   signal: AbortSignal;
-  skillName?: string;
   startup: AgentAskStartupHandle;
 }) {
   recordSessionRuntimeEvent({
@@ -119,7 +115,6 @@ async function runAgentAskSessionStartup({
     itemId,
     kind: "agent-session.started",
     mode,
-    skillName,
   });
 
   try {
@@ -146,54 +141,41 @@ async function runAgentAskSessionStartup({
       });
     }
 
-    const resourceLoader = await createAgentAskResourceLoader({
-      root: sessionRoot,
-    });
-    throwIfAgentSessionAborted(signal);
     const initialPrompt = await buildInitialAgentPrompt({
       contextItems,
       focusedContextItemId,
       prompt,
-      resourceLoader,
       root: sessionRoot,
-      skillName,
     });
     throwIfAgentSessionAborted(signal);
-    const { session } = await createConfiguredPiAgentSession({
-      cwd: sessionRoot,
-      noTools: "builtin",
-      resourceLoader,
-      sessionManager: SessionManager.inMemory(sessionRoot),
+    const backend = resolveConfiguredAgentBackend();
+    const driver = await createAgentSessionDriverWithAbort({
+      create: () =>
+        createAgentSessionDriver({
+          backend,
+          cwd: sessionRoot,
+          onOutputUpdate: (update) => {
+            recordAgentOutputUpdates({
+              itemId,
+              source: "event",
+              updates: [update],
+            });
+          },
+          signal,
+        }),
+      signal,
     });
-    startup.session = session;
-    if (isAgentSessionAborted(signal)) {
-      throw new Error("Agent session was aborted.");
-    }
-    activateAgentAskTools(session, mode);
-
-    const outputFormatter = createPiAgentOutputFormatter();
-    const unsubscribe = session.subscribe((event) => {
-      recordAgentOutputUpdates({
-        itemId,
-        source: "event",
-        updates: outputFormatter.format(event),
-      });
-    });
-    startup.unsubscribe = unsubscribe;
-    if (isAgentSessionAborted(signal)) {
-      throw new Error("Agent session was aborted.");
-    }
+    startup.driver = driver;
+    throwIfAgentSessionAborted(signal);
 
     agentAskSessions.set(itemId, {
-      outputFormatter,
+      activePromptCount: 0,
+      driver,
       sandbox,
-      session,
-      unsubscribe,
     });
     startup.registered = true;
     startup.sandbox = undefined;
-    startup.session = undefined;
-    startup.unsubscribe = undefined;
+    startup.driver = undefined;
     agentAskStartups.delete(itemId);
     useAppStore.getState().actions.agentAsk.recordOutput({
       itemId,
@@ -201,12 +183,10 @@ async function runAgentAskSessionStartup({
         block: createAgentToolBlock({
           phase: "start",
           summary:
-            skillName !== undefined
-              ? `agent skill ${skillName}`
-              : mode === "edit"
-                ? "agent edit sandbox session"
-                : "agent ask session",
-          toolName: "pi",
+            mode === "edit"
+              ? "agent edit sandbox session"
+              : "agent ask session",
+          toolName: "agent",
         }),
         kind: "append-block",
       },
@@ -240,32 +220,18 @@ async function buildInitialAgentPrompt({
   contextItems,
   focusedContextItemId,
   prompt,
-  resourceLoader,
   root,
-  skillName,
 }: {
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
   prompt: string;
-  resourceLoader: ResourceLoader;
   root: string;
-  skillName?: string;
 }) {
-  const userMessage = await buildAgentPromptWithContext({
+  return await buildAgentPromptWithContext({
     contextItems,
     focusedContextItemId,
     prompt,
     root,
-  });
-
-  if (skillName === undefined) {
-    return userMessage;
-  }
-
-  return await buildAgentSkillKickoffPrompt({
-    resourceLoader,
-    skillName,
-    userMessage,
   });
 }
 
@@ -307,16 +273,18 @@ export async function disposeAgentAskSession(itemId: string): Promise<void> {
     return;
   }
 
-  handle.unsubscribe();
-  handle.session.dispose();
-  recordSessionRuntimeEvent({
-    itemId,
-    kind: "agent-session.disposed",
-    sandboxPath: handle.sandbox?.path,
-  });
-  agentAskSessions.delete(itemId);
-  if (handle.sandbox !== undefined) {
-    await removeAgentSandbox(handle.sandbox);
+  try {
+    await handle.driver.dispose();
+    recordSessionRuntimeEvent({
+      itemId,
+      kind: "agent-session.disposed",
+      sandboxPath: handle.sandbox?.path,
+    });
+  } finally {
+    agentAskSessions.delete(itemId);
+    if (handle.sandbox !== undefined) {
+      await removeAgentSandbox(handle.sandbox);
+    }
   }
 }
 
@@ -326,14 +294,12 @@ export async function disposeAllAgentAskSessions(): Promise<void> {
     startup.abort();
   }
 
-  await Promise.all(
-    [
-      ...[...agentAskSessions.keys()].map((itemId) =>
-        disposeAgentAskSession(itemId),
-      ),
-      ...startups.map((startup) => startup.done),
-    ],
-  );
+  await Promise.all([
+    ...[...agentAskSessions.keys()].map((itemId) =>
+      disposeAgentAskSession(itemId),
+    ),
+    ...startups.map((startup) => startup.done),
+  ]);
 }
 
 export async function saveAgentSandboxDiffToContext(itemId: string) {
@@ -380,21 +346,16 @@ async function runAgentPrompt(itemId: string, message: string) {
     return;
   }
 
+  handle.activePromptCount += 1;
   try {
-    const wasStreaming = handle.session.isStreaming;
     recordSessionRuntimeEvent({
-      followUp: wasStreaming,
+      followUp: handle.activePromptCount > 1,
       itemId,
       kind: "agent-session.prompt-started",
       messageLength: message.length,
     });
-    if (wasStreaming) {
-      await handle.session.followUp(message);
-      return;
-    }
 
-    handle.outputFormatter.beginPrompt();
-    await handle.session.prompt(message);
+    await handle.driver.prompt(message);
     recordFinalAgentOutput(itemId, handle);
     if (handle.sandbox !== undefined) {
       await refreshAgentSandboxDiff(itemId, handle.sandbox);
@@ -403,8 +364,12 @@ async function runAgentPrompt(itemId: string, message: string) {
       itemId,
       kind: "agent-session.prompt-finished",
     });
-    useAppStore.getState().actions.agentAsk.finish({ itemId });
+    handle.activePromptCount -= 1;
+    if (handle.activePromptCount === 0) {
+      useAppStore.getState().actions.agentAsk.finish({ itemId });
+    }
   } catch (error) {
+    handle.activePromptCount = Math.max(0, handle.activePromptCount - 1);
     recordSessionRuntimeEvent({
       errorMessage: error instanceof Error ? error.message : String(error),
       itemId,
@@ -418,20 +383,17 @@ async function runAgentPrompt(itemId: string, message: string) {
 }
 
 function recordFinalAgentOutput(itemId: string, handle: AgentAskHandle) {
-  const updates = handle.outputFormatter.formatFinalMessages(
-    handle.session.messages,
-  );
-  if (updates.length === 0) {
-    return;
+  const latestAssistantText = handle.driver.latestAssistantText();
+  if (latestAssistantText === null || latestAssistantText.trim().length === 0) {
+    throw new Error("ACP agent did not produce assistant text.");
   }
 
   recordSessionRuntimeEvent({
     itemId,
     kind: "agent-session.final-output-reconciled",
-    messageLength: getLatestAssistantText(handle.session.messages)?.length ?? 0,
-    updateCount: updates.length,
+    messageLength: latestAssistantText.length,
+    updateCount: 0,
   });
-  recordAgentOutputUpdates({ itemId, source: "final-state", updates });
 }
 
 function recordAgentOutputUpdates({
@@ -440,7 +402,7 @@ function recordAgentOutputUpdates({
   updates,
 }: {
   itemId: string;
-  source: "event" | "final-state";
+  source: "event";
   updates: readonly AgentOutputUpdate[];
 }) {
   for (const update of updates) {
@@ -515,12 +477,41 @@ async function disposeAgentAskStartup(
     return;
   }
 
-  startup.unsubscribe?.();
-  startup.session?.dispose();
-  if (startup.sandbox !== undefined) {
-    await removeAgentSandbox(startup.sandbox);
+  try {
+    await startup.driver?.dispose();
+  } finally {
+    if (startup.sandbox !== undefined) {
+      await removeAgentSandbox(startup.sandbox);
+    }
+    startup.sandbox = undefined;
+    startup.driver = undefined;
   }
-  startup.sandbox = undefined;
-  startup.session = undefined;
-  startup.unsubscribe = undefined;
+}
+
+async function createAgentSessionDriverWithAbort({
+  create,
+  signal,
+}: {
+  create: () => Promise<AgentSessionDriver>;
+  signal: AbortSignal;
+}): Promise<AgentSessionDriver> {
+  const driverPromise = create();
+  if (!signal.aborted) {
+    const abortPromise = new Promise<never>((_, reject) => {
+      signal.addEventListener(
+        "abort",
+        () => reject(new Error("Agent session was aborted.")),
+        { once: true },
+      );
+    });
+    try {
+      return await Promise.race([driverPromise, abortPromise]);
+    } catch (error) {
+      void driverPromise.then((driver) => driver.dispose()).catch(() => {});
+      throw error;
+    }
+  }
+
+  void driverPromise.then((driver) => driver.dispose()).catch(() => {});
+  throw new Error("Agent session was aborted.");
 }
