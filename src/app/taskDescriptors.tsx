@@ -15,7 +15,11 @@ import { FindFilesScreen } from "../workflows/findFiles/FindFilesScreen";
 import { ShellCommandScreen } from "../workflows/shellCommand/ShellCommandScreen";
 import { ShowContextScreen } from "../workflows/showContext/ShowContextScreen";
 import type { AppTask } from "./appTypes";
-import type { TaskDescriptor, TaskDescriptors } from "./taskDescriptor";
+import type {
+  SnapshotTaskKind,
+  TaskDescriptor,
+  TaskDescriptors,
+} from "./taskDescriptor";
 
 const identitySerialize = <Task extends AppTask>(task: Task) => task;
 const identityRestore = <Task extends AppTask>(task: Task) => task;
@@ -180,7 +184,7 @@ export const snapshotTaskDescriptors = {
   response: responseTaskDescriptor,
   "shell-command": shellCommandTaskDescriptor,
   "show-context": showContextTaskDescriptor,
-} as const;
+} satisfies { [Kind in SnapshotTaskKind]: TaskDescriptor<Kind> };
 
 function normalizeResponseTask(
   task: Extract<AppTask, { kind: "response" }>,

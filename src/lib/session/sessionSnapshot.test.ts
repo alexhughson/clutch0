@@ -384,6 +384,13 @@ test("snapshot parser rejects malformed known active tasks and counters", () => 
   expect(() =>
     parseAppSnapshot({
       ...baseSnapshot,
+      nextLlmRequestId: 9007199254740992,
+    }),
+  ).toThrow("nextLlmRequestId must be a positive safe integer");
+
+  expect(() =>
+    parseAppSnapshot({
+      ...baseSnapshot,
       activeTask: {
         id: 0,
         kind: "show-context",

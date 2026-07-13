@@ -295,7 +295,7 @@ test("rejects malformed ACP agent backend settings", async () => {
   );
 
   expect(() => resolveConfiguredAgentBackend(paths)).toThrow(
-    "Clutch agentBackend.env must be an object of strings.",
+    "Clutch settings.agentBackend.env.CURSOR_AGENT_LOG must be a string.",
   );
 });
 
@@ -587,6 +587,6 @@ test("malformed model service tier fails loudly", async () => {
   );
 
   expect(() => isClutchConfigured(paths)).toThrow(
-    "model serviceTier must be one of",
+    "Clutch settings.models.primary.serviceTier",
   );
 });

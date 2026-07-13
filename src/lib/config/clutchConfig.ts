@@ -13,80 +13,30 @@ import {
   type OAuthCredentials,
 } from "@earendil-works/pi-ai/oauth";
 import { normalizeClutchModelMetadata } from "./modelMetadata";
+import {
+  CLUTCH_MODEL_EFFORT_LEVELS,
+  CLUTCH_MODEL_SERVICE_TIERS,
+  DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
+  DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
+  SUPPORTED_CLUTCH_LLM_PROVIDERS,
+  decodeClutchAuth,
+  decodeClutchSettings,
+  isSupportedClutchProvider,
+  normalizeAgentBackendConfig,
+  type ClutchAgentBackendConfig,
+  type ClutchApiKeyCredential,
+  type ClutchAuth,
+  type ClutchCredential,
+  type ClutchModelEffortLevel,
+  type ClutchModelRole,
+  type ClutchModelSelection,
+  type ClutchModelServiceTier,
+  type ClutchOAuthCredential,
+  type ClutchSettings,
+  type SupportedClutchLlmProvider,
+} from "./clutchConfigSchemas";
 
 export const CLUTCH_CONFIG_DIR_ENV = "CLUTCH_CONFIG_DIR";
-
-export const SUPPORTED_CLUTCH_LLM_PROVIDERS = [
-  { id: "cerebras", label: "Cerebras" },
-  { id: "google", label: "Google Gemini" },
-  { id: "openai", label: "OpenAI" },
-  { id: "openai-codex", label: "OpenAI subscription" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "opencode", label: "OpenCode Zen" },
-  { id: "opencode-go", label: "OpenCode Go" },
-  { id: "sambanova", label: "SambaNova" },
-] as const;
-
-export type SupportedClutchLlmProvider =
-  (typeof SUPPORTED_CLUTCH_LLM_PROVIDERS)[number]["id"];
-
-export type ClutchModelRole = "agent" | "primary" | "summarization";
-
-export const CLUTCH_MODEL_EFFORT_LEVELS = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-] as const;
-
-export type ClutchModelEffortLevel =
-  (typeof CLUTCH_MODEL_EFFORT_LEVELS)[number];
-
-export const DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL: ClutchModelEffortLevel = "low";
-
-export const CLUTCH_MODEL_SERVICE_TIERS = ["default", "priority"] as const;
-
-export type ClutchModelServiceTier =
-  (typeof CLUTCH_MODEL_SERVICE_TIERS)[number];
-
-export const DEFAULT_CLUTCH_MODEL_SERVICE_TIER: ClutchModelServiceTier =
-  "default";
-
-export type ClutchModelSelection = {
-  effortLevel?: ClutchModelEffortLevel;
-  metadata?: Model<Api>;
-  model: string;
-  provider: SupportedClutchLlmProvider;
-  serviceTier?: ClutchModelServiceTier;
-};
-
-export type ClutchSettings = {
-  agentBackend?: ClutchAgentBackendConfig;
-  models?: Partial<Record<ClutchModelRole, ClutchModelSelection>>;
-};
-
-export type ClutchAgentBackendConfig = {
-  args?: string[];
-  command: string;
-  env?: Record<string, string>;
-};
-
-export type ClutchApiKeyCredential = {
-  key: string;
-  type: "api_key";
-};
-
-export type ClutchOAuthCredential = OAuthCredentials & {
-  type: "oauth";
-};
-
-export type ClutchCredential = ClutchApiKeyCredential | ClutchOAuthCredential;
-
-export type ClutchAuth = Partial<
-  Record<SupportedClutchLlmProvider, ClutchCredential>
->;
 
 export type ClutchConfigPaths = {
   authPath: string;
@@ -132,14 +82,6 @@ export function getSupportedClutchProviderLabel(
   return getSupportedProviderMetadata(provider).label;
 }
 
-export function isSupportedClutchProvider(
-  provider: string,
-): provider is SupportedClutchLlmProvider {
-  return SUPPORTED_CLUTCH_LLM_PROVIDERS.some(
-    (candidate) => candidate.id === provider,
-  );
-}
-
 export function loadClutchSettings(
   paths = getClutchConfigPaths(),
 ): ClutchSettings {
@@ -147,7 +89,7 @@ export function loadClutchSettings(
     return {};
   }
 
-  return parseClutchSettings(
+  return decodeClutchSettings(
     readJsonObject(paths.settingsPath, "Clutch settings"),
   );
 }
@@ -157,7 +99,7 @@ export function loadClutchAuth(paths = getClutchConfigPaths()): ClutchAuth {
     return {};
   }
 
-  return parseClutchAuth(readJsonObject(paths.authPath, "Clutch auth"));
+  return decodeClutchAuth(readJsonObject(paths.authPath, "Clutch auth"));
 }
 
 export function isClutchConfigured(paths = getClutchConfigPaths()): boolean {
@@ -463,158 +405,7 @@ function getExistingOrEmptyModelSelection({
   };
 }
 
-function parseClutchSettings(raw: Record<string, unknown>): ClutchSettings {
-  const models = raw.models;
-  if (
-    models !== undefined &&
-    (models === null || typeof models !== "object" || Array.isArray(models))
-  ) {
-    throw new Error("Clutch settings field models must be an object.");
-  }
-
-  return {
-    agentBackend: parseAgentBackendConfig(raw.agentBackend),
-    ...(models === undefined
-      ? {}
-      : { models: parseModelSelections(models as Record<string, unknown>) }),
-  };
-}
-
-function parseAgentBackendConfig(
-  raw: unknown,
-): ClutchAgentBackendConfig | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error("Clutch settings field agentBackend must be an object.");
-  }
-
-  return normalizeAgentBackendConfig(raw as Record<string, unknown>);
-}
-
-function normalizeAgentBackendConfig(
-  raw: ClutchAgentBackendConfig | Record<string, unknown>,
-): ClutchAgentBackendConfig {
-  const command = raw.command;
-  if (typeof command !== "string" || command.trim().length === 0) {
-    throw new Error("Clutch agentBackend.command must be a non-empty string.");
-  }
-
-  const args = raw.args;
-  if (args !== undefined && !isStringArray(args)) {
-    throw new Error("Clutch agentBackend.args must be a string array.");
-  }
-
-  const env = raw.env;
-  if (env !== undefined && !isStringRecord(env)) {
-    throw new Error("Clutch agentBackend.env must be an object of strings.");
-  }
-
-  return {
-    ...(args === undefined ? {} : { args }),
-    command,
-    ...(env === undefined ? {} : { env }),
-  };
-}
-
-function parseModelSelections(
-  rawModels: Record<string, unknown>,
-): Partial<Record<ClutchModelRole, ClutchModelSelection>> {
-  return {
-    agent: parseModelSelection(rawModels.agent, "agent"),
-    primary: parseModelSelection(rawModels.primary, "primary"),
-    summarization: parseModelSelection(
-      rawModels.summarization,
-      "summarization",
-    ),
-  };
-}
-
-function parseModelSelection(
-  raw: unknown,
-  role: ClutchModelRole,
-): ClutchModelSelection | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error(`Clutch ${role} model config must be an object.`);
-  }
-
-  const provider = (raw as Record<string, unknown>).provider;
-  const model = (raw as Record<string, unknown>).model;
-  const metadata = (raw as Record<string, unknown>).metadata;
-  const effortLevel = parseModelEffortLevel({
-    raw: (raw as Record<string, unknown>).effortLevel,
-    role,
-  });
-  const serviceTier = parseModelServiceTier({
-    raw: (raw as Record<string, unknown>).serviceTier,
-    role,
-  });
-  if (typeof provider !== "string" || typeof model !== "string") {
-    throw new Error(
-      `Clutch ${role} model config must include provider and model strings.`,
-    );
-  }
-  if (!isSupportedClutchProvider(provider)) {
-    throw new Error(`Unsupported Clutch LLM provider: ${provider}`);
-  }
-
-  if (metadata === undefined) {
-    return { effortLevel, model, provider, serviceTier };
-  }
-
-  return {
-    effortLevel,
-    metadata: parseModelMetadata({ metadata, modelId: model, provider, role }),
-    model,
-    provider,
-    serviceTier,
-  };
-}
-
-function parseClutchAuth(raw: Record<string, unknown>): ClutchAuth {
-  const auth: ClutchAuth = {};
-  for (const [provider, credential] of Object.entries(raw)) {
-    if (!isSupportedClutchProvider(provider)) {
-      continue;
-    }
-    if (
-      credential === null ||
-      typeof credential !== "object" ||
-      Array.isArray(credential)
-    ) {
-      throw new Error(
-        `Clutch auth credential for ${provider} must be an object.`,
-      );
-    }
-
-    const type = (credential as Record<string, unknown>).type;
-    if (type === "api_key") {
-      const key = (credential as Record<string, unknown>).key;
-      if (typeof key !== "string") {
-        throw new Error(
-          `Clutch auth credential for ${provider} with type "api_key" must include key string.`,
-        );
-      }
-      auth[provider] = { key, type };
-      continue;
-    }
-    if (type === "oauth") {
-      auth[provider] = parseOAuthCredential(provider, credential);
-      continue;
-    }
-    throw new Error(
-      `Clutch auth credential for ${provider} must include type "api_key" or "oauth".`,
-    );
-  }
-
-  return auth;
-}
-
-function readJsonObject(path: string, label: string): Record<string, unknown> {
+function readJsonObject(path: string, label: string): unknown {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(path, "utf-8"));
@@ -626,7 +417,7 @@ function readJsonObject(path: string, label: string): Record<string, unknown> {
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error(`${label} file must contain a JSON object.`);
   }
-  return parsed as Record<string, unknown>;
+  return parsed;
 }
 
 function writeJsonFile(path: string, value: unknown) {
@@ -636,72 +427,6 @@ function writeJsonFile(path: string, value: unknown) {
 function writeClutchAuth(paths: ClutchConfigPaths, auth: ClutchAuth) {
   writeJsonFile(paths.authPath, auth);
   chmodSync(paths.authPath, 0o600);
-}
-
-function parseModelMetadata({
-  metadata,
-  modelId,
-  provider,
-  role,
-}: {
-  metadata: unknown;
-  modelId: string;
-  provider: SupportedClutchLlmProvider;
-  role: ClutchModelRole;
-}): Model<Api> {
-  if (
-    metadata === null ||
-    typeof metadata !== "object" ||
-    Array.isArray(metadata)
-  ) {
-    throw new Error(`Clutch ${role} model metadata must be an object.`);
-  }
-
-  const candidate = metadata as Record<string, unknown>;
-  if (candidate.id !== modelId) {
-    throw new Error(`Clutch ${role} model metadata id must match model.`);
-  }
-  if (candidate.provider !== provider) {
-    throw new Error(
-      `Clutch ${role} model metadata provider must match provider.`,
-    );
-  }
-  if (typeof candidate.name !== "string" || candidate.name.length === 0) {
-    throw new Error(`Clutch ${role} model metadata name must be a string.`);
-  }
-  if (typeof candidate.api !== "string" || candidate.api.length === 0) {
-    throw new Error(`Clutch ${role} model metadata api must be a string.`);
-  }
-  if (typeof candidate.baseUrl !== "string" || candidate.baseUrl.length === 0) {
-    throw new Error(`Clutch ${role} model metadata baseUrl must be a string.`);
-  }
-  if (typeof candidate.reasoning !== "boolean") {
-    throw new Error(
-      `Clutch ${role} model metadata reasoning must be a boolean.`,
-    );
-  }
-  if (!isStringArray(candidate.input)) {
-    throw new Error(
-      `Clutch ${role} model metadata input must be a string array.`,
-    );
-  }
-  if (!isPositiveNumber(candidate.contextWindow)) {
-    throw new Error(
-      `Clutch ${role} model metadata contextWindow must be a positive number.`,
-    );
-  }
-  if (!isPositiveNumber(candidate.maxTokens)) {
-    throw new Error(
-      `Clutch ${role} model metadata maxTokens must be a positive number.`,
-    );
-  }
-  if (!isCostObject(candidate.cost)) {
-    throw new Error(
-      `Clutch ${role} model metadata cost must include numeric token costs.`,
-    );
-  }
-
-  return candidate as unknown as Model<Api>;
 }
 
 function assertUsableModelSelection(
@@ -765,87 +490,6 @@ function normalizeModelSelectionForSave(
   };
 }
 
-function parseModelEffortLevel({
-  raw,
-  role,
-}: {
-  raw: unknown;
-  role: ClutchModelRole;
-}): ClutchModelEffortLevel {
-  if (raw === undefined) {
-    return DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL;
-  }
-  if (typeof raw !== "string" || !isClutchModelEffortLevel(raw)) {
-    throw new Error(
-      `Clutch ${role} model effortLevel must be one of: ${CLUTCH_MODEL_EFFORT_LEVELS.join(", ")}.`,
-    );
-  }
-  return raw;
-}
-
-function isClutchModelEffortLevel(
-  value: string,
-): value is ClutchModelEffortLevel {
-  return CLUTCH_MODEL_EFFORT_LEVELS.some((level) => level === value);
-}
-
-function parseModelServiceTier({
-  raw,
-  role,
-}: {
-  raw: unknown;
-  role: ClutchModelRole;
-}): ClutchModelServiceTier {
-  if (raw === undefined) {
-    return DEFAULT_CLUTCH_MODEL_SERVICE_TIER;
-  }
-  if (typeof raw !== "string" || !isClutchModelServiceTier(raw)) {
-    throw new Error(
-      `Clutch ${role} model serviceTier must be one of: ${CLUTCH_MODEL_SERVICE_TIERS.join(", ")}.`,
-    );
-  }
-  return raw;
-}
-
-function isClutchModelServiceTier(
-  value: string,
-): value is ClutchModelServiceTier {
-  return CLUTCH_MODEL_SERVICE_TIERS.some((tier) => tier === value);
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === "string")
-  );
-}
-
-function isStringRecord(value: unknown): value is Record<string, string> {
-  return (
-    value !== null &&
-    typeof value === "object" &&
-    !Array.isArray(value) &&
-    Object.values(value).every((item) => typeof item === "string")
-  );
-}
-
-function isPositiveNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
-}
-
-function isCostObject(value: unknown): boolean {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-
-  const cost = value as Record<string, unknown>;
-  return (
-    typeof cost.input === "number" &&
-    typeof cost.output === "number" &&
-    typeof cost.cacheRead === "number" &&
-    typeof cost.cacheWrite === "number"
-  );
-}
-
 export function hasUsableApiKey(
   credential: ClutchApiKeyCredential | undefined,
 ): credential is ClutchApiKeyCredential {
@@ -866,33 +510,6 @@ export function hasUsableCredential(
     credential.refresh.trim().length > 0 &&
     Number.isFinite(credential.expires)
   );
-}
-
-function parseOAuthCredential(
-  provider: string,
-  credential: object,
-): ClutchOAuthCredential {
-  assertOAuthProvider(provider);
-
-  const raw = credential as Record<string, unknown>;
-  if (
-    typeof raw.access !== "string" ||
-    typeof raw.refresh !== "string" ||
-    typeof raw.expires !== "number" ||
-    !Number.isFinite(raw.expires)
-  ) {
-    throw new Error(
-      `Clutch auth credential for ${provider} with type "oauth" must include access, refresh, and expires.`,
-    );
-  }
-
-  return {
-    ...(raw as OAuthCredentials),
-    access: raw.access,
-    expires: raw.expires,
-    refresh: raw.refresh,
-    type: "oauth",
-  };
 }
 
 function assertOAuthProvider(

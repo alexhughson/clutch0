@@ -1,5 +1,45 @@
-import { Value } from "@sinclair/typebox/value";
+import { Kind, TypeRegistry } from "@sinclair/typebox";
 import type { TSchema } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
+
+const SAFE_INTEGER_KIND = "SafeInteger";
+
+TypeRegistry.Set(SAFE_INTEGER_KIND, (schema: TSchema, value) => {
+  if (
+    typeof value !== "number" ||
+    !Number.isInteger(value) ||
+    !Number.isSafeInteger(value)
+  ) {
+    return false;
+  }
+
+  const minimum = readNumericConstraint(schema, "minimum");
+  if (minimum !== undefined && value < minimum) {
+    return false;
+  }
+
+  const maximum = readNumericConstraint(schema, "maximum");
+  if (maximum !== undefined && value > maximum) {
+    return false;
+  }
+
+  return true;
+});
+
+export function SafeInteger(options?: {
+  maximum?: number;
+  minimum?: number;
+}) {
+  return Type.Unsafe<number>({
+    [Kind]: SAFE_INTEGER_KIND,
+    type: "integer",
+    ...options,
+  });
+}
+
+export const PositiveSafeInteger = SafeInteger({ minimum: 1 });
+export const NonNegativeSafeInteger = SafeInteger({ minimum: 0 });
 
 export function decodeSchema<T>(schema: TSchema, snapshot: unknown, label: string): T {
   if (!Value.Check(schema, snapshot)) {
@@ -62,6 +102,9 @@ export function formatSchemaErrorMessage(
     return `${fieldLabel} must be a finite number.`;
   }
   if (message === "Expected integer") {
+    return integerConstraintMessage(fieldLabel, errorSchema);
+  }
+  if (message === `Expected kind '${SAFE_INTEGER_KIND}'`) {
     return integerConstraintMessage(fieldLabel, errorSchema);
   }
   if (message.startsWith("Expected integer to be greater or equal to")) {

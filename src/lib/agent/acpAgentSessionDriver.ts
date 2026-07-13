@@ -8,7 +8,7 @@ import {
   createAcpAgentOutputFormatter,
   type AcpAgentOutputFormatter,
 } from "../agentOutput/acpAgentOutputAdapter";
-import type { ClutchAgentBackendConfig } from "../config/clutchConfig";
+import type { ClutchAgentBackendConfig } from "../config/clutchConfigSchemas";
 
 export type AgentSessionDriver = {
   dispose: () => Promise<void>;

@@ -15,12 +15,13 @@ import {
   encodeContextItemV1,
 } from "../context/contextItemPersistence";
 import type { PersistentContextItem } from "../context/contextItemTypes";
-import { decodeSchema } from "../schemaDecode";
+import {
+  NonNegativeSafeInteger,
+  PositiveSafeInteger,
+  decodeSchema,
+} from "../schemaDecode";
 
 export const APP_SNAPSHOT_SCHEMA_VERSION = 1;
-
-const PositiveSafeInteger = Type.Integer({ minimum: 1 });
-const NonNegativeSafeInteger = Type.Integer({ minimum: 0 });
 const NonNegativeNumber = Type.Number({ minimum: 0 });
 
 export const ComposerStateSchema = Type.Object({

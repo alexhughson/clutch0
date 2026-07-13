@@ -1,8 +1,8 @@
 import type {
   ClutchModelEffortLevel,
   ClutchModelServiceTier,
-  ResolvedConfiguredLlmRequest,
-} from "../config/clutchConfig";
+} from "../config/clutchConfigSchemas";
+import type { ResolvedConfiguredLlmRequest } from "../config/clutchConfig";
 import type { LlmModel, LlmThinkingLevel } from "./types";
 
 const CEREBRAS_MAX_OUTPUT_TOKENS = 4_096;

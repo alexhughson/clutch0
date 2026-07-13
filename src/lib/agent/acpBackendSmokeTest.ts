@@ -4,9 +4,9 @@ import * as acp from "@agentclientprotocol/sdk";
 import {
   getClutchConfigPaths,
   resolveConfiguredAgentBackend,
-  type ClutchAgentBackendConfig,
   type ClutchConfigPaths,
 } from "../config/clutchConfig";
+import type { ClutchAgentBackendConfig } from "../config/clutchConfigSchemas";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const BUFFER_LIMIT = 8_000;

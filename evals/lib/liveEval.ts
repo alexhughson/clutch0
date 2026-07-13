@@ -6,15 +6,17 @@ import {
   type ToolCall,
 } from "@earendil-works/pi-ai";
 import {
-  DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
-  DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
   hasUsableApiKey,
-  isSupportedClutchProvider,
   loadClutchAuth,
   resolveConfiguredLlmRequest,
   type ResolvedConfiguredLlmRequest,
-  type SupportedClutchLlmProvider,
 } from "../../src/lib/config/clutchConfig";
+import {
+  DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
+  DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
+  isSupportedClutchProvider,
+  type SupportedClutchLlmProvider,
+} from "../../src/lib/config/clutchConfigSchemas";
 import { modelsFromProviderResponse } from "../../src/lib/config/providerModels";
 import { patchProposalFromToolCall } from "../../src/lib/llm/patchTool";
 import { renderPrompt } from "../../src/lib/llm/prompts";

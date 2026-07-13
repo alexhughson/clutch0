@@ -4,10 +4,8 @@ import {
   type Api,
   type Model,
 } from "@earendil-works/pi-ai";
-import type {
-  ClutchConfigPaths,
-  SupportedClutchLlmProvider,
-} from "./clutchConfig";
+import type { ClutchConfigPaths } from "./clutchConfig";
+import type { SupportedClutchLlmProvider } from "./clutchConfigSchemas";
 import {
   getClutchConfigPaths,
   hasUsableCredential,

@@ -8,7 +8,7 @@ import type {
   ClutchAgentBackendConfig,
   ClutchModelSelection,
   SupportedClutchLlmProvider,
-} from "../lib/config/clutchConfig";
+} from "../lib/config/clutchConfigSchemas";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
 import type { AgentAskMode, AgentSandboxContext, FilePath } from "../types";
 import type {

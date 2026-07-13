@@ -10,18 +10,20 @@ import type { ConfigTaskState } from "../../app/appTypes";
 import {
   CLUTCH_MODEL_EFFORT_LEVELS,
   CLUTCH_MODEL_SERVICE_TIERS,
-  getSupportedClutchProviderLabel,
-  getClutchModelEffortLevel,
-  getClutchModelServiceTier,
-  saveClutchAgentBackendConfiguration,
-  saveClutchApiKey,
-  saveClutchModelConfiguration,
   SUPPORTED_CLUTCH_LLM_PROVIDERS,
   type ClutchAgentBackendConfig,
   type ClutchModelEffortLevel,
   type ClutchModelSelection,
   type ClutchModelServiceTier,
   type SupportedClutchLlmProvider,
+} from "../../lib/config/clutchConfigSchemas";
+import {
+  getSupportedClutchProviderLabel,
+  getClutchModelEffortLevel,
+  getClutchModelServiceTier,
+  saveClutchAgentBackendConfiguration,
+  saveClutchApiKey,
+  saveClutchModelConfiguration,
 } from "../../lib/config/clutchConfig";
 import {
   loginClutchOpenAiSubscription,
