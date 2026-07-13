@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { AppTask } from "./appTypes";
+import { createMinimalConfigTask } from "../workflows/config/configInitialState";
 import {
   getWorkspaceLayout,
   getWorkspaceLayoutMode,
@@ -79,14 +80,7 @@ test("workspace stack keeps enough context rows for one summarized item", () => 
 });
 
 function configTask(mode: "first-run" | "settings"): AppTask {
-  return {
-    agent: { model: "gpt-test", provider: "openai" },
-    configuredProviders: [],
-    kind: "config",
-    mode,
-    primary: { model: "gpt-test", provider: "openai" },
-    summarization: { model: "gpt-test", provider: "openai" },
-  };
+  return createMinimalConfigTask(mode);
 }
 
 function stack(

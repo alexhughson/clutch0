@@ -1,3 +1,4 @@
+import type { Api, Model } from "@earendil-works/pi-ai";
 import type {
   AgentOutputBlock,
   AgentOutputUpdate,
@@ -9,6 +10,15 @@ import type {
   ClutchModelSelection,
   SupportedClutchLlmProvider,
 } from "../lib/config/clutchConfigSchemas";
+import type {
+  ConfigAgentBackendForm,
+  ConfigKeyInput,
+  ConfigModelEntry,
+  ConfigModelLoadState,
+  ConfigStage,
+  ConfigSubscriptionLoginState,
+} from "../workflows/config/configTypes";
+import type { OpenAiSubscriptionDeviceCode } from "../lib/config/openAiSubscriptionAuth";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
 import type { AgentAskMode, AgentSandboxContext, FilePath } from "../types";
 import type {
@@ -107,13 +117,31 @@ export type ContextItemViewerTaskState = {
 };
 
 export type ConfigTaskState = {
+  activeModelEntry: ConfigModelEntry;
   agent: ClutchModelSelection;
   agentBackend?: ClutchAgentBackendConfig;
+  agentBackendForm: ConfigAgentBackendForm;
+  agentBackendRowIndex: number;
   configuredProviders: SupportedClutchLlmProvider[];
   kind: "config";
+  message: string | null;
   mode: "first-run" | "settings";
+  modelEffortIndex: number;
+  modelFilter: string;
+  modelIndex: number;
+  modelLoad: ConfigModelLoadState;
+  modelLoadRequestId: number;
+  modelProviderIndex: number;
+  modelSettingsIndex: number;
+  modelServiceTierIndex: number;
   primary: ClutchModelSelection;
+  providerIndex: number;
+  stage: ConfigStage;
+  subscriptionLogin: ConfigSubscriptionLoginState;
+  subscriptionLoginRequestId: number;
   summarization: ClutchModelSelection;
+  token: string;
+  tokenProvider: SupportedClutchLlmProvider;
 };
 
 export type CreateFileTaskState = {
@@ -197,9 +225,30 @@ export type AppActions = {
     ensureWorkspaceSummaries: () => void;
   };
   config: {
+    appendPaste: (options: { text: string }) => void;
+    cancelSubscriptionLogin: () => void;
     closeAfterSave: () => void;
+    failModelLoad: (options: {
+      errorMessage: string;
+      requestId: number;
+    }) => void;
+    finishModelLoad: (options: {
+      models: Model<Api>[];
+      requestId: number;
+    }) => void;
+    handleKey: (options: { key: ConfigKeyInput }) => void;
     openSettings: () => void;
     openSetup: () => void;
+    startModelLoad: (options: { requestId: number }) => void;
+    subscriptionLoginDeviceCode: (options: {
+      info: OpenAiSubscriptionDeviceCode;
+      requestId: number;
+    }) => void;
+    subscriptionLoginFail: (options: {
+      errorMessage: string;
+      requestId: number;
+    }) => void;
+    subscriptionLoginFinish: (options: { requestId: number }) => void;
   };
   agentAsk: {
     attachSandbox: (options: {

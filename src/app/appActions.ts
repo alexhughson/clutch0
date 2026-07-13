@@ -33,7 +33,7 @@ export function createAppActions({
     addFiles: createAddFilesActions({ set }),
     agentAsk: createAgentAskActions({ get, set }),
     compose: createComposeActions({ get, set }),
-    config: createConfigActions({ set }),
+    config: createConfigActions({ get, set }),
     contextSummaries: createContextSummariesActions({ get, set }),
     contextItems: createContextItemsActions({ set }),
     createFile: createCreateFileActions({ set }),

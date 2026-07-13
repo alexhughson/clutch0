@@ -1,6 +1,7 @@
 import type { KeyEvent } from "@opentui/core";
 import { expect, test } from "bun:test";
 import type { AppTask } from "./appTypes";
+import { createMinimalConfigTask } from "../workflows/config/configInitialState";
 import {
   BASE_CTRL_C_EXIT_INTERVAL_MS,
   getCtrlCShortcutDecision,
@@ -98,14 +99,7 @@ test("exits on a second ctrl+c even when the active task cannot close", () => {
 test("arms exit instead of closing first-run config", () => {
   expect(
     getCtrlCShortcutDecision({
-      activeTask: {
-        agent: { model: "gpt-test", provider: "openai" },
-        configuredProviders: [],
-        kind: "config",
-        mode: "first-run",
-        primary: { model: "gpt-test", provider: "openai" },
-        summarization: { model: "gpt-test", provider: "openai" },
-      },
+      activeTask: createMinimalConfigTask("first-run"),
       lastBaseCtrlCAt: null,
       now: 1000,
     }),
