@@ -28,7 +28,7 @@
     "@sinclair/typebox": "^0.34.52",
     "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0",
     "diff": "^9.0.0",
-    "fiat": "file:../fiat", // TODO(fiat-pin): pin to commit after fiat release process
+    "fiat": "github:alexhughson/fiat#3cdd849c42194e2293310e46762e7e8b8fbcb0e8",
     "react": "^19.2.6",
     "zod": "^4.4.3",
     "zustand": "^5.0.13"
