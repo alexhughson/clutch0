@@ -27,8 +27,8 @@ type ConfiguredLlmRequestOptions = ReturnType<
   typeof configuredLlmRequestOptions
 >;
 
-const MAX_INVALID_PATCH_TOOL_RETRIES = 3;
-const MAX_PATCH_TOOL_CONTINUATIONS = 8;
+const PATCH_APPLY_STEP_BUDGET = 8;
+const PATCH_INVALID_RETRY_BUDGET = 3;
 
 export type { PatchToolMode };
 
@@ -225,6 +225,7 @@ export async function streamLlmInteraction({
       firstResponseText: responseText,
       requestId,
       root,
+      stepBudget: PATCH_APPLY_STEP_BUDGET,
       routeAssistantMessageToolCalls: (assistantMessage) =>
         routeWorkflowToolCalls(getAssistantToolCalls(assistantMessage)),
       streamContinuation: ({ assistantMessage, context, toolOutputs }) =>
@@ -254,11 +255,13 @@ export async function streamLlmInteraction({
       firstAssistantMessage: finalMessage,
       firstResponseText: responseText,
       firstWorkflowResult: workflowResult,
+      invalidRetryBudget: PATCH_INVALID_RETRY_BUDGET,
       patchToolMode,
       requestId,
+      root,
+      stepBudget: PATCH_APPLY_STEP_BUDGET,
       routeAssistantMessageToolCalls: (assistantMessage) =>
         routeWorkflowToolCalls(getAssistantToolCalls(assistantMessage)),
-      root,
       streamContinuation: ({ assistantMessage, context, toolOutput }) =>
         streamLlmToolContinuation({
           assistantMessage,
@@ -278,16 +281,64 @@ export async function streamLlmInteraction({
   };
 }
 
+type StepBudgetTracker = {
+  budget: number;
+  invalidRetryBudget?: number;
+  stepsUsed: number;
+  invalidRetriesUsed: number;
+};
+
+async function advanceWithToolContinuation({
+  assistantMessage,
+  continuationContext,
+  routeAssistantMessageToolCalls,
+  streamContinuation,
+  toolOutput,
+}: {
+  assistantMessage: LlmAssistantMessage;
+  continuationContext: LlmContext;
+  routeAssistantMessageToolCalls: (
+    assistantMessage: LlmAssistantMessage,
+  ) => Promise<LlmWorkflowToolResult | null>;
+  streamContinuation: (options: {
+    assistantMessage: LlmAssistantMessage;
+    context: LlmContext;
+    toolOutput: LlmToolContinuationOutput;
+  }) => Promise<StreamLlmToolContinuationResult>;
+  toolOutput: LlmToolContinuationOutput;
+}): Promise<{
+  assistantMessage: LlmAssistantMessage;
+  continuationContext: LlmContext;
+  responseText: string;
+  workflowResult: LlmWorkflowToolResult | null;
+}> {
+  const continuation = await streamContinuation({
+    assistantMessage,
+    context: continuationContext,
+    toolOutput,
+  });
+  const workflowResult = await routeAssistantMessageToolCalls(
+    continuation.assistantMessage,
+  );
+
+  return {
+    assistantMessage: continuation.assistantMessage,
+    continuationContext: continuation.context,
+    responseText: continuation.responseText,
+    workflowResult,
+  };
+}
+
 export async function continuePatchToolCalls({
   context,
   firstAssistantMessage,
   firstResponseText,
   firstWorkflowResult,
-  maxInvalidPatchRetries = MAX_INVALID_PATCH_TOOL_RETRIES,
-  maxToolContinuations = MAX_PATCH_TOOL_CONTINUATIONS,
+  invalidRetryBudget = PATCH_INVALID_RETRY_BUDGET,
   patchToolMode = "review",
   requestId,
   root,
+  stepBudget,
   routeAssistantMessageToolCalls,
   streamContinuation,
 }: {
@@ -295,11 +346,11 @@ export async function continuePatchToolCalls({
   firstAssistantMessage: LlmAssistantMessage;
   firstResponseText: string;
   firstWorkflowResult: LlmWorkflowToolResult;
-  maxInvalidPatchRetries?: number;
-  maxToolContinuations?: number;
+  invalidRetryBudget?: number;
   patchToolMode?: PatchToolMode;
   requestId?: number;
   root?: string;
+  stepBudget: number;
   routeAssistantMessageToolCalls: (
     assistantMessage: LlmAssistantMessage,
   ) => Promise<LlmWorkflowToolResult | null>;
@@ -313,38 +364,29 @@ export async function continuePatchToolCalls({
   let continuationContext = context;
   let responseText = firstResponseText;
   let workflowResult = firstWorkflowResult;
-  let invalidPatchRetryCount = 0;
-  let toolContinuationCount = 0;
+  const budget: StepBudgetTracker = {
+    budget: stepBudget,
+    invalidRetryBudget,
+    stepsUsed: 0,
+    invalidRetriesUsed: 0,
+  };
 
   while (true) {
     if (workflowResult.kind !== "patch") {
-      return {
-        ...workflowResult,
-        responseText,
-      };
+      return { ...workflowResult, responseText };
     }
 
     const toolCall = getAssistantToolCalls(assistantMessage)[0];
     if (toolCall === undefined) {
-      return {
-        ...workflowResult,
-        responseText,
-      };
+      return { ...workflowResult, responseText };
     }
 
     if (workflowResult.patch.status === "valid") {
       if (patchToolMode === "review") {
-        return {
-          ...workflowResult,
-          responseText,
-        };
+        return { ...workflowResult, responseText };
       }
-
-      if (toolContinuationCount >= maxToolContinuations) {
-        return {
-          ...workflowResult,
-          responseText,
-        };
+      if (budget.stepsUsed >= budget.budget) {
+        return { ...workflowResult, responseText };
       }
 
       const applyResult = await applyPatchProposalWithRuntimeEvents({
@@ -353,17 +395,16 @@ export async function continuePatchToolCalls({
         root,
       });
       if (applyResult.status === "invalid") {
-        workflowResult = {
-          kind: "patch",
-          patch: applyResult,
-        };
+        workflowResult = { kind: "patch", patch: applyResult };
         continue;
       }
 
-      toolContinuationCount += 1;
-      const continuation = await streamContinuation({
+      budget.stepsUsed += 1;
+      const advanced = await advanceWithToolContinuation({
         assistantMessage,
-        context: continuationContext,
+        continuationContext,
+        routeAssistantMessageToolCalls,
+        streamContinuation,
         toolOutput: {
           content: applyResult.toolOutput.content,
           isError: false,
@@ -371,42 +412,37 @@ export async function continuePatchToolCalls({
           toolName: toolCall.name,
         },
       });
-      const retryWorkflowResult = await routeAssistantMessageToolCalls(
-        continuation.assistantMessage,
-      );
+      continuationContext = advanced.continuationContext;
+      assistantMessage = advanced.assistantMessage;
+      responseText = advanced.responseText;
 
-      continuationContext = continuation.context;
-      assistantMessage = continuation.assistantMessage;
-      responseText = continuation.responseText;
-
-      if (retryWorkflowResult === null) {
+      if (advanced.workflowResult === null) {
         return {
           applyStatus: "applied",
           kind: "patch",
           patch: applyResult,
-          responseText,
+          responseText: advanced.responseText,
         };
       }
 
-      workflowResult = retryWorkflowResult;
+      workflowResult = advanced.workflowResult;
       continue;
     }
 
-    if (invalidPatchRetryCount >= maxInvalidPatchRetries) {
-      return {
-        ...workflowResult,
-        responseText,
-      };
+    if (budget.invalidRetriesUsed >= invalidRetryBudget) {
+      return { ...workflowResult, responseText };
     }
 
     const toolOutput = buildPatchValidationFailureToolOutput({
       result: workflowResult.patch,
     });
-    invalidPatchRetryCount += 1;
-    toolContinuationCount += 1;
-    const continuation = await streamContinuation({
+    budget.invalidRetriesUsed += 1;
+    budget.stepsUsed += 1;
+    const advanced = await advanceWithToolContinuation({
       assistantMessage,
-      context: continuationContext,
+      continuationContext,
+      routeAssistantMessageToolCalls,
+      streamContinuation,
       toolOutput: {
         content: toolOutput.content,
         isError: true,
@@ -414,22 +450,15 @@ export async function continuePatchToolCalls({
         toolName: toolCall.name,
       },
     });
-    const retryWorkflowResult = await routeAssistantMessageToolCalls(
-      continuation.assistantMessage,
-    );
+    continuationContext = advanced.continuationContext;
+    assistantMessage = advanced.assistantMessage;
+    responseText = advanced.responseText;
 
-    continuationContext = continuation.context;
-    assistantMessage = continuation.assistantMessage;
-    responseText = continuation.responseText;
-
-    if (retryWorkflowResult === null) {
-      return {
-        kind: "text",
-        responseText,
-      };
+    if (advanced.workflowResult === null) {
+      return { kind: "text", responseText: advanced.responseText };
     }
 
-    workflowResult = retryWorkflowResult;
+    workflowResult = advanced.workflowResult;
   }
 }
 
@@ -437,18 +466,18 @@ export async function continueApplyPatchToolCalls({
   context,
   firstAssistantMessage,
   firstResponseText,
-  maxToolContinuations = MAX_PATCH_TOOL_CONTINUATIONS,
   requestId,
   root,
+  stepBudget,
   routeAssistantMessageToolCalls,
   streamContinuation,
 }: {
   context: LlmContext;
   firstAssistantMessage: LlmAssistantMessage;
   firstResponseText: string;
-  maxToolContinuations?: number;
   requestId?: number;
   root?: string;
+  stepBudget: number;
   routeAssistantMessageToolCalls: (
     assistantMessage: LlmAssistantMessage,
   ) => Promise<LlmWorkflowToolResult | null>;
@@ -464,11 +493,7 @@ export async function continueApplyPatchToolCalls({
   let lastAppliedPatch: (LlmWorkflowToolResult & { kind: "patch" }) | null =
     null;
 
-  for (
-    let continuationCount = 0;
-    continuationCount < maxToolContinuations;
-    continuationCount += 1
-  ) {
+  for (let stepIndex = 0; stepIndex < stepBudget; stepIndex += 1) {
     const patchToolCalls = getAssistantToolCalls(assistantMessage);
     if (!areOnlyApplyPatchToolCalls(patchToolCalls)) {
       const workflowResult =
@@ -508,7 +533,6 @@ export async function continueApplyPatchToolCalls({
       context: continuationContext,
       toolOutputs,
     });
-
     continuationContext = continuation.context;
     assistantMessage = continuation.assistantMessage;
     responseText = continuation.responseText;
@@ -518,14 +542,8 @@ export async function continueApplyPatchToolCalls({
 
     if (getAssistantToolCalls(assistantMessage).length === 0) {
       return lastAppliedPatch === null
-        ? {
-            kind: "text",
-            responseText,
-          }
-        : {
-            ...lastAppliedPatch,
-            responseText,
-          };
+        ? { kind: "text", responseText }
+        : { ...lastAppliedPatch, responseText };
     }
   }
 

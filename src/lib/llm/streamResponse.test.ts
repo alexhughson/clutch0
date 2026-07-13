@@ -152,7 +152,8 @@ test("continues invalid patch tool calls until the model returns a valid patch",
     firstAssistantMessage: firstAssistant,
     firstResponseText: "first malformed patch",
     firstWorkflowResult: invalidPatchWorkflowResult("first"),
-    maxInvalidPatchRetries: 3,
+    invalidRetryBudget: 3,
+    stepBudget: 8,
     routeAssistantMessageToolCalls: async (assistantMessage) =>
       assistantMessage.content[0]?.type === "toolCall" &&
       assistantMessage.content[0].id === "call_patch_2"
@@ -214,7 +215,8 @@ test("stops invalid patch tool-call retries at the configured limit", async () =
     }),
     firstResponseText: "first malformed patch",
     firstWorkflowResult: invalidPatchWorkflowResult("first"),
-    maxInvalidPatchRetries: 2,
+    invalidRetryBudget: 2,
+    stepBudget: 8,
     routeAssistantMessageToolCalls: async () =>
       invalidPatchWorkflowResult(`retry ${toolOutputs.length}`),
     streamContinuation: async ({ assistantMessage, context, toolOutput }) => {
@@ -274,6 +276,7 @@ test("returns a normalized patch without applying it in review mode", async () =
     },
     patchToolMode: "review",
     root,
+    stepBudget: 8,
     routeAssistantMessageToolCalls: async () => {
       throw new Error("No continuation expected for review mode.");
     },
@@ -320,6 +323,7 @@ test("applies valid patch tool calls in apply mode and continues with success ou
     }),
     patchToolMode: "apply",
     root,
+    stepBudget: 8,
     routeAssistantMessageToolCalls: async () => null,
     streamContinuation: async ({ assistantMessage, context, toolOutput }) => {
       toolOutputs.push(toolOutput);
@@ -392,6 +396,7 @@ test("applies routed shell apply_patch calls in apply mode", async () => {
     }),
     patchToolMode: "apply",
     root,
+    stepBudget: 8,
     routeAssistantMessageToolCalls: async () => null,
     streamContinuation: async ({ assistantMessage, context, toolOutput }) => {
       toolOutputs.push(toolOutput);
@@ -459,6 +464,7 @@ test("applies multiple apply_patch tool calls before continuing in apply mode", 
     ]),
     firstResponseText: "",
     root,
+    stepBudget: 8,
     routeAssistantMessageToolCalls: async () => {
       throw new Error("No further workflow tools expected.");
     },
@@ -498,6 +504,163 @@ test("applies multiple apply_patch tool calls before continuing in apply mode", 
       status: "valid",
     },
     responseText: "Applied both.",
+  });
+});
+
+test("stops patch apply continuations when the step budget is exhausted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-patch-step-budget-"));
+  await writeFile(join(root, "README.md"), "old\n", "utf8");
+  const patch = [
+    "*** Begin Patch",
+    "*** Update File: README.md",
+    "@@",
+    "-old",
+    "+new",
+    "*** End Patch",
+  ].join("\n");
+  const toolOutputs: unknown[] = [];
+
+  const result = await continuePatchToolCalls({
+    context: continuationBaseContext(),
+    firstAssistantMessage: assistantMessageFixture({
+      callId: "call_patch_budget",
+      patch,
+    }),
+    firstResponseText: "first apply",
+    firstWorkflowResult: validPatchWorkflowResult({
+      patch,
+      toolCallId: "call_patch_budget",
+    }),
+    patchToolMode: "apply",
+    root,
+    stepBudget: 0,
+    routeAssistantMessageToolCalls: async () => {
+      throw new Error("No routing expected when step budget is zero.");
+    },
+    streamContinuation: async () => {
+      throw new Error("No continuation expected when step budget is zero.");
+    },
+  });
+
+  expect(await readFile(join(root, "README.md"), "utf8")).toBe("old\n");
+  expect(toolOutputs).toHaveLength(0);
+  expect(result).toMatchObject({
+    kind: "patch",
+    patch: { status: "valid" },
+    responseText: "first apply",
+  });
+  expect("applyStatus" in result).toBe(false);
+});
+
+test("invalid patch retries consume the step budget and block later apply continuations", async () => {
+  const context = continuationBaseContext();
+  const retryAssistants = [
+    assistantMessageFixture({ callId: "call_patch_2", patch: "bad patch 2" }),
+    assistantMessageFixture({ callId: "call_patch_3", patch: "bad patch 3" }),
+  ];
+  const toolOutputs: unknown[] = [];
+
+  const result = await continuePatchToolCalls({
+    context,
+    firstAssistantMessage: assistantMessageFixture({
+      callId: "call_patch_1",
+      patch: "bad patch 1",
+    }),
+    firstResponseText: "first malformed patch",
+    firstWorkflowResult: invalidPatchWorkflowResult("first"),
+    invalidRetryBudget: 3,
+    patchToolMode: "apply",
+    stepBudget: 2,
+    routeAssistantMessageToolCalls: async () =>
+      toolOutputs.length < 2
+        ? invalidPatchWorkflowResult(`retry ${toolOutputs.length}`)
+        : validPatchWorkflowResult(),
+    streamContinuation: async ({ assistantMessage, context, toolOutput }) => {
+      toolOutputs.push(toolOutput);
+      return {
+        assistantMessage: retryAssistants[toolOutputs.length - 1]!,
+        context: buildLlmToolContinuationContext({
+          assistantMessage,
+          context,
+          toolOutput,
+        }),
+        responseText: `malformed patch ${toolOutputs.length + 1}`,
+      };
+    },
+  });
+
+  expect(toolOutputs).toHaveLength(2);
+  expect(result).toMatchObject({
+    kind: "patch",
+    patch: { status: "valid" },
+    responseText: "malformed patch 3",
+  });
+  expect("applyStatus" in result).toBe(false);
+});
+
+test("stops apply_patch-only continuations when the step budget is exhausted", async () => {
+  const root = await mkdtemp(join(tmpdir(), "clutch-apply-patch-step-budget-"));
+  await writeFile(join(root, "README.md"), "old\n", "utf8");
+  const firstPatch = [
+    "*** Begin Patch",
+    "*** Update File: README.md",
+    "@@",
+    "-old",
+    "+new",
+    "*** End Patch",
+  ].join("\n");
+  const secondPatch = [
+    "*** Begin Patch",
+    "*** Update File: README.md",
+    "@@",
+    "-new",
+    "+newer",
+    "*** End Patch",
+  ].join("\n");
+  let continuationCount = 0;
+
+  const result = await continueApplyPatchToolCalls({
+    context: continuationBaseContext(),
+    firstAssistantMessage: assistantMessageFixture({
+      callId: "call_patch_1",
+      patch: firstPatch,
+    }),
+    firstResponseText: "round 1",
+    root,
+    stepBudget: 1,
+    routeAssistantMessageToolCalls: async () =>
+      validPatchWorkflowResult({
+        patch: secondPatch,
+        toolCallId: "call_patch_exhausted",
+      }),
+    streamContinuation: async ({ assistantMessage, context, toolOutputs }) => {
+      continuationCount += 1;
+      return {
+        assistantMessage: assistantMessageFixture({
+          callId: "call_patch_2",
+          patch: secondPatch,
+        }),
+        context: buildLlmToolContinuationContext({
+          assistantMessage,
+          context,
+          toolOutputs,
+        }),
+        responseText: "round 2",
+      };
+    },
+  });
+
+  expect(await readFile(join(root, "README.md"), "utf8")).toBe("new\n");
+  expect(continuationCount).toBe(1);
+  expect(result).toMatchObject({
+    kind: "patch",
+    patch: {
+      proposal: {
+        patch: expect.stringContaining("-new\n+newer"),
+      },
+      status: "valid",
+    },
+    responseText: "round 2",
   });
 });
 
