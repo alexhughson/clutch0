@@ -9,11 +9,8 @@ import {
   runAgentAskSlashCommand,
   runAgentEditSlashCommand,
   runConfigSlashCommand,
-  runAddSlashCommand,
-  runFindSlashCommand,
   runLlmSlashCommand,
   runSaySlashCommand,
-  runShellCommandSlashCommand,
   runShowContextSlashCommand,
 } from "../slashCommands/slashCommandRunners";
 import { patchWorkflowTool } from "./patchWorkflowTool";
@@ -289,14 +286,5 @@ function slashCommandFromController(
 function slashCommandRunnerForController(
   controller: LlmWorkflowToolController,
 ): LlmSlashCommand["run"] {
-  if (controller === addFilesWorkflowTool) {
-    return runAddSlashCommand;
-  }
-  if (controller === findFilesWorkflowTool) {
-    return runFindSlashCommand;
-  }
-  if (controller === shellCommandWorkflowTool) {
-    return runShellCommandSlashCommand;
-  }
   return controller.runSlashCommand ?? runLlmSlashCommand;
 }

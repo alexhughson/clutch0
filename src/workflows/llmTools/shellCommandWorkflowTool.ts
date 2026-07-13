@@ -8,6 +8,7 @@ import {
 import { validatePatchProposal } from "../../lib/patch/patchEngine";
 import { runShellCommand } from "../../lib/shell/shellCommand";
 import { recordSessionRuntimeEvent } from "../../store/appStore";
+import { runShellCommandSlashCommand } from "../slashCommands/slashCommandRunners";
 import type { LlmWorkflowToolController } from "./types";
 
 export const RUN_SHELL_COMMAND_TOOL_NAME = "run_shell_command";
@@ -25,6 +26,7 @@ export const runShellCommandTool: Tool = {
 
 export const shellCommandWorkflowTool: LlmWorkflowToolController = {
   resultKind: "command-output",
+  runSlashCommand: runShellCommandSlashCommand,
   slashCommand: {
     description:
       "Ask the LLM to choose and run a shell command, then save the output as context.",

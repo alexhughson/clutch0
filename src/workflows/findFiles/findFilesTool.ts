@@ -2,6 +2,7 @@ import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
 import { invariant } from "../../lib/invariant";
 import { findCommandPromptDirective } from "../../lib/llm/prompts";
 import type { LlmWorkflowToolController } from "../llmTools/types";
+import { runFindSlashCommand } from "../slashCommands/slashCommandRunners";
 
 export const FIND_RELEVANT_FILES_TOOL_NAME = "find_relevant_files";
 
@@ -23,6 +24,7 @@ export const findRelevantFilesTool: Tool = {
 
 export const findFilesWorkflowTool: LlmWorkflowToolController = {
   resultKind: "find-files",
+  runSlashCommand: runFindSlashCommand,
   slashCommand: {
     description:
       "Ask the LLM to find project files relevant to a goal, then open the interactive file picker.",

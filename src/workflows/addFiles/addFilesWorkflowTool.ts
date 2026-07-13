@@ -4,6 +4,7 @@ import { invariant } from "../../lib/invariant";
 import { addCommandPromptDirective } from "../../lib/llm/prompts";
 import type { FilePath } from "../../types";
 import type { LlmWorkflowToolController } from "../llmTools/types";
+import { runAddSlashCommand } from "../slashCommands/slashCommandRunners";
 
 export const ADD_CONTEXT_FILES_TOOL_NAME = "add_context_files";
 
@@ -20,6 +21,7 @@ export const addContextFilesTool: Tool = {
 
 export const addFilesWorkflowTool: LlmWorkflowToolController = {
   resultKind: "add-files",
+  runSlashCommand: runAddSlashCommand,
   slashCommand: {
     description: "Ask the LLM to choose files and add them to context.",
     name: "add",
