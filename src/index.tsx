@@ -292,9 +292,7 @@ async function recordStartupFailureSession({
           })
         : snapshotModule.serializeInterruptedAppSnapshot({
             state: {
-              ...snapshotModule.restoreAppStateFromSnapshot(
-                snapshotModule.parseAppSnapshot(session.snapshot),
-              ),
+              ...snapshotModule.restoreAppStateFromSnapshot(session.snapshot),
               actions: {} as AppActions,
             },
             workspaceRoot,

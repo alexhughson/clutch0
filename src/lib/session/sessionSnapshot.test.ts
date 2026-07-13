@@ -496,3 +496,163 @@ test("snapshot parser rejects malformed known active tasks and counters", () => 
     }),
   ).toThrow("activeTask.validation.proposal.summary must be a string");
 });
+
+test("snapshot round-trips every task kind byte-identically through parse", () => {
+  const base = {
+    ...createInitialAppState(),
+    actions: {} as AppState["actions"],
+    nextContextItemId: 12,
+    nextLlmRequestId: 9,
+    workspace: {
+      ...createInitialAppState().workspace,
+      composer: { cursorPosition: 4, message: "draft" },
+      contextItems: [createFileContextItem("src/a.ts")],
+      focusedContextItemId: "file:src/a.ts",
+    },
+  };
+  const workspaceRoot = "/repo";
+  const patchProposal = {
+    patch:
+      "*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n*** End Patch",
+    summary: "Update helper",
+  };
+  const responseBase = {
+    contextItems: [
+      createSavedLlmResponseContextItem({
+        createdAt: 1,
+        id: "saved:3",
+        output: "prior answer",
+        prompt: "prior",
+        sourceRequestId: 3,
+      }),
+    ],
+    focusedContextItemId: "saved:3",
+    id: 4,
+    latencyStats: { totalMs: 120, ttftMs: 40 },
+    patch: {
+      applyStatus: "pending" as const,
+      diffText: "diff --git a/src/a.ts b/src/a.ts\n",
+      proposal: patchProposal,
+      status: "valid" as const,
+    },
+    patchProgress: {
+      files: [{ operation: "update" as const, path: "src/a.ts" }],
+      patchCharacterCount: 88,
+    },
+    question: "continue",
+    replacement: {
+      contextItemId: "saved:3",
+      expectedResult: "text" as const,
+    },
+    responseText: "answer",
+    savedContextItemId: "saved:3",
+  };
+  const tasks: NonNullable<AppState["activeTask"]>[] = [
+    {
+      applyStatus: "idle",
+      itemId: "file:src/a.ts",
+      kind: "context-item-viewer",
+      rejectComposer: { cursorPosition: 1, message: "reject" },
+    },
+    {
+      applyStatus: "pending",
+      id: 5,
+      kind: "create-file",
+      prompt: "add helper",
+      validation: {
+        proposal: {
+          content: "export const value = 1;\n",
+          path: "src/new.ts",
+          summary: "Create helper",
+        },
+        status: "valid",
+      },
+    },
+    {
+      agentOutput: [
+        {
+          id: "status:1",
+          kind: "status",
+          message: "searching",
+          timestamp: 1,
+        },
+        {
+          id: "stream:1",
+          kind: "stream",
+          streamKind: "assistant",
+          text: "candidate path",
+          timestamp: 2,
+        },
+      ],
+      candidates: [
+        {
+          confidence: "high",
+          path: "src/a.ts",
+          reason: "matches goal",
+        },
+      ],
+      goal: "find parser",
+      hints: ["src"],
+      kind: "find-files",
+      selectedIndex: 0,
+      status: "results",
+    },
+    {
+      id: 6,
+      kind: "shell-command",
+      prompt: "bun test",
+      replacement: { contextItemId: "saved:3" },
+      result: {
+        command: "bun test",
+        durationMs: 10,
+        exitCode: 0,
+        stderr: "",
+        stdout: "ok",
+        timedOut: false,
+        truncated: false,
+      },
+      savedContextItemId: "shell:6",
+      status: "done",
+    },
+    {
+      content: "rendered context",
+      id: 7,
+      kind: "show-context",
+      question: "show files",
+      status: "done",
+    },
+    {
+      kind: "response",
+      rejectComposer: { cursorPosition: 0, message: "" },
+      request: { ...responseBase, status: "loading" },
+    },
+    {
+      kind: "response",
+      request: { ...responseBase, responseText: "streaming", status: "streaming" },
+    },
+    {
+      kind: "response",
+      request: { ...responseBase, status: "done" },
+    },
+    {
+      kind: "response",
+      request: {
+        ...responseBase,
+        errorMessage: "model failed",
+        status: "error",
+      },
+    },
+  ];
+
+  for (const activeTask of tasks) {
+    const snapshot = serializeAppSnapshot({
+      state: { ...base, activeTask },
+      workspaceRoot,
+    });
+    const roundTripped = parseAppSnapshot(
+      JSON.parse(JSON.stringify(snapshot)) as unknown,
+    );
+
+    expect(roundTripped, activeTask.kind).toEqual(snapshot);
+  }
+});
