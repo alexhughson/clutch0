@@ -1,12 +1,8 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialComposeScreen } from "../../app/appInitialState";
-import {
-  LiveLlmResponseContextItem,
-  SavedDiffContextItem,
-  SavedLlmResponseContextItem,
-  createSavedLlmResponseContextItem,
-} from "../../lib/context/contextItems";
+import { createSavedLlmResponseContextItem } from "../../lib/context/contextItemFactories";
+import { getContextItemSummaryView } from "../../lib/context/contextItemRegistry";
 import { createResponseActions } from "./responseWorkflow";
 
 function createHarness(initialState: AppState) {
@@ -75,8 +71,10 @@ test("finishing a text rerun replaces the saved response context item", () => {
   expect(harness.state.activeTask.request.savedContextItemId).toBe(saved.id);
   const [replacement] = harness.state.workspace.contextItems;
   expect(replacement?.id).toBe(saved.id);
-  expect(replacement?.getDetailView).toBeDefined();
-  expect(replacement?.getListLabel()).toContain("Explain the app");
+  expect(replacement?.type).toBe("llm-response");
+  expect(getContextItemSummaryView(replacement!).title).toContain(
+    "Explain the app",
+  );
 });
 
 test("saving a running response creates live context and finish updates it", () => {
@@ -101,15 +99,15 @@ test("saving a running response creates live context and finish updates it", () 
   harness.response.saveTextToContext({ requestId: 1 });
 
   expect(harness.state.activeTask).toBeNull();
-  expect(harness.state.workspace.contextItems[0]).toBeInstanceOf(
-    LiveLlmResponseContextItem,
-  );
+  expect(harness.state.workspace.contextItems[0]).toMatchObject({
+    type: "llm-response-live",
+  });
 
   harness.response.appendDelta({ delta: " output", requestId: 1 });
-  expect(
-    (harness.state.workspace.contextItems[0] as LiveLlmResponseContextItem)
-      .output,
-  ).toBe("partial output");
+  expect(harness.state.workspace.contextItems[0]).toMatchObject({
+    output: "partial output",
+    type: "llm-response-live",
+  });
 
   harness.response.finish({
     requestId: 1,
@@ -118,8 +116,7 @@ test("saving a running response creates live context and finish updates it", () 
   });
 
   const item = harness.state.workspace.contextItems[0];
-  expect(item).toBeInstanceOf(SavedLlmResponseContextItem);
-  expect(item?.id).toBe("saved:1");
+  expect(item).toMatchObject({ id: "saved:1", type: "llm-response" });
 });
 
 test("records latency stats on the active response request", () => {
@@ -293,7 +290,7 @@ test("saving a running edit replaces the live item with a saved diff", () => {
   });
 
   const item = harness.state.workspace.contextItems[0];
-  expect(item).toBeInstanceOf(SavedDiffContextItem);
+  expect(item).toMatchObject({ type: "diff" });
   expect(item?.id).toBe("saved:1");
 });
 
@@ -334,6 +331,6 @@ test("saving an applied patch keeps the normalized diff as context", () => {
   }
   expect(harness.state.activeTask.request.savedContextItemId).toBe("saved:1");
   const item = harness.state.workspace.contextItems[0];
-  expect(item).toBeInstanceOf(SavedDiffContextItem);
+  expect(item).toMatchObject({ type: "diff" });
   expect(item?.id).toBe("saved:1");
 });

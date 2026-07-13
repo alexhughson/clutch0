@@ -14,7 +14,7 @@ import {
   createSavedLlmResponseContextItem,
   createShellCommandOutputContextItem,
   createUserTextContextItem,
-} from "../../src/lib/context/contextItems";
+} from "../../src/lib/context/contextItemFactories";
 import { buildLlmInteractionContext } from "../../src/lib/llm/interactionContext";
 import { getLlmSlashCommand } from "../../src/workflows/llmTools/toolRegistry";
 

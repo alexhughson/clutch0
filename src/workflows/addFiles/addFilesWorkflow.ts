@@ -1,6 +1,6 @@
 import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
-import { createFileContextItem } from "../../lib/context/contextItems";
+import { createFileContextItem } from "../../lib/context/contextItemFactories";
 import type { FilePath } from "../../types";
 
 type SetAppState = (

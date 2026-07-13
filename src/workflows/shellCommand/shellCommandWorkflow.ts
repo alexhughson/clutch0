@@ -4,7 +4,7 @@ import type {
   AppState,
   ShellCommandReplacementTarget,
 } from "../../app/appTypes";
-import { createShellCommandOutputContextItem } from "../../lib/context/contextItems";
+import { createShellCommandOutputContextItem } from "../../lib/context/contextItemFactories";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 
 type SetAppState = (

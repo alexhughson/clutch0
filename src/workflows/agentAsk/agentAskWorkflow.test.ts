@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialAppState } from "../../app/appInitialState";
-import { PiAgentContextItem } from "../../lib/context/contextItems";
+import type { PiAgentContextItem } from "../../lib/context/contextItemTypes";
 import { createAgentAskActions } from "./agentAskWorkflow";
 
 function createHarness() {
@@ -40,9 +40,9 @@ test("agent ask creates a live context item and opens it", () => {
     itemId: "agent:1",
     kind: "context-item-viewer",
   });
-  expect(harness.state.workspace.contextItems[0]).toBeInstanceOf(
-    PiAgentContextItem,
-  );
+  expect(harness.state.workspace.contextItems[0]).toMatchObject({
+    type: "pi-agent",
+  });
 });
 
 test("agent ask can keep a submitted draft for reject-to-edit", () => {
@@ -76,6 +76,18 @@ test("agent ask output updates the same context item", () => {
   });
   expect(itemId).toBe("agent:1");
 
+  harness.agentAsk.fail({
+    errorMessage: "first attempt failed",
+    itemId: "agent:1",
+  });
+  harness.agentAsk.startMessage({ itemId: "agent:1" });
+  const retriedItem = harness.state.workspace.contextItems[0];
+  expect(retriedItem).toMatchObject({
+    errorMessage: undefined,
+    status: "running",
+    type: "pi-agent",
+  });
+
   harness.agentAsk.recordOutput({
     itemId: "agent:1",
     update: {
@@ -86,10 +98,12 @@ test("agent ask output updates the same context item", () => {
       timestamp: 1,
     },
   });
+  harness.agentAsk.fail({ errorMessage: "late failure", itemId: "agent:1" });
   harness.agentAsk.finish({ itemId: "agent:1" });
 
   const item = harness.state.workspace.contextItems[0];
-  expect(item).toBeInstanceOf(PiAgentContextItem);
+  expect(item).toMatchObject({ type: "pi-agent" });
   expect((item as PiAgentContextItem).blocks).toHaveLength(1);
   expect((item as PiAgentContextItem).status).toBe("idle");
+  expect((item as PiAgentContextItem).errorMessage).toBeUndefined();
 });

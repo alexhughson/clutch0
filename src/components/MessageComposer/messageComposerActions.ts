@@ -1,5 +1,6 @@
 import type { KeyEvent } from "@opentui/core";
 import { getContextItemActionForKeyEvent } from "../../lib/context/contextItemActions";
+import { getContextItemActions } from "../../lib/context/contextItemRegistry";
 import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import { moveFileHighlight } from "../../lib/fileSelection";
 import {
@@ -394,7 +395,7 @@ function runFocusedContextItemActionForKey(event: KeyEvent) {
   }
 
   const action = getContextItemActionForKeyEvent({
-    actions: focusedItem.getActions(),
+    actions: getContextItemActions(focusedItem),
     event,
   });
   if (action === null) {

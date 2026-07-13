@@ -3,20 +3,82 @@ import type { ContextItemAction } from "../../types";
 
 export function openContextItemAction(itemId: string): ContextItemAction {
   return {
+    command: { itemId, kind: "open" },
     id: "open",
     label: "open",
     shortcut: { ctrl: true, display: "Ctrl+o", name: "o" },
-    run: (context) => context.openContextItem(itemId),
   };
 }
 
 export function applyDiffAction(itemId: string): ContextItemAction {
   return {
+    command: { itemId, kind: "apply-diff" },
     id: "apply",
     label: "apply",
     paneShortcut: { display: "a", name: "a" },
     shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
-    run: (context) => context.applyDiff(itemId),
+  };
+}
+
+export function removeContextItemAction(itemId: string): ContextItemAction {
+  return {
+    command: { itemId, kind: "remove" },
+    id: "remove",
+    label: "remove",
+    paneShortcut: { display: "x", name: "x" },
+    shortcut: { ctrl: true, display: "Ctrl+x", name: "x" },
+  };
+}
+
+export function rerunPromptAction({
+  expectedResult,
+  prompt,
+  replaceContextItemId,
+}: {
+  expectedResult: "diff" | "text";
+  prompt: string;
+  replaceContextItemId: string;
+}): ContextItemAction {
+  return {
+    command: {
+      expectedResult,
+      itemId: replaceContextItemId,
+      kind: "rerun-prompt",
+      prompt,
+    },
+    id: "rerun",
+    label: "rerun",
+    paneShortcut: { display: "r", name: "r" },
+    shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
+  };
+}
+
+export function rerunShellCommandAction({
+  command,
+  replaceContextItemId,
+}: {
+  command: string;
+  replaceContextItemId: string;
+}): ContextItemAction {
+  return {
+    command: {
+      command,
+      itemId: replaceContextItemId,
+      kind: "rerun-shell",
+    },
+    id: "rerun",
+    label: "rerun",
+    paneShortcut: { display: "r", name: "r" },
+    shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
+  };
+}
+
+export function saveAgentSandboxDiffAction(itemId: string): ContextItemAction {
+  return {
+    command: { itemId, kind: "save-agent-diff" },
+    id: "save-agent-diff",
+    label: "add diff to context",
+    shortcut: { ctrl: true, display: "Ctrl+d", name: "d" },
   };
 }
 

@@ -9,10 +9,15 @@ import {
 } from "./contextItemActions";
 
 const rerunAction: ContextItemAction = {
+  command: {
+    expectedResult: "text",
+    itemId: "saved:1",
+    kind: "rerun-prompt",
+    prompt: "question",
+  },
   id: "rerun",
   label: "rerun",
   shortcut: { ctrl: true, display: "Ctrl+r", name: "r" },
-  run: () => {},
 };
 
 test("matches context item actions by exact shortcut modifiers", () => {
@@ -37,11 +42,11 @@ test("formats context item action shortcuts", () => {
 
 test("matches pane shortcuts without modifier keys", () => {
   const applyAction: ContextItemAction = {
+    command: { itemId: "diff:1", kind: "apply-diff" },
     id: "apply",
     label: "apply",
     paneShortcut: { display: "a", name: "a" },
     shortcut: { ctrl: true, display: "Ctrl+y", name: "y" },
-    run: () => {},
   };
 
   expect(

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createInitialAppState } from "../app/appInitialState";
 import type { SessionRecorder } from "../lib/session/sessionRecorder";
-import { createUserTextContextItem } from "../lib/context/contextItems";
+import { createUserTextContextItem } from "../lib/context/contextItemFactories";
 import {
   hydrateAppStore,
   setSessionRecorder,

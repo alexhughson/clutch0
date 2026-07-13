@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createFileContextItem } from "../../lib/context/contextItems";
+import { createFileContextItem } from "../../lib/context/contextItemFactories";
 import {
   NoFileSelector,
   NoSlashCommandSelector,

@@ -3,8 +3,8 @@ import type { AppActions, AppState } from "../../app/appTypes";
 import {
   createUserTextContextItem,
   getContextItemById,
-  UserTextContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
+import { MISSING_SUMMARY_STATE } from "../../lib/context/contextItemTypes";
 
 const USER_TEXT_CONTEXT_ITEM_ID_PREFIX = "say";
 
@@ -68,13 +68,17 @@ function updateUserTextContextItem(
   },
 ): Partial<AppState> | AppState {
   const item = getContextItemById(state.workspace.contextItems, itemId);
-  if (!(item instanceof UserTextContextItem)) {
+  if (item?.type !== "user-text") {
     throw new Error(`Expected editable user text context item: ${itemId}`);
   }
 
   return {
     workspace: ContextDeck.fromComposeScreen(state.workspace)
-      .replace(item.withText(text))
+      .replace({
+        ...item,
+        summaryState: MISSING_SUMMARY_STATE,
+        text,
+      })
       .applyTo(state.workspace),
   };
 }

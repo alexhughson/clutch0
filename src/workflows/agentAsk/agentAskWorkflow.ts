@@ -1,11 +1,12 @@
+import { applyAgentOutputUpdate } from "../../lib/agentOutput/agentOutputReducer";
 import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
 import {
   createPiAgentContextItem,
   createSavedAgentSandboxDiffContextItem,
   getContextItemById,
-  PiAgentContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
+import type { PiAgentContextItem } from "../../lib/context/contextItemTypes";
 
 type SetAppState = (
   partial:
@@ -26,23 +27,33 @@ export function createAgentAskActions({
   return {
     attachSandbox: ({ itemId, sandbox }) =>
       set((state) =>
-        replacePiAgentItem(state, itemId, (item) => item.withSandbox(sandbox)),
+        replacePiAgentItem(state, itemId, (item) => ({
+          ...item,
+          sandbox,
+        })),
       ),
     fail: ({ errorMessage, itemId }) =>
       set((state) =>
-        replacePiAgentItem(state, itemId, (item) =>
-          item.withStatus("error", errorMessage),
-        ),
+        replacePiAgentItem(state, itemId, (item) => ({
+          ...item,
+          errorMessage,
+          status: "error" as const,
+        })),
       ),
     finish: ({ itemId }) =>
       set((state) =>
-        replacePiAgentItem(state, itemId, (item) => item.withStatus("idle")),
+        replacePiAgentItem(state, itemId, (item) => ({
+          ...item,
+          errorMessage: undefined,
+          status: "idle" as const,
+        })),
       ),
     recordOutput: ({ itemId, update }) =>
       set((state) =>
-        replacePiAgentItem(state, itemId, (item) =>
-          item.withAgentOutputUpdate(update),
-        ),
+        replacePiAgentItem(state, itemId, (item) => ({
+          ...item,
+          blocks: applyAgentOutputUpdate(item.blocks, update),
+        })),
       ),
     saveSandboxDiffToContext: ({ agentItemId, diffText, summary }) =>
       set((state) =>
@@ -56,11 +67,18 @@ export function createAgentAskActions({
       startAgentAsk({ get, mode, prompt, rejectComposer, set }),
     startMessage: ({ itemId }) =>
       set((state) =>
-        replacePiAgentItem(state, itemId, (item) => item.withStatus("running")),
+        replacePiAgentItem(state, itemId, (item) => ({
+          ...item,
+          errorMessage: undefined,
+          status: "running" as const,
+        })),
       ),
     updateSandboxDiff: ({ itemId, sandbox }) =>
       set((state) =>
-        replacePiAgentItem(state, itemId, (item) => item.withSandbox(sandbox)),
+        replacePiAgentItem(state, itemId, (item) => ({
+          ...item,
+          sandbox,
+        })),
       ),
   };
 }
@@ -119,7 +137,7 @@ function saveSandboxDiffToContext(
     state.workspace.contextItems,
     agentItemId,
   );
-  if (!(agentItem instanceof PiAgentContextItem)) {
+  if (agentItem?.type !== "pi-agent") {
     return state;
   }
 
@@ -146,7 +164,7 @@ function replacePiAgentItem(
   update: (item: PiAgentContextItem) => PiAgentContextItem,
 ): Partial<AppState> | AppState {
   const item = getContextItemById(state.workspace.contextItems, itemId);
-  if (!(item instanceof PiAgentContextItem)) {
+  if (item?.type !== "pi-agent") {
     return state;
   }
 

@@ -1,5 +1,6 @@
 import { getContextItemDisplayEntries } from "../lib/context/contextItemDisplay";
-import { getContextItemById } from "../lib/context/contextItems";
+import { getContextItemById } from "../lib/context/contextItemFactories";
+import { getContextItemSummaryView } from "../lib/context/contextItemRegistry";
 import type { ContextItem, ContextItemSummaryView } from "../types";
 
 type ContextItemsListProps = {
@@ -110,7 +111,7 @@ function ContextEntryColumn({
         }
 
         const isFocused = entry.item.id === focusedContextItemId;
-        const summary = entry.item.getSummaryView();
+        const summary = getContextItemSummaryView(entry.item);
 
         return (
           <ContextItemRow
@@ -174,7 +175,7 @@ export function ContextItemRow({
 }
 
 function FocusedContextItemSummaryContent({ item }: { item: ContextItem }) {
-  const summary = item.getSummaryView();
+  const summary = getContextItemSummaryView(item);
   const detail = summary.detail ?? getShortSummary(summary) ?? summary.label;
 
   return (

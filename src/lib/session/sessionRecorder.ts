@@ -1,4 +1,5 @@
 import type { AppState } from "../../app/appTypes";
+import { getContextItemHistoryEvents } from "../context/contextItemRegistry";
 import type { ContextItem, SessionEvent } from "../../types";
 import {
   serializeAppSnapshot,
@@ -164,7 +165,7 @@ function collectContextItemEvents({
   );
   const nextIds = new Set(nextItems.map((item) => item.id));
   const events = nextItems.flatMap((item) =>
-    item.getHistoryEvents(previousById.get(item.id) ?? null),
+    getContextItemHistoryEvents(item, previousById.get(item.id) ?? null),
   );
 
   for (const previous of previousItems) {

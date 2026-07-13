@@ -7,7 +7,7 @@ import { createInitialAppState } from "../../app/appInitialState";
 import {
   createLiveLlmResponseContextItem,
   createUserTextContextItem,
-} from "../context/contextItems";
+} from "../context/contextItemFactories";
 import { createSessionRecorder } from "./sessionRecorder";
 import {
   createSessionMetadata,
@@ -105,7 +105,9 @@ test("recorder writes mutation events, item events, runtime events, and latest s
     (event) => event.kind === "state.mutation",
   );
   expect(mutation).toMatchObject({
-    after: { workspace: { contextItems: [expect.objectContaining({ id: "say:1" })] } },
+    after: {
+      workspace: { contextItems: [expect.objectContaining({ id: "say:1" })] },
+    },
     before: { workspace: { contextItems: [] } },
   });
 

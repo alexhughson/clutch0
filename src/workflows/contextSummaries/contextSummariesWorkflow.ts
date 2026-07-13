@@ -1,6 +1,11 @@
 import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
-import { getContextItemById } from "../../lib/context/contextItems";
+import {
+  getContextItemById,
+  isAutomaticContextItem,
+  isPersistentContextItem,
+} from "../../lib/context/contextItemFactories";
+import { getContextItemSummarizationInput } from "../../lib/context/contextItemRegistry";
 import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
 import {
   generateContextItemSummary,
@@ -54,7 +59,9 @@ async function ensureWorkspaceSummaries({
     ...get().workspace.contextItems,
   ];
   for (const item of items) {
-    const input = await item.getSummarizationInput({ root: process.cwd() });
+    const input = await getContextItemSummarizationInput(item, {
+      root: process.cwd(),
+    });
     if (input === null) {
       continue;
     }
@@ -77,7 +84,7 @@ function shouldStartSummaryWorker(
   item: ContextItem,
   input: ContextItemSummarizationInput,
 ): boolean {
-  const summaryState = item.getSummaryState();
+  const summaryState = item.summaryState;
   const workerId = getSummaryWorkerId(input);
 
   if (summaryState.status === "missing") {
@@ -169,14 +176,14 @@ function finishSummaryWorker(
       return state;
     }
 
-    return replaceContextItemInWorkspace(
-      state,
-      item.withSummaryState({
+    return replaceContextItemInWorkspace(state, {
+      ...item,
+      summaryState: {
         sourceHash: summary.sourceHash,
         status: "ready",
         summary,
-      }),
-    );
+      },
+    });
   });
 }
 
@@ -196,15 +203,15 @@ function failSummaryWorker(
       return state;
     }
 
-    return replaceContextItemInWorkspace(
-      state,
-      item.withSummaryState({
+    return replaceContextItemInWorkspace(state, {
+      ...item,
+      summaryState: {
         errorMessage,
         sourceHash: input.sourceHash,
         status: "error",
         workerId,
-      }),
-    );
+      },
+    });
   });
 }
 
@@ -223,10 +230,10 @@ function replaceContextItemSummaryState(
       return state;
     }
 
-    return replaceContextItemInWorkspace(
-      state,
-      item.withSummaryState(summaryState),
-    );
+    return replaceContextItemInWorkspace(state, {
+      ...item,
+      summaryState,
+    });
   });
 }
 
@@ -235,6 +242,12 @@ function replaceContextItemInWorkspace(
   item: ContextItem,
 ): Partial<AppState> | AppState {
   if (getContextItemById(state.workspace.automaticContextItems, item.id)) {
+    if (!isAutomaticContextItem(item)) {
+      throw new Error(
+        `Cannot replace automatic context item ${item.id}: item is not automatic.`,
+      );
+    }
+
     return {
       workspace: {
         ...state.workspace,
@@ -243,6 +256,10 @@ function replaceContextItemInWorkspace(
         ),
       },
     };
+  }
+
+  if (!isPersistentContextItem(item)) {
+    return state;
   }
 
   if (getContextItemById(state.workspace.contextItems, item.id) === null) {
@@ -265,7 +282,7 @@ function hasMatchingPendingSummary(
     return false;
   }
 
-  const summaryState = item.getSummaryState();
+  const summaryState = item.summaryState;
   return (
     summaryState.status === "pending" &&
     summaryState.workerId === workerId &&

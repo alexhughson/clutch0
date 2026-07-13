@@ -5,11 +5,13 @@ import {
   AGENTS_CONTEXT_ITEM_ID,
   createAutomaticContextItems,
 } from "../../lib/context/automaticContextItems";
+import { applyAgentOutputUpdate } from "../../lib/agentOutput/agentOutputReducer";
 import {
   createPiAgentContextItem,
   createSavedLlmResponseContextItem,
-  PiAgentContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
+import { getContextItemSummaryView } from "../../lib/context/contextItemRegistry";
+import type { PiAgentContextItem } from "../../lib/context/contextItemTypes";
 import type {
   ContextItemSummarizationInput,
   GeneratedContextItemSummary,
@@ -81,8 +83,7 @@ test("context summaries use one worker handle per item and update the item", asy
   await flushPromises();
 
   expect(calls).toHaveLength(1);
-  const pendingState =
-    harness.state.workspace.contextItems[0]?.getSummaryState();
+  const pendingState = harness.state.workspace.contextItems[0]?.summaryState;
   expect(pendingState?.status).toBe("pending");
   if (pendingState?.status !== "pending") {
     return;
@@ -98,8 +99,8 @@ test("context summaries use one worker handle per item and update the item", asy
   await flushPromises();
 
   const summarizedItem = harness.state.workspace.contextItems[0];
-  expect(summarizedItem?.getSummaryState().status).toBe("ready");
-  expect(summarizedItem?.getSummaryView()).toMatchObject({
+  expect(summarizedItem?.summaryState.status).toBe("ready");
+  expect(getContextItemSummaryView(summarizedItem!)).toMatchObject({
     detail: "Explains the TUI task architecture and context handling.",
     title: "TUI task architecture overview",
   });
@@ -180,8 +181,8 @@ test("context summaries update automatic context items", async () => {
   const agentsItem = harness.state.workspace.automaticContextItems.find(
     (item) => item.id === AGENTS_CONTEXT_ITEM_ID,
   );
-  expect(agentsItem?.getSummaryState().status).toBe("ready");
-  expect(agentsItem?.getSummaryView()).toMatchObject({
+  expect(agentsItem?.summaryState.status).toBe("ready");
+  expect(getContextItemSummaryView(agentsItem!)).toMatchObject({
     detail: "Automatic summary for AGENTS.md.",
     title: "Summary: AGENTS.md",
   });
@@ -190,20 +191,23 @@ test("context summaries update automatic context items", async () => {
 test("agent output reconciled while summarizing is preserved when summary finishes", async () => {
   const calls: ContextItemSummarizationInput[] = [];
   const deferred = createDeferred<GeneratedContextItemSummary>();
-  const agent = createPiAgentContextItem({
+  const baseAgent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:summary-race",
     mode: "ask",
     prompt: "Investigate",
-  })
-    .withAgentOutputUpdate({
+  });
+  const agent: PiAgentContextItem = {
+    ...baseAgent,
+    blocks: applyAgentOutputUpdate(baseAgent.blocks, {
       delta: "partial ans",
       id: "stream:partial",
       kind: "append-stream-delta",
       streamKind: "assistant",
       timestamp: 1,
-    })
-    .withStatus("idle");
+    }),
+    status: "idle",
+  };
   const harness = createHarness({
     generateSummary: (input) => {
       calls.push(input);
@@ -224,18 +228,24 @@ test("agent output reconciled while summarizing is preserved when summary finish
   expect(calls).toHaveLength(1);
 
   const pendingAgent = harness.state.workspace.contextItems[0];
-  expect(pendingAgent).toBeInstanceOf(PiAgentContextItem);
+  expect(pendingAgent).toMatchObject({ type: "pi-agent" });
+  if (pendingAgent?.type !== "pi-agent") {
+    throw new Error("Expected pi-agent context item.");
+  }
   harness.setState({
     workspace: {
       ...harness.state.workspace,
       contextItems: [
-        (pendingAgent as PiAgentContextItem).withAgentOutputUpdate({
-          id: "stream:final",
-          kind: "reconcile-stream",
-          streamKind: "assistant",
-          text: "partial answer with the final sentence",
-          timestamp: 2,
-        }),
+        {
+          ...pendingAgent,
+          blocks: applyAgentOutputUpdate(pendingAgent.blocks, {
+            id: "stream:final",
+            kind: "reconcile-stream",
+            streamKind: "assistant",
+            text: "partial answer with the final sentence",
+            timestamp: 2,
+          }),
+        },
       ],
     },
   });
@@ -249,15 +259,18 @@ test("agent output reconciled while summarizing is preserved when summary finish
   await flushPromises();
 
   const summarizedAgent = harness.state.workspace.contextItems[0];
-  expect(summarizedAgent).toBeInstanceOf(PiAgentContextItem);
-  expect((summarizedAgent as PiAgentContextItem).blocks).toEqual([
+  expect(summarizedAgent).toMatchObject({ type: "pi-agent" });
+  if (summarizedAgent?.type !== "pi-agent") {
+    throw new Error("Expected pi-agent context item.");
+  }
+  expect(summarizedAgent.blocks).toEqual([
     expect.objectContaining({
       kind: "stream",
       streamKind: "assistant",
       text: "partial answer with the final sentence",
     }),
   ]);
-  expect(summarizedAgent?.getSummaryState().status).toBe("ready");
+  expect(summarizedAgent.summaryState.status).toBe("ready");
 });
 
 function createDeferred<T>() {

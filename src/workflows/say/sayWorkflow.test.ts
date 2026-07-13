@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialComposeScreen } from "../../app/appInitialState";
-import { UserTextContextItem } from "../../lib/context/contextItems";
+import type { UserTextContextItem } from "../../lib/context/contextItemTypes";
 import { createSayActions } from "./sayWorkflow";
 
 function createHarness(initialState: AppState) {
@@ -39,7 +39,7 @@ test("say adds editable user text to context and opens it", () => {
   harness.say.addToContext({ text: "remember this" });
 
   const [item] = harness.state.workspace.contextItems;
-  expect(item).toBeInstanceOf(UserTextContextItem);
+  expect(item).toMatchObject({ type: "user-text" });
   expect(item?.id).toBe("say:1");
   expect((item as UserTextContextItem).text).toBe("remember this");
   expect(harness.state.workspace.focusedContextItemId).toBe("say:1");
@@ -68,7 +68,7 @@ test("say updates editable user text context items", () => {
   harness.say.updateText({ itemId: "say:1", text: "after" });
 
   const [item] = harness.state.workspace.contextItems;
-  expect(item).toBeInstanceOf(UserTextContextItem);
+  expect(item).toMatchObject({ type: "user-text" });
   expect((item as UserTextContextItem).text).toBe("after");
 });
 

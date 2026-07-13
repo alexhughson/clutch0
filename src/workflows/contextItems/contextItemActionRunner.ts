@@ -1,4 +1,3 @@
-import type { ContextItemAction } from "../../types";
 import {
   disposeAgentAskSession,
   saveAgentSandboxDiffToContext,
@@ -6,6 +5,8 @@ import {
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
 import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
 import { useAppStore } from "../../store/appStore";
+import { assertNever } from "../../lib/invariant";
+import type { ContextItemAction } from "../../types";
 import { applySavedDiffContextItem } from "./contextItemEffects";
 
 export function runContextItemAction({
@@ -15,31 +16,44 @@ export function runContextItemAction({
   action: ContextItemAction;
   closeAfterRemove: boolean;
 }) {
-  void action.run({
-    applyDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
-    },
-    openContextItem: (itemId) => {
-      useAppStore.getState().actions.contextItems.openContextItem({ itemId });
-    },
-    removeContextItem: (itemId) => {
-      void disposeAgentAskSession(itemId);
-      useAppStore.getState().actions.compose.removeContextItem({ itemId });
+  const command = action.command;
+
+  switch (command.kind) {
+    case "open":
+      useAppStore.getState().actions.contextItems.openContextItem({
+        itemId: command.itemId,
+      });
+      return;
+    case "remove":
+      void disposeAgentAskSession(command.itemId);
+      useAppStore.getState().actions.compose.removeContextItem({
+        itemId: command.itemId,
+      });
       if (closeAfterRemove) {
         useAppStore.getState().actions.navigation.dismissPane();
       }
-    },
-    rerunPrompt: ({ expectedResult, prompt, replaceContextItemId }) =>
-      startLlmRequest(prompt, {
+      return;
+    case "apply-diff":
+      void applySavedDiffContextItem(command.itemId);
+      return;
+    case "rerun-prompt":
+      startLlmRequest(command.prompt, {
         replacement: {
-          contextItemId: replaceContextItemId,
-          expectedResult,
+          contextItemId: command.itemId,
+          expectedResult: command.expectedResult,
         },
-      }),
-    rerunShellCommand: ({ command, replaceContextItemId }) =>
-      startShellCommandRerun({ command, replaceContextItemId }),
-    saveAgentSandboxDiff: (itemId) => {
-      void saveAgentSandboxDiffToContext(itemId);
-    },
-  });
+      });
+      return;
+    case "rerun-shell":
+      startShellCommandRerun({
+        command: command.command,
+        replaceContextItemId: command.itemId,
+      });
+      return;
+    case "save-agent-diff":
+      void saveAgentSandboxDiffToContext(command.itemId);
+      return;
+    default:
+      return assertNever(command, "Unhandled context item action command");
+  }
 }

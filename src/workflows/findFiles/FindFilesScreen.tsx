@@ -6,7 +6,7 @@ import { AgentOutputLog } from "../../components/AgentOutputLog";
 import {
   getFileContextItemId,
   hasContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
 import { getVerticalNavigationDirection, isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 import { startFindFilesSearch } from "./findFilesSearchController";

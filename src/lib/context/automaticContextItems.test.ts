@@ -8,13 +8,21 @@ import {
   getVisibleContextItems,
   UNSTAGED_CHANGES_CONTEXT_ITEM_ID,
 } from "./automaticContextItems";
+import {
+  formatContextItemForLlm,
+  getContextItemDetailView,
+  getContextItemSummarizationInput,
+  getContextItemSummaryView,
+} from "./contextItemRegistry";
 
 const execFileAsync = promisify(execFile);
 
 test("shows automatic current changes in the visible context list", () => {
-  expect(getVisibleContextItems([]).map((item) => item.getListLabel())).toEqual(
-    ["@AGENTS.md", "Current changes", "File list"],
-  );
+  expect(
+    getVisibleContextItems([]).map(
+      (item) => getContextItemSummaryView(item).title,
+    ),
+  ).toEqual(["@AGENTS.md", "Current changes", "File list"]);
 });
 
 test("unstaged changes detail shows the working tree diff", async () => {
@@ -25,7 +33,7 @@ test("unstaged changes detail shows the working tree diff", async () => {
   await writeFile(join(root, "example.txt"), "after\n");
 
   const item = getUnstagedChangesItem();
-  const detail = await item.getDetailView({ root });
+  const detail = await getContextItemDetailView(item, { root });
 
   expect(detail?.kind).toBe("diff");
   if (detail?.kind !== "diff") {
@@ -44,7 +52,9 @@ test("unstaged changes detail includes untracked non-ignored files", async () =>
   await writeFile(join(root, "new.txt"), "hello from an untracked file\n");
   await writeFile(join(root, "ignored.txt"), "ignored\n");
 
-  const detail = await getUnstagedChangesItem().getDetailView({ root });
+  const detail = await getContextItemDetailView(getUnstagedChangesItem(), {
+    root,
+  });
 
   expect(detail?.kind).toBe("diff");
   if (detail?.kind !== "diff") {
@@ -68,9 +78,9 @@ test("unstaged changes detail matches LLM context text", async () => {
   await writeFile(join(root, "untracked.txt"), "new file\n");
 
   const item = getUnstagedChangesItem();
-  const detail = await item.getDetailView({ root });
-  const summaryInput = await item.getSummarizationInput({ root });
-  const formatted = await item.formatForLlm({
+  const detail = await getContextItemDetailView(item, { root });
+  const summaryInput = await getContextItemSummarizationInput(item, { root });
+  const formatted = await formatContextItemForLlm(item, {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -104,9 +114,9 @@ test("unstaged changes detail shows the full large working tree diff", async () 
   await writeFile(join(root, "large.txt"), repeatLines("after", 30_000));
 
   const item = getUnstagedChangesItem();
-  const detail = await item.getDetailView({ root });
-  const summaryInput = await item.getSummarizationInput({ root });
-  const formatted = await item.formatForLlm({
+  const detail = await getContextItemDetailView(item, { root });
+  const summaryInput = await getContextItemSummarizationInput(item, { root });
+  const formatted = await formatContextItemForLlm(item, {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -128,13 +138,16 @@ test("unstaged changes detail shows the full large working tree diff", async () 
 test("current changes detail shows the full large staged diff", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
   await git(root, ["init"]);
-  await writeFile(join(root, "large-staged.txt"), repeatLines("staged", 30_000));
+  await writeFile(
+    join(root, "large-staged.txt"),
+    repeatLines("staged", 30_000),
+  );
   await git(root, ["add", "large-staged.txt"]);
 
   const item = getUnstagedChangesItem();
-  const detail = await item.getDetailView({ root });
-  const summaryInput = await item.getSummarizationInput({ root });
-  const formatted = await item.formatForLlm({
+  const detail = await getContextItemDetailView(item, { root });
+  const summaryInput = await getContextItemSummarizationInput(item, { root });
+  const formatted = await formatContextItemForLlm(item, {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -160,9 +173,9 @@ test("current changes LLM context marks byte-truncated multibyte diffs", async (
   await git(root, ["add", "large-cjk.txt"]);
 
   const item = getUnstagedChangesItem();
-  const detail = await item.getDetailView({ root });
-  const summaryInput = await item.getSummarizationInput({ root });
-  const formatted = await item.formatForLlm({
+  const detail = await getContextItemDetailView(item, { root });
+  const summaryInput = await getContextItemSummarizationInput(item, { root });
+  const formatted = await formatContextItemForLlm(item, {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -184,9 +197,12 @@ test("current changes LLM context keeps staged diff when untracked diff byte-tru
   await git(root, ["init"]);
   await writeFile(join(root, "staged.txt"), "small staged marker\n");
   await git(root, ["add", "staged.txt"]);
-  await writeFile(join(root, "large-untracked.txt"), repeatLine("漢字漢字", 20_000));
+  await writeFile(
+    join(root, "large-untracked.txt"),
+    repeatLine("漢字漢字", 20_000),
+  );
 
-  const formatted = await getUnstagedChangesItem().formatForLlm({
+  const formatted = await formatContextItemForLlm(getUnstagedChangesItem(), {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -206,7 +222,7 @@ test("current changes LLM context keeps cached diff when unborn working tree dif
   await git(root, ["add", "large.txt"]);
   await writeFile(join(root, "large.txt"), repeatLine("漢字漢字", 20_000));
 
-  const formatted = await getUnstagedChangesItem().formatForLlm({
+  const formatted = await formatContextItemForLlm(getUnstagedChangesItem(), {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -230,7 +246,7 @@ test("current changes LLM context does not treat an oversized untracked path lis
     );
   }
 
-  const formatted = await getUnstagedChangesItem().formatForLlm({
+  const formatted = await formatContextItemForLlm(getUnstagedChangesItem(), {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -246,7 +262,9 @@ test("unstaged changes detail shows an empty state when the tree is clean", asyn
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
   await git(root, ["init"]);
 
-  const detail = await getUnstagedChangesItem().getDetailView({ root });
+  const detail = await getContextItemDetailView(getUnstagedChangesItem(), {
+    root,
+  });
 
   expect(detail).toEqual({
     content: "No current changes.",
@@ -259,9 +277,9 @@ test("current changes detail is empty outside git repositories", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
 
   const item = getUnstagedChangesItem();
-  const detail = await item.getDetailView({ root });
-  const summaryInput = await item.getSummarizationInput({ root });
-  const formatted = await item.formatForLlm({
+  const detail = await getContextItemDetailView(item, { root });
+  const summaryInput = await getContextItemSummarizationInput(item, { root });
+  const formatted = await formatContextItemForLlm(item, {
     focused: false,
     remainingFileCharacters: Number.POSITIVE_INFINITY,
     root,
@@ -283,7 +301,7 @@ test("current changes detail fails loudly for unexpected git errors", async () =
   );
 
   await expect(
-    getUnstagedChangesItem().getDetailView({ root }),
+    getContextItemDetailView(getUnstagedChangesItem(), { root }),
   ).rejects.toThrow();
 });
 

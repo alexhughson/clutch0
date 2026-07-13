@@ -10,13 +10,11 @@ import type {
 } from "../../app/appTypes";
 import { createAutomaticContextItems } from "../context/automaticContextItems";
 import {
-  LiveLlmResponseContextItem,
-  PiAgentContextItem,
-  type PersistentContextItemState,
+  decodeContextItemV1,
+  encodeContextItemV1,
   parseAgentOutputBlock,
-  restoreContextItem,
-  serializeContextItem,
-} from "../context/contextItems";
+} from "../context/contextItemPersistence";
+import type { PersistentContextItem } from "../context/contextItemTypes";
 import type { CreateFileValidationResult } from "../createFile/createFile";
 import { patchProposalFromLegacyEdits } from "../patch/patchEngine";
 import type { PatchProgressState, PatchReviewState } from "../patch/types";
@@ -27,7 +25,7 @@ export const APP_SNAPSHOT_SCHEMA_VERSION = 1;
 
 export type SerializedWorkspace = {
   composer: AppState["workspace"]["composer"];
-  contextItems: PersistentContextItemState[];
+  contextItems: PersistentContextItem[];
   focusedContextItemId: string | null;
 };
 
@@ -35,7 +33,7 @@ export type SerializedLlmRequestState = Omit<
   LlmRequestState,
   "contextItems"
 > & {
-  contextItems: PersistentContextItemState[];
+  contextItems: PersistentContextItem[];
 };
 
 type SerializedResponseTaskState = {
@@ -101,7 +99,7 @@ export function serializeInterruptedAppSnapshot({
 export function restoreAppStateFromSnapshot(
   snapshot: AppSnapshot,
 ): Omit<AppState, "actions"> {
-  const contextItems = snapshot.workspace.contextItems.map(restoreContextItem);
+  const contextItems = snapshot.workspace.contextItems.map(decodeContextItemV1);
   const workspace: WorkspaceState = {
     automaticContextItems: createAutomaticContextItems(),
     composer: snapshot.workspace.composer,
@@ -483,20 +481,16 @@ function parseComposer(value: unknown): ComposerState {
 function parsePersistentContextItemStates(
   value: unknown,
   label: string,
-): PersistentContextItemState[] {
+): PersistentContextItem[] {
   const ids = new Set<string>();
   return assertArray(value, label).map((snapshot, index) => {
-    const item = restoreContextItem(snapshot);
-    const serialized = serializeContextItem(item);
-    if (serialized === null) {
-      throw new Error(`${label}[${index}] must be persistent.`);
-    }
-    if (ids.has(serialized.id)) {
-      throw new Error(`${label}[${index}].id duplicates ${serialized.id}.`);
+    const item = decodeContextItemV1(snapshot);
+    if (ids.has(item.id)) {
+      throw new Error(`${label}[${index}].id duplicates ${item.id}.`);
     }
 
-    ids.add(serialized.id);
-    return serialized;
+    ids.add(item.id);
+    return item;
   });
 }
 
@@ -824,18 +818,15 @@ function restoreAppTask(task: SerializedAppTask | null): AppTask | null {
     ...task,
     request: {
       ...task.request,
-      contextItems: task.request.contextItems.map(restoreContextItem),
+      contextItems: task.request.contextItems.map(decodeContextItemV1),
     } as LlmRequestState,
   };
 }
 
 function serializeContextItems(
-  contextItems: readonly ContextItem[],
-): PersistentContextItemState[] {
-  return contextItems.flatMap((item) => {
-    const serialized = serializeContextItem(item);
-    return serialized === null ? [] : [serialized];
-  });
+  contextItems: readonly PersistentContextItem[],
+): PersistentContextItem[] {
+  return contextItems.map(encodeContextItemV1);
 }
 
 function normalizeRestoredTask(task: AppTask | null): AppTask | null {
@@ -927,15 +918,25 @@ function normalizePatchReviewState(patch: PatchReviewState): PatchReviewState {
     : patch;
 }
 
-function normalizeRestoredItem(item: ContextItem): ContextItem {
-  if (item instanceof LiveLlmResponseContextItem && item.status === "running") {
-    return item.withError("Interrupted while waiting for model response.");
+function normalizeRestoredItem(
+  item: PersistentContextItem,
+): PersistentContextItem {
+  if (item.type === "llm-response-live" && item.status === "running") {
+    return {
+      ...item,
+      errorMessage: "Interrupted while waiting for model response.",
+      status: "error",
+    };
   }
 
-  if (item instanceof PiAgentContextItem) {
-    const detached = item.withSessionAvailability("detached");
+  if (item.type === "pi-agent") {
+    const detached = { ...item, sessionAvailability: "detached" as const };
     return detached.status === "running"
-      ? detached.withStatus("error", "Interrupted while running agent session.")
+      ? {
+          ...detached,
+          errorMessage: "Interrupted while running agent session.",
+          status: "error" as const,
+        }
       : detached;
   }
 
@@ -976,9 +977,8 @@ function nextRequestId(
   contextItems: readonly ContextItem[],
 ): number {
   const requestIds = contextItems.flatMap((item) =>
-    "sourceRequestId" in item.state &&
-    typeof item.state.sourceRequestId === "number"
-      ? [item.state.sourceRequestId]
+    "sourceRequestId" in item && typeof item.sourceRequestId === "number"
+      ? [item.sourceRequestId]
       : [],
   );
 

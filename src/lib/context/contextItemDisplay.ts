@@ -1,5 +1,5 @@
 import type { ContextItem } from "../../types";
-import { FileContextItem } from "./contextItems";
+import type { FileContextItem } from "./contextItemTypes";
 
 export type ContextItemDisplayEntry =
   | {
@@ -25,7 +25,7 @@ export function getContextItemDisplayEntries(
 ): ContextItemDisplayEntry[] {
   const fileItems = getFileContextItems(contextItems);
   const nonFileEntries = contextItems
-    .filter((item) => !(item instanceof FileContextItem))
+    .filter((item) => item.type !== "file")
     .map((item) => ({ depth: 0, item, kind: "item" as const }));
 
   return [...getFileDisplayEntries(fileItems), ...nonFileEntries];
@@ -46,7 +46,7 @@ function getFileContextItems(
   contextItems: readonly ContextItem[],
 ): FileContextItem[] {
   return contextItems
-    .filter((item): item is FileContextItem => item instanceof FileContextItem)
+    .filter((item): item is FileContextItem => item.type === "file")
     .sort((a, b) => comparePath(a.filePath, b.filePath));
 }
 

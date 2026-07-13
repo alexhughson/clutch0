@@ -10,7 +10,7 @@ import {
   type SlashCommandSelectorMatchResult,
 } from "../../lib/inputLineParser";
 import type { ComposeScreenState } from "../../store/appStore";
-import { getSelectedFilePaths } from "../../lib/context/contextItems";
+import { getSelectedFilePaths } from "../../lib/context/contextItemFactories";
 import type { ContextItem, FilePath, HighlightedFilePath } from "../../types";
 import { getLlmSlashCommands } from "../../workflows/llmTools/toolRegistry";
 import type { LlmSlashCommand } from "../../workflows/llmTools/types";

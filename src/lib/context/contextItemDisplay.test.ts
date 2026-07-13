@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createFileContextItem } from "./contextItems";
+import { createFileContextItem } from "./contextItemFactories";
 import { getContextItemDisplayEntries } from "./contextItemDisplay";
 
 test("groups file context items under compact alphabetical folder headers", () => {

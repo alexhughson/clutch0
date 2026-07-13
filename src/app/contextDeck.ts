@@ -1,15 +1,18 @@
 import { getContextItemDisplayOrder } from "../lib/context/contextItemDisplay";
-import { hasContextItem } from "../lib/context/contextItems";
-import type { ContextItem } from "../types";
+import { hasContextItem } from "../lib/context/contextItemFactories";
+import type {
+  ContextItem,
+  PersistentContextItem,
+} from "../lib/context/contextItemTypes";
 import type { ComposeScreenState } from "./appTypes";
 
 export class ContextDeck {
   constructor(
-    readonly contextItems: readonly ContextItem[],
+    readonly contextItems: readonly PersistentContextItem[],
     readonly focusedContextItemId: string | null,
   ) {}
 
-  add(item: ContextItem): ContextDeck {
+  add(item: PersistentContextItem): ContextDeck {
     if (hasContextItem(this.contextItems, item.id)) {
       return new ContextDeck(this.contextItems, item.id);
     }
@@ -28,7 +31,7 @@ export class ContextDeck {
     );
   }
 
-  replace(item: ContextItem): ContextDeck {
+  replace(item: PersistentContextItem): ContextDeck {
     if (!hasContextItem(this.contextItems, item.id)) {
       return this;
     }
@@ -111,7 +114,7 @@ function getFocusAfterRemoval({
   removedIndex,
   removedItemId,
 }: {
-  contextItems: readonly ContextItem[];
+  contextItems: readonly PersistentContextItem[];
   previousFocusedContextItemId: string | null;
   removedIndex: number;
   removedItemId: string;

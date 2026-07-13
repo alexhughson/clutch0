@@ -25,6 +25,7 @@
     "@earendil-works/pi-ai": "^0.79.1",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",
+    "@sinclair/typebox": "^0.34.52",
     "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0",
     "diff": "^9.0.0",
     "fiat": "github:alexhughson/fiat#v0.1",

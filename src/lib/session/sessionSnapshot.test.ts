@@ -2,13 +2,13 @@ import { test, expect } from "bun:test";
 import type { AppState } from "../../app/appTypes";
 import { createInitialAppState } from "../../app/appInitialState";
 import {
-  PiAgentContextItem,
-  type PiAgentContextItemState,
   createFileContextItem,
   createLiveLlmResponseContextItem,
   createPiAgentContextItem,
   createSavedLlmResponseContextItem,
-} from "../context/contextItems";
+} from "../context/contextItemFactories";
+import type { PiAgentContextItem } from "../context/contextItemTypes";
+import { CONTEXT_RECORDS_V1_SNAPSHOT } from "./contextRecordsV1.fixture";
 import {
   parseAppSnapshot,
   restoreAppStateFromSnapshot,
@@ -16,55 +16,51 @@ import {
   serializeInterruptedAppSnapshot,
 } from "./sessionSnapshot";
 
-test("snapshot round-trips workspace and active request context separately", () => {
-  const initial = createInitialAppState();
-  const selectedFile = createFileContextItem("src/index.tsx");
-  const automaticAgents = createFileContextItem("AGENTS.md");
-  const state: AppState = {
-    ...initial,
-    actions: {} as AppState["actions"],
-    activeTask: {
-      kind: "response",
-      request: {
-        contextItems: [automaticAgents, selectedFile],
-        focusedContextItemId: selectedFile.id,
-        id: 3,
-        patchProgress: {
-          files: [{ operation: "update", path: "src/index.tsx" }],
-          patchCharacterCount: 100,
-        },
-        question: "explain",
-        responseText: "partial",
-        status: "done",
-      },
-    },
-    workspace: {
-      ...initial.workspace,
-      contextItems: [selectedFile],
-      focusedContextItemId: selectedFile.id,
-    },
-  };
-
+test("literal v1 snapshot restores workspace and request records separately", () => {
   const restored = restoreAppStateFromSnapshot(
-    serializeAppSnapshot({ state, workspaceRoot: "/repo" }),
+    parseAppSnapshot(CONTEXT_RECORDS_V1_SNAPSHOT as unknown),
   );
 
-  expect(restored.workspace.contextItems.map((item) => item.id)).toEqual([
-    selectedFile.id,
+  expect(restored.workspace.contextItems.map((item) => item.type)).toEqual([
+    "file",
+    "llm-response",
+    "shell-command-output",
+    "user-text",
+    "llm-response-live",
+    "pi-agent",
+    "diff",
+    "agent-sandbox-diff",
   ]);
   expect(
     restored.activeTask?.kind === "response"
       ? restored.activeTask.request.contextItems.map((item) => item.id)
       : [],
-  ).toEqual([automaticAgents.id, selectedFile.id]);
+  ).toEqual(["file:src/index.tsx", "request-context:20"]);
   expect(
     restored.activeTask?.kind === "response"
       ? restored.activeTask.request.patchProgress
       : undefined,
   ).toEqual({
     files: [{ operation: "update", path: "src/index.tsx" }],
-    patchCharacterCount: 100,
+    patchCharacterCount: 321,
   });
+  expect(
+    restored.workspace.automaticContextItems.map((item) => item.type),
+  ).toEqual(["file", "automatic-unstaged-changes", "automatic-file-list"]);
+
+  const encoded = serializeAppSnapshot({
+    state: { ...restored, actions: {} as AppState["actions"] },
+    workspaceRoot: "/repo",
+  });
+  expect(encoded.workspace.contextItems).toHaveLength(8);
+  expect(encoded.activeTask?.kind).toBe("response");
+  if (encoded.activeTask?.kind === "response") {
+    expect(encoded.activeTask.request.contextItems).toHaveLength(2);
+    expect(encoded.activeTask.request.patchProgress).toEqual({
+      files: [{ operation: "update", path: "src/index.tsx" }],
+      patchCharacterCount: 321,
+    });
+  }
 });
 
 test("restore normalizes searching find-files before render", () => {
@@ -232,7 +228,7 @@ test("restore detaches legacy agent sessions and marks running agents interrupte
   );
   const restoredAgent = restored.workspace.contextItems[0];
 
-  expect(restoredAgent).toBeInstanceOf(PiAgentContextItem);
+  expect(restoredAgent).toMatchObject({ type: "pi-agent" });
   expect((restoredAgent as PiAgentContextItem).sessionAvailability).toBe(
     "detached",
   );
@@ -470,7 +466,7 @@ test("snapshot parser rejects malformed known active tasks and counters", () => 
       },
     },
     workspaceRoot: "/repo",
-  }).workspace.contextItems[0]! as PiAgentContextItemState;
+  }).workspace.contextItems[0]! as PiAgentContextItem;
   const { sessionAvailability, ...agentWithoutAvailability } = serializedAgent;
 
   expect(sessionAvailability).toBeDefined();

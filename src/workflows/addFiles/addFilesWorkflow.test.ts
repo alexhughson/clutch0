@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialComposeScreen } from "../../app/appInitialState";
-import { FileContextItem } from "../../lib/context/contextItems";
+import type { FileContextItem } from "../../lib/context/contextItemTypes";
 import { createAddFilesActions } from "./addFilesWorkflow";
 
 function createHarness(initialState: AppState) {
@@ -34,9 +34,9 @@ test("adds multiple files to context and focuses the last requested file", () =>
   harness.addFiles.addToContext({ paths: ["src/a.ts"] });
 
   expect(harness.state.workspace.contextItems).toHaveLength(2);
-  expect(harness.state.workspace.contextItems[0]).toBeInstanceOf(
-    FileContextItem,
-  );
+  expect(harness.state.workspace.contextItems[0]).toMatchObject({
+    type: "file",
+  });
   expect(harness.state.workspace.contextItems.map((item) => item.id)).toEqual([
     "file:src/a.ts",
     "file:src/b.ts",

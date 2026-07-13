@@ -5,7 +5,7 @@ import {
   createFileContextItem,
   getFileContextItemId,
   createSavedLlmResponseContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
 import { createComposeActions } from "./composeWorkflow";
 
 function createHarness(initialState: Omit<AppState, "actions">) {

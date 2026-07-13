@@ -1,17 +1,27 @@
 import {
+  MAX_FILE_CONTEXT_CHARACTERS,
   MAX_TOTAL_FILE_CONTEXT_CHARACTERS,
   getContextItemById,
-} from "../context/contextItems";
+} from "../context/contextItemFactories";
+import {
+  formatContextItemForLlm,
+  getContextItemSummaryView,
+} from "../context/contextItemRegistry";
 import {
   getAutomaticFileContextItems,
   getAmbientLlmContextItems,
   getAutomaticContextBlockName,
 } from "../context/automaticContextItems";
-import type { ContextItem, LlmFileContext } from "../../types";
+import type {
+  AutomaticContextItem,
+  ContextItem,
+  LlmFileContext,
+  PersistentContextItem,
+} from "../../types";
 import { defaultSystemPrompt, renderPrompt } from "./prompts";
 import type { LlmContext, LlmTool, LlmUserMessage } from "./types";
 
-export { MAX_FILE_CONTEXT_CHARACTERS } from "../context/contextItems";
+export { MAX_FILE_CONTEXT_CHARACTERS } from "../context/contextItemFactories";
 export {
   MAX_DIFF_CONTEXT_CHARACTERS,
   MAX_DIRECTORY_TREE_ENTRIES,
@@ -35,7 +45,7 @@ export type BuiltLlmContext = {
 };
 
 export type AssembledLlmContextInput = {
-  contextItems: ContextItem[];
+  contextItems: PersistentContextItem[];
   focusedContextItemId: string | null;
 };
 
@@ -45,8 +55,8 @@ export function assembleLlmContextInput({
   excludedContextItemId,
   focusedContextItemId,
 }: {
-  automaticContextItems: readonly ContextItem[];
-  contextItems: readonly ContextItem[];
+  automaticContextItems: readonly AutomaticContextItem[];
+  contextItems: readonly PersistentContextItem[];
   excludedContextItemId?: string;
   focusedContextItemId: string | null;
 }): AssembledLlmContextInput {
@@ -159,7 +169,7 @@ async function formatSelectedContextItems({
   let remainingFileCharacters = MAX_TOTAL_FILE_CONTEXT_CHARACTERS;
 
   for (const item of contextItems) {
-    const formatted = await item.formatForLlm({
+    const formatted = await formatContextItemForLlm(item, {
       focused: item.id === focusedContextItemId,
       remainingFileCharacters,
       root,
@@ -194,7 +204,7 @@ function formatSelectedContextItemMessage(
   const selectedContextItemText =
     selectedContextItem === null
       ? "No selected context item."
-      : selectedContextItem.getListLabel();
+      : getContextItemSummaryView(selectedContextItem).title;
 
   return renderPrompt("context/selected-context-item.md", {
     selectedContextItem: selectedContextItemText,
@@ -238,7 +248,7 @@ async function formatAutomaticContextFromItems({
       continue;
     }
 
-    const formatted = await item.formatForLlm({
+    const formatted = await formatContextItemForLlm(item, {
       focused: false,
       remainingFileCharacters: Number.POSITIVE_INFINITY,
       root,

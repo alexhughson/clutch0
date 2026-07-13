@@ -4,7 +4,7 @@ import {
   createInitialAppState,
   createInitialComposeScreen,
 } from "../../app/appInitialState";
-import { createSavedDiffContextItem } from "../../lib/context/contextItems";
+import { createSavedDiffContextItem } from "../../lib/context/contextItemFactories";
 import { createContextItemsActions } from "./contextItemsWorkflow";
 
 function createHarness(

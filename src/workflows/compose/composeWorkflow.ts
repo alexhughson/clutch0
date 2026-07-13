@@ -9,7 +9,7 @@ import {
   createFileContextItem,
   getFileContextItemId,
   hasContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
 import { getVisibleContextItems } from "../../lib/context/automaticContextItems";
 import { assembleLlmContextInput } from "../../lib/llm/context";
 import type { FilePath } from "../../types";

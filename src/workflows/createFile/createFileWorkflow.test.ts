@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialAppState } from "../../app/appInitialState";
-import { getFileContextItemId } from "../../lib/context/contextItems";
+import { getFileContextItemId } from "../../lib/context/contextItemFactories";
 import { createCreateFileActions } from "./createFileWorkflow";
 
 function createHarness(initialState: AppState) {

@@ -10,8 +10,7 @@ import {
   createSavedLlmResponseContextItem,
   createUserTextContextItem,
   getFileContextItemId,
-  PiAgentContextItem,
-} from "../context/contextItems";
+} from "../context/contextItemFactories";
 import { createAutomaticContextItems } from "../context/automaticContextItems";
 import {
   assembleLlmContextInput,
@@ -62,9 +61,7 @@ test("builds LLM context from selected file contents on disk", async () => {
     "<automatic_context_reference>",
   );
   expect(getTextUserContent(context, 1)).toContain('<file path="example.ts">');
-  expect(getTextUserContent(context, 1)).toContain(
-    "export const answer = 42;",
-  );
+  expect(getTextUserContent(context, 1)).toContain("export const answer = 42;");
   expect(getTextUserContent(context, 2)).toContain(
     "The selected context item is:",
   );
@@ -223,7 +220,7 @@ test("agent session context includes only the latest assistant message", async (
   const root = await mkdtemp(join(tmpdir(), "clutch-llm-context-"));
   const { context } = await buildLlmContext({
     contextItems: [
-      new PiAgentContextItem({
+      {
         blocks: [
           {
             id: "status:1",
@@ -270,19 +267,15 @@ test("agent session context includes only the latest assistant message", async (
         status: "idle",
         summaryState: { status: "missing" },
         type: "pi-agent",
-      }),
+      },
     ],
     question: "Use agent context",
     root,
   });
 
   const userContent = joinTextUserMessages(context);
-  expect(userContent).toContain(
-    "<question>\nInvestigate routing\n</question>",
-  );
-  expect(userContent).toContain(
-    "<response>\nLatest answer.\n</response>",
-  );
+  expect(userContent).toContain("<question>\nInvestigate routing\n</question>");
+  expect(userContent).toContain("<response>\nLatest answer.\n</response>");
   expect(userContent).not.toContain("First answer.");
   expect(userContent).not.toContain("Private reasoning");
   expect(userContent).not.toContain("read src/index.ts");
@@ -301,9 +294,7 @@ test("places the current user request after all context", async () => {
 
   expect(context.messages).toHaveLength(4);
   expect(
-    getTextUserContent(context, 0).startsWith(
-      "<automatic_context_reference>",
-    ),
+    getTextUserContent(context, 0).startsWith("<automatic_context_reference>"),
   ).toBe(true);
   expect(getTextUserContent(context, 1)).toContain("<file");
   expect(getTextUserContent(context, 2)).toContain("<selected_context_item>");

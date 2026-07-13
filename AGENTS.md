@@ -21,9 +21,9 @@ OpenTUI system for LLM prompting. Keep code tight, explicit, and fail-fast.
 
 ## Context items
 
-Context items are the main OO abstraction. See `src/types.ts` and implementations in `src/lib/context/contextItems.ts`.
+Context items are plain records whose state types derive from typebox schemas in `src/lib/context/contextItemSchemas.ts`. Per-type behavior lives in `src/lib/context/contextItemDefinitions/` and is accessed through `src/lib/context/contextItemRegistry.ts`.
 
-A context item owns how it is listed, opened, summarized, formatted for the LLM, viewed in detail, and what actions it exposes. UI code should ask the item instead of switching on item types.
+UI code asks the definition table (via registry helpers like `getContextItemDetailView(item)`) — never switches on item type.
 
 UI list: `src/components/ContextItemsList.tsx`  
 Summaries: `src/workflows/contextSummaries/contextSummariesWorkflow.ts`

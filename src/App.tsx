@@ -22,6 +22,7 @@ import {
   formatContextItemAction,
   getContextItemActionForKeyEvent,
 } from "./lib/context/contextItemActions";
+import { getContextItemActions } from "./lib/context/contextItemRegistry";
 import {
   getVisibleContextItemById,
   getVisibleContextItems,
@@ -120,10 +121,10 @@ export function App({ filePaths, onExit }: AppProps) {
     }
 
     const action = getContextItemActionForKeyEvent({
-      actions: focusedItem.getActions(),
+      actions: getContextItemActions(focusedItem),
       event,
     });
-    if (action?.id !== "open") {
+    if (action?.command.kind !== "open") {
       return;
     }
 
@@ -397,8 +398,8 @@ function ContextHotkeys({
   );
   const hotkeys = [
     "↑/↓ focus",
-    ...(showItemActions
-      ? (focusedItem?.getActions().map(formatContextItemAction) ?? [])
+    ...(showItemActions && focusedItem !== null
+      ? getContextItemActions(focusedItem).map(formatContextItemAction)
       : []),
   ].join(" · ");
 

@@ -1,4 +1,20 @@
 import type { AgentOutputBlock } from "./lib/agentOutput/agentOutputTypes";
+export type {
+  AutomaticContextItem,
+  AutomaticFileListContextItem,
+  AutomaticUnstagedChangesContextItem,
+  ContextItem,
+  FileContextItem,
+  LiveLlmResponseContextItem,
+  PersistentContextItem,
+  PiAgentContextItem,
+  PiAgentSessionAvailability,
+  SavedAgentSandboxDiffContextItem,
+  SavedDiffContextItem,
+  SavedLlmResponseContextItem,
+  ShellCommandOutputContextItem,
+  UserTextContextItem,
+} from "./lib/context/contextItemTypes";
 
 export type FilePath = string;
 export type AgentAskMode = "ask" | "edit";
@@ -19,45 +35,6 @@ export type SessionEvent = {
   kind: string;
   schemaVersion: 1;
 };
-
-export type ContextItemState = {
-  id: string;
-  schemaVersion: number;
-  summaryState: ContextItemSummaryState;
-  type: string;
-};
-
-export type ContextItemPersistence<
-  State extends ContextItemState = ContextItemState,
-> =
-  | { kind: "ephemeral"; reason: string }
-  | { kind: "persistent"; snapshot: State };
-
-export interface ContextItem<
-  State extends ContextItemState = ContextItemState,
-> {
-  readonly id: string;
-  readonly state: State;
-  readonly type: State["type"];
-
-  formatForLlm(
-    options: FormatContextItemForLlmOptions,
-  ): Promise<FormattedContextItem>;
-  getActions(): readonly ContextItemAction[];
-  getDetailView(
-    options: GetContextItemDetailViewOptions,
-  ): Promise<ContextItemDetailView | null>;
-  getLiveDetailView?(): ContextItemDetailView | null;
-  getHistoryEvents(previous: ContextItem | null): readonly SessionEvent[];
-  getListLabel(): string;
-  getPersistence(): ContextItemPersistence<State>;
-  getSummarizationInput(
-    options: GetContextItemSummaryInputOptions,
-  ): Promise<ContextItemSummarizationInput | null>;
-  getSummaryState(): ContextItemSummaryState;
-  getSummaryView(): ContextItemSummaryView;
-  withSummaryState(summaryState: ContextItemSummaryState): ContextItem;
-}
 
 export type GeneratedContextItemSummary = {
   details: string;
@@ -156,7 +133,21 @@ export type ContextItemActionShortcut = {
   super?: boolean;
 };
 
+export type ContextItemActionCommand =
+  | { itemId: string; kind: "open" }
+  | { itemId: string; kind: "remove" }
+  | { itemId: string; kind: "apply-diff" }
+  | {
+      expectedResult: "diff" | "text";
+      itemId: string;
+      kind: "rerun-prompt";
+      prompt: string;
+    }
+  | { command: string; itemId: string; kind: "rerun-shell" }
+  | { itemId: string; kind: "save-agent-diff" };
+
 export type ContextItemAction = {
+  command: ContextItemActionCommand;
   id: string;
   label: string;
   paneShortcut?: {
@@ -164,23 +155,6 @@ export type ContextItemAction = {
     name: string;
   };
   shortcut?: ContextItemActionShortcut;
-  run: (context: ContextItemActionContext) => Promise<void> | void;
-};
-
-export type ContextItemActionContext = {
-  applyDiff: (itemId: string) => void;
-  openContextItem: (itemId: string) => void;
-  removeContextItem: (itemId: string) => void;
-  rerunPrompt: (options: {
-    expectedResult: "diff" | "text";
-    prompt: string;
-    replaceContextItemId: string;
-  }) => void;
-  rerunShellCommand: (options: {
-    command: string;
-    replaceContextItemId: string;
-  }) => void;
-  saveAgentSandboxDiff: (itemId: string) => void;
 };
 
 export type FormatContextItemForLlmOptions = {

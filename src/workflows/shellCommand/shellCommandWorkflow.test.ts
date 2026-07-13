@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { createInitialAppState } from "../../app/appInitialState";
-import { createShellCommandOutputContextItem } from "../../lib/context/contextItems";
+import { createShellCommandOutputContextItem } from "../../lib/context/contextItemFactories";
 import { createShellCommandActions } from "./shellCommandWorkflow";
 
 function createHarness(

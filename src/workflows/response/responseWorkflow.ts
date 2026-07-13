@@ -12,8 +12,8 @@ import {
   createSavedLlmResponseContextItem,
   getContextItemById,
   hasContextItem,
-  LiveLlmResponseContextItem,
-} from "../../lib/context/contextItems";
+} from "../../lib/context/contextItemFactories";
+import type { LiveLlmResponseContextItem } from "../../lib/context/contextItemTypes";
 import type {
   PatchProgressState,
   PatchReviewState,
@@ -115,9 +115,10 @@ function appendResponseDelta(
     : {};
   const nextState = { ...state, ...activeUpdate };
 
-  return updateLiveLlmResponseItem(nextState, requestId, (item) =>
-    item.withOutput(item.output + delta),
-  );
+  return updateLiveLlmResponseItem(nextState, requestId, (item) => ({
+    ...item,
+    output: item.output + delta,
+  }));
 }
 
 function failResponse(
@@ -136,12 +137,11 @@ function failResponse(
     : {};
   const nextState = { ...state, ...activeUpdate };
 
-  return updateLiveLlmResponseItem(nextState, requestId, (item) =>
-    (responseText === undefined
-      ? item
-      : item.withOutput(responseText)
-    ).withError(errorMessage),
-  );
+  return updateLiveLlmResponseItem(nextState, requestId, (item) => ({
+    ...(responseText === undefined ? item : { ...item, output: responseText }),
+    errorMessage,
+    status: "error" as const,
+  }));
 }
 
 function finishResponse(
@@ -246,9 +246,11 @@ function setPatchOnActiveRequest(
     }
 
     if (patch.status !== "valid") {
-      return updateLiveLlmResponseItem(state, requestId, (item) =>
-        item.withError(formatPatchValidationErrors(patch)),
-      );
+      return updateLiveLlmResponseItem(state, requestId, (item) => ({
+        ...item,
+        errorMessage: formatPatchValidationErrors(patch),
+        status: "error" as const,
+      }));
     }
 
     const item = createSavedDiffItem({
@@ -571,12 +573,12 @@ function getLiveLlmResponseItemByRequestId(
   requestId: number,
 ): LiveLlmResponseContextItem | null {
   const item = state.workspace.contextItems.find(
-    (contextItem) =>
-      contextItem instanceof LiveLlmResponseContextItem &&
+    (contextItem): contextItem is LiveLlmResponseContextItem =>
+      contextItem.type === "llm-response-live" &&
       contextItem.sourceRequestId === requestId,
   );
 
-  return item instanceof LiveLlmResponseContextItem ? item : null;
+  return item ?? null;
 }
 
 function isActiveInProgressLlmRequest(

@@ -6,7 +6,7 @@ import type {
   RelevantFileCandidate,
   WorkspaceState,
 } from "../../app/appTypes";
-import { createFileContextItem } from "../../lib/context/contextItems";
+import { createFileContextItem } from "../../lib/context/contextItemFactories";
 
 const MAX_SEARCH_ACTIVITY_LINES = 200;
 

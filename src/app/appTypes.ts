@@ -10,12 +10,11 @@ import type {
   SupportedClutchLlmProvider,
 } from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
+import type { AgentAskMode, AgentSandboxContext, FilePath } from "../types";
 import type {
-  AgentAskMode,
-  AgentSandboxContext,
-  ContextItem,
-  FilePath,
-} from "../types";
+  AutomaticContextItem,
+  PersistentContextItem,
+} from "../lib/context/contextItemTypes";
 
 export type AppTask =
   | ContextItemViewerTaskState
@@ -43,7 +42,7 @@ export type ShellCommandReplacementTarget = {
 };
 
 type LlmRequestBase = {
-  contextItems: ContextItem[];
+  contextItems: PersistentContextItem[];
   focusedContextItemId: string | null;
   id: number;
   latencyStats?: LlmRequestLatencyStats;
@@ -79,9 +78,9 @@ export type ComposerState = {
 };
 
 export type WorkspaceState = {
-  automaticContextItems: ContextItem[];
+  automaticContextItems: AutomaticContextItem[];
   composer: ComposerState;
-  contextItems: ContextItem[];
+  contextItems: PersistentContextItem[];
   focusedContextItemId: string | null;
 };
 

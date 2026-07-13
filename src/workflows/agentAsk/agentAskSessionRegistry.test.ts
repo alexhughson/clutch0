@@ -11,7 +11,7 @@ import {
   type CreateAcpAgentSessionDriverOptions,
 } from "../../lib/agent/acpAgentSessionDriver";
 import { CLUTCH_CONFIG_DIR_ENV } from "../../lib/config/clutchConfig";
-import { PiAgentContextItem } from "../../lib/context/contextItems";
+import type { PiAgentContextItem } from "../../lib/context/contextItemTypes";
 import { hydrateAppStore, useAppStore } from "../../store/appStore";
 import {
   disposeAgentAskSession,
@@ -72,7 +72,7 @@ test("agent ask registry records ACP startup, prompt, follow-up, and dispose", a
   await disposeAgentAskSession(itemId);
 
   const item = useAppStore.getState().workspace.contextItems[0];
-  expect(item).toBeInstanceOf(PiAgentContextItem);
+  expect(item).toMatchObject({ type: "pi-agent" });
   expect((item as PiAgentContextItem).status).toBe("idle");
   expect((item as PiAgentContextItem).blocks).toEqual(
     expect.arrayContaining([
@@ -126,7 +126,7 @@ test("agent edit dispose removes sandbox even when driver dispose fails", async 
     root,
   });
   const item = useAppStore.getState().workspace.contextItems[0];
-  expect(item).toBeInstanceOf(PiAgentContextItem);
+  expect(item).toMatchObject({ type: "pi-agent" });
   const sandboxPath = (item as PiAgentContextItem).sandbox?.path;
   expect(typeof sandboxPath).toBe("string");
   if (sandboxPath === undefined) {

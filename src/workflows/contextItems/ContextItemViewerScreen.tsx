@@ -16,6 +16,12 @@ import {
   getContextItemActionForKeyEvent,
   getContextItemActionForPaneKeyEvent,
 } from "../../lib/context/contextItemActions";
+import {
+  getContextItemActions,
+  getContextItemDetailView,
+  getContextItemLiveDetailView,
+  getContextItemSummaryView,
+} from "../../lib/context/contextItemRegistry";
 import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
 import { AgentSessionFollowUp } from "../agentAsk/AgentSessionFollowUp";
@@ -34,15 +40,19 @@ export function ContextItemViewerScreen({
       state.workspace.automaticContextItems,
     ),
   );
-  const [staticDetail, setStaticDetail] = useState<ContextItemDetailView | null>(
-    null,
-  );
-  const liveDetail = item?.getLiveDetailView?.() ?? null;
+  const [staticDetail, setStaticDetail] =
+    useState<ContextItemDetailView | null>(null);
+  const liveDetail = item === null ? null : getContextItemLiveDetailView(item);
   const detail = liveDetail ?? staticDetail;
   const isAgentDetail = detail?.kind === "agent-output";
   const canAct = screen.applyStatus !== "applying";
   const itemActions = useMemo(
-    () => item?.getActions().filter((action) => action.id !== "open") ?? [],
+    () =>
+      item === null
+        ? []
+        : getContextItemActions(item).filter(
+            (action) => action.command.kind !== "open",
+          ),
     [item],
   );
   const canRunShortcutActions =
@@ -51,7 +61,9 @@ export function ContextItemViewerScreen({
     canRunShortcutActions && detail.kind !== "agent-output";
   const title = isAgentDetail
     ? undefined
-    : (detail?.title ?? item?.getListLabel() ?? "Context item");
+    : (detail?.title ??
+      (item === null ? undefined : getContextItemSummaryView(item).title) ??
+      "Context item");
   const bottomTitle = isAgentDetail
     ? formatAgentShortcutHints(itemActions)
     : canRunPaneActions
@@ -68,17 +80,19 @@ export function ContextItemViewerScreen({
         : undefined;
 
   useEffect(() => {
-    if (item === null || item.getLiveDetailView !== undefined) {
+    if (item === null || getContextItemLiveDetailView(item) !== null) {
       return;
     }
 
     let cancelled = false;
     setStaticDetail(null);
-    void item.getDetailView({ root: process.cwd() }).then((nextDetail) => {
-      if (!cancelled) {
-        setStaticDetail(nextDetail);
-      }
-    });
+    void getContextItemDetailView(item, { root: process.cwd() }).then(
+      (nextDetail) => {
+        if (!cancelled) {
+          setStaticDetail(nextDetail);
+        }
+      },
+    );
 
     return () => {
       cancelled = true;
