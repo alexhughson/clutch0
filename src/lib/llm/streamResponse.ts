@@ -2,7 +2,7 @@ import type { ContextItem } from "../../types";
 import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
 import { buildLlmInteractionContext } from "./interactionContext";
 import { configuredLlmRequestOptions } from "./requestOptions";
-import { streamDirectLlmResponse } from "./directLlmClient";
+import { streamDirectLlmResponse } from "./llmClient";
 import { APPLY_PATCH_TOOL_NAME, patchProposalFromToolCall } from "./patchTool";
 import type {
   LlmWorkflowToolResult,

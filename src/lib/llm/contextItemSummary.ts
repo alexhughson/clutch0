@@ -5,7 +5,7 @@ import type {
 import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
 import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
 import { configuredLlmRequestOptions } from "./requestOptions";
-import { completeDirectLlmResponse } from "./directLlmClient";
+import { completeDirectLlmResponse } from "./llmClient";
 import type { LlmContext } from "./types";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;

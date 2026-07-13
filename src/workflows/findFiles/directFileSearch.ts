@@ -2,7 +2,7 @@ import type { RelevantFileCandidate } from "../../app/appTypes";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import { resolveConfiguredLlmRequest } from "../../lib/config/clutchConfig";
 import { buildAgentContextSnapshot } from "../../lib/llm/agentContext";
-import { completeDirectLlmResponse } from "../../lib/llm/directLlmClient";
+import { completeDirectLlmResponse } from "../../lib/llm/llmClient";
 import { renderPrompt } from "../../lib/llm/prompts";
 import { configuredLlmRequestOptions } from "../../lib/llm/requestOptions";
 import type { LlmContext } from "../../lib/llm/types";

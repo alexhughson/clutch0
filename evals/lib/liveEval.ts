@@ -23,7 +23,7 @@ import { renderPrompt } from "../../src/lib/llm/prompts";
 import {
   configuredLlmRequestOptions,
 } from "../../src/lib/llm/requestOptions";
-import { completeDirectLlmResponse } from "../../src/lib/llm/directLlmClient";
+import { completeDirectLlmResponse } from "../../src/lib/llm/llmClient";
 import type { LlmContext } from "../../src/lib/llm/types";
 import {
   getPatchProposalPaths,

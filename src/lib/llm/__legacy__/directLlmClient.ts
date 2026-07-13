@@ -1,3 +1,7 @@
+// Vendored from git c0d4316:src/lib/llm/directLlmClient.ts (test-only baseline).
+// Edits beyond import paths:
+// - export buildDirectRequest, createLegacyAssistantAccumulator, legacyFiatProgramFromStreamEvent
+
 import {
   GeminiTranslator,
   OpenAIChatTranslator,
@@ -6,7 +10,7 @@ import {
   type Program,
   type ThinkingEffort,
 } from "fiat";
-import type { LlmCompletionLatencyStats } from "./streamResponse";
+import type { LlmCompletionLatencyStats } from "../streamResponse";
 import type {
   AssistantMessageEventStream,
   LlmAssistantMessage,
@@ -19,8 +23,8 @@ import type {
   LlmToolCall,
   LlmUserMessage,
   LlmUsage,
-} from "./types";
-import { createAssistantMessageEventStream, emptyLlmUsage } from "./types";
+} from "../types";
+import { createAssistantMessageEventStream, emptyLlmUsage } from "../types";
 
 type DirectLlmRequestOptions = {
   apiKey: string;
@@ -136,13 +140,13 @@ export function streamDirectLlmResponse(
         throw new Error(await formatErrorResponse(response));
       }
 
-      const accumulator = createAssistantAccumulator({ model, output, stream });
+      const accumulator = createLegacyAssistantAccumulator({ model, output, stream });
       for await (const event of parseSseData(response, options.signal)) {
         if (event === "[DONE]") {
           continue;
         }
         const parsed = parseJsonObject(event, `${model.provider} stream event`);
-        const program = fiatProgramFromStreamEvent({
+        const program = legacyFiatProgramFromStreamEvent({
           event: parsed,
           translator: request.translator,
         });
@@ -211,7 +215,7 @@ export async function completeDirectLlmResponse(
   }
 
   const output = createInitialAssistantMessage(model);
-  const accumulator = createAssistantAccumulator({ model, output });
+  const accumulator = createLegacyAssistantAccumulator({ model, output });
   accumulator.pushProgram(request.translator.fromResponse(await response.json()));
   accumulator.finish();
   const text = output.content
@@ -225,7 +229,7 @@ export async function completeDirectLlmResponse(
   return output;
 }
 
-async function buildDirectRequest({
+export async function buildDirectRequest({
   context,
   model,
   options,
@@ -393,7 +397,7 @@ function requestBodyForModel({
   );
 }
 
-function fiatProgramFromStreamEvent({
+export function legacyFiatProgramFromStreamEvent({
   event,
   translator,
 }: {
@@ -487,7 +491,7 @@ function textFromMessageContent(
     .join("\n");
 }
 
-function createAssistantAccumulator({
+export function createLegacyAssistantAccumulator({
   model,
   output,
   stream,

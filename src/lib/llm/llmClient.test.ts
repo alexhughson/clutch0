@@ -14,7 +14,7 @@ import {
   getDirectLlmConnection,
   resetDirectLlmConnectionCacheForTests,
   streamDirectLlmResponse,
-} from "./directLlmClient";
+} from "./llmClient";
 import type { LlmContext, LlmModel } from "./types";
 
 const originalFetch = globalThis.fetch;
