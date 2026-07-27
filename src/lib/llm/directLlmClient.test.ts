@@ -10,6 +10,7 @@ import {
 } from "../config/clutchConfig";
 import { generateContextItemSummary } from "./contextItemSummary";
 import {
+  buildChatCompletionsBody,
   completeDirectLlmResponse,
   getDirectLlmConnection,
   resetDirectLlmConnectionCacheForTests,
@@ -280,6 +281,107 @@ test("direct completion charges cached input tokens once", async () => {
   expect(message.usage.cost.total).toBeCloseTo(0.00048);
 });
 
+test("builds multi-turn chat completion body with tool history", () => {
+  const body = buildChatCompletionsBody(
+    multiTurnContextFixture(),
+    modelFixture(),
+    {},
+    false,
+  );
+
+  expect(body).toEqual({
+    messages: [
+      { content: "Use tools.", role: "system" },
+      { content: "Search now.", role: "user" },
+      {
+        content: "I will search.",
+        role: "assistant",
+        tool_calls: [
+          {
+            function: {
+              arguments: JSON.stringify({ query: "llm client" }),
+              name: "find_relevant_files",
+            },
+            id: "call_1",
+            type: "function",
+          },
+        ],
+      },
+      {
+        content: "src/lib/llm/directLlmClient.ts",
+        role: "tool",
+        tool_call_id: "call_1",
+      },
+      { content: "Thanks.", role: "user" },
+    ],
+    model: "gpt-test",
+    stream: false,
+    tool_choice: "auto",
+    tools: [
+      {
+        function: {
+          description: "Find files by query.",
+          name: "find_relevant_files",
+          parameters: expect.objectContaining({ type: "object" }),
+        },
+        type: "function",
+      },
+    ],
+  });
+});
+
+test("injects service_tier when option is set", () => {
+  const body = buildChatCompletionsBody(
+    contextFixture(),
+    modelFixture(),
+    { serviceTier: "priority" },
+    true,
+  );
+
+  expect(body.service_tier).toBe("priority");
+});
+
+test("injects reasoning effort when model supports it", () => {
+  const body = buildChatCompletionsBody(
+    contextFixture(),
+    {
+      ...modelFixture(),
+      reasoning: true,
+      thinkingLevelMap: { high: "high", low: "low", medium: "medium" },
+    },
+    { reasoningEffort: "high" },
+    true,
+  );
+
+  expect(body.reasoning).toEqual({ effort: "high" });
+});
+
+test("omits reasoning for minimal effort", () => {
+  const body = buildChatCompletionsBody(
+    contextFixture(),
+    { ...modelFixture(), reasoning: true },
+    { reasoningEffort: "minimal" },
+    true,
+  );
+
+  expect(body.reasoning).toBeUndefined();
+});
+
+test("rejects unsupported reasoning effort mapping", () => {
+  expect(() =>
+    buildChatCompletionsBody(
+      contextFixture(),
+      {
+        ...modelFixture(),
+        reasoning: true,
+        thinkingLevelMap: { high: null },
+      },
+      { reasoningEffort: "high" },
+      true,
+    ),
+  ).toThrow("Model openai/gpt-test cannot use effort level high.");
+});
+
 test("direct completion rejects unsupported direct API profiles", async () => {
   await expect(
     completeDirectLlmResponse(
@@ -296,6 +398,64 @@ test("direct completion rejects unsupported direct API profiles", async () => {
     "Unsupported direct LLM provider/api combination: provider=openai-codex model=gpt-test api=openai-codex-responses.",
   );
 });
+
+function multiTurnContextFixture(): LlmContext {
+  return {
+    messages: [
+      { content: "Search now.", role: "user", timestamp: 1 },
+      {
+        api: "openai-completions",
+        content: [
+          { text: "I will search.", type: "text" },
+          {
+            arguments: { query: "llm client" },
+            id: "call_1",
+            name: "find_relevant_files",
+            type: "toolCall",
+          },
+        ],
+        model: "gpt-test",
+        provider: "openai",
+        role: "assistant",
+        stopReason: "toolUse",
+        timestamp: 2,
+        usage: {
+          cacheRead: 0,
+          cacheWrite: 0,
+          cost: {
+            cacheRead: 0,
+            cacheWrite: 0,
+            input: 0,
+            output: 0,
+            total: 0,
+          },
+          input: 0,
+          output: 0,
+          totalTokens: 0,
+        },
+      },
+      {
+        content: [{ text: "src/lib/llm/directLlmClient.ts", type: "text" }],
+        isError: false,
+        role: "toolResult",
+        timestamp: 3,
+        toolCallId: "call_1",
+        toolName: "find_relevant_files",
+      },
+      { content: "Thanks.", role: "user", timestamp: 4 },
+    ],
+    systemPrompt: "Use tools.",
+    tools: [
+      {
+        description: "Find files by query.",
+        name: "find_relevant_files",
+        parameters: Type.Object({
+          query: Type.String(),
+        }),
+      },
+    ],
+  };
+}
 
 function contextFixture(): LlmContext {
   return {

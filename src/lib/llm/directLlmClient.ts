@@ -1,11 +1,3 @@
-import {
-  GeminiTranslator,
-  OpenAIChatTranslator,
-  OpenAIResponsesTranslator,
-  type Op,
-  type Program,
-  type ThinkingEffort,
-} from "fiat";
 import type { LlmCompletionLatencyStats } from "./streamResponse";
 import type {
   AssistantMessageEventStream,
@@ -16,7 +8,6 @@ import type {
   LlmTextContent,
   LlmThinkingLevel,
   LlmToolResultMessage,
-  LlmToolCall,
   LlmUserMessage,
   LlmUsage,
 } from "./types";
@@ -54,6 +45,11 @@ type DirectLlmConnection = {
   headers: Record<string, string>;
   provider: string;
 };
+
+type ChatCompletionBodyOptions = Pick<
+  DirectLlmRequestOptions,
+  "maxTokens" | "reasoning" | "reasoningEffort" | "serviceTier" | "temperature"
+>;
 
 const connectionCache = new Map<string, DirectLlmConnection>();
 
@@ -93,6 +89,44 @@ export function resetDirectLlmConnectionCacheForTests(): void {
   connectionCache.clear();
 }
 
+export function buildChatCompletionsBody(
+  context: LlmContext,
+  model: LlmModel,
+  options: ChatCompletionBodyOptions,
+  stream: boolean,
+): Record<string, unknown> {
+  assertOpenAiCompletionsApi(model);
+
+  const body: Record<string, unknown> = {
+    messages: serializeMessages(context),
+    model: model.id,
+    stream,
+  };
+
+  if (options.maxTokens !== undefined) {
+    body.max_tokens = options.maxTokens;
+  }
+  if (options.temperature !== undefined) {
+    body.temperature = options.temperature;
+  }
+  if (options.serviceTier !== undefined) {
+    body.service_tier = options.serviceTier;
+  }
+
+  const reasoningEffort = reasoningEffortForModel({ model, options });
+  if (reasoningEffort !== undefined) {
+    body.reasoning = { effort: reasoningEffort };
+  }
+
+  const tools = serializeTools(context.tools);
+  if (tools !== undefined) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
+  return body;
+}
+
 export function streamDirectLlmResponse(
   model: LlmModel,
   context: LlmContext,
@@ -109,20 +143,15 @@ export function streamDirectLlmResponse(
         headers: options.headers,
         model,
       });
-      const request = await buildDirectRequest({
-        context,
-        model,
-        options,
-        stream: true,
-      });
+      const body = await finalizeRequestBody({ context, model, options, stream: true });
 
       stream.push({ partial: output, type: "start" });
-      const response = await fetch(request.url, {
-        body: JSON.stringify(request.body),
+      const response = await fetch(joinUrl(model.baseUrl, "chat/completions"), {
+        body: JSON.stringify(body),
         headers: {
           accept: "text/event-stream",
           "content-type": "application/json",
-          ...authHeaders(model, connection),
+          ...authHeaders(connection),
         },
         keepalive: true,
         method: "POST",
@@ -141,14 +170,7 @@ export function streamDirectLlmResponse(
         if (event === "[DONE]") {
           continue;
         }
-        const parsed = parseJsonObject(event, `${model.provider} stream event`);
-        const program = fiatProgramFromStreamEvent({
-          event: parsed,
-          translator: request.translator,
-        });
-        if (program.length > 0) {
-          accumulator.pushProgram(program);
-        }
+        accumulator.pushChunk(parseJsonObject(event, `${model.provider} stream event`));
       }
       accumulator.finish();
 
@@ -185,18 +207,13 @@ export async function completeDirectLlmResponse(
     headers: options.headers,
     model,
   });
-  const request = await buildDirectRequest({
-    context,
-    model,
-    options,
-    stream: false,
-  });
-  const response = await fetch(request.url, {
-    body: JSON.stringify(request.body),
+  const body = await finalizeRequestBody({ context, model, options, stream: false });
+  const response = await fetch(joinUrl(model.baseUrl, "chat/completions"), {
+    body: JSON.stringify(body),
     headers: {
       accept: "application/json",
       "content-type": "application/json",
-      ...authHeaders(model, connection),
+      ...authHeaders(connection),
     },
     keepalive: true,
     method: "POST",
@@ -212,7 +229,7 @@ export async function completeDirectLlmResponse(
 
   const output = createInitialAssistantMessage(model);
   const accumulator = createAssistantAccumulator({ model, output });
-  accumulator.pushProgram(request.translator.fromResponse(await response.json()));
+  accumulator.pushResponse(parseJsonObject(await response.text(), `${model.provider} response`));
   accumulator.finish();
   const text = output.content
     .filter((block): block is LlmTextContent => block.type === "text")
@@ -225,7 +242,7 @@ export async function completeDirectLlmResponse(
   return output;
 }
 
-async function buildDirectRequest({
+async function finalizeRequestBody({
   context,
   model,
   options,
@@ -235,198 +252,110 @@ async function buildDirectRequest({
   model: LlmModel;
   options: DirectLlmRequestOptions;
   stream: boolean;
-}): Promise<{
-  body: Record<string, unknown>;
-  translator: typeof OpenAIChatTranslator;
-  url: string;
-}> {
-  const program: Program = [{ op: "llm.model", model: model.id }];
+}): Promise<Record<string, unknown>> {
+  const body = buildChatCompletionsBody(context, model, options, stream);
+  const nextBody = await options.onPayload?.(body, model);
+  return nextBody === undefined
+    ? body
+    : assertRecord(nextBody, `${model.provider}/${model.id} payload`);
+}
 
-  if (options.maxTokens !== undefined) {
-    program.push({ op: "llm.max_output_tokens", value: options.maxTokens });
+function assertOpenAiCompletionsApi(model: LlmModel): void {
+  if (model.api !== "openai-completions") {
+    throw new Error(
+      `Unsupported direct LLM provider/api combination: provider=${model.provider} model=${model.id} api=${model.api}.`,
+    );
   }
-  const thinkingEffort = thinkingEffortForModel({ model, options });
-  if (thinkingEffort !== undefined) {
-    program.push({ op: "llm.thinking", effort: thinkingEffort });
-  }
-  if (options.temperature !== undefined) {
-    program.push({ op: "llm.temperature", value: options.temperature });
-  }
+}
+
+function serializeMessages(context: LlmContext): Record<string, unknown>[] {
+  const messages: Record<string, unknown>[] = [];
   if (context.systemPrompt !== undefined) {
-    program.push({
-      op: "llm.text",
-      role: "system",
-      content: context.systemPrompt,
-    });
+    messages.push({ content: context.systemPrompt, role: "system" });
   }
   for (const message of context.messages) {
     if (message.role === "user") {
-      program.push({
-        op: "llm.text",
-        role: "user",
+      messages.push({
         content: textFromMessageContent(message.content, "user"),
+        role: "user",
       });
       continue;
     }
     if (message.role === "assistant") {
-      for (const block of message.content) {
-        if (block.type === "text") {
-          program.push({
-            op: "llm.text",
-            role: "assistant",
-            content: block.text,
-          });
-        }
-        if (block.type === "toolCall") {
-          program.push({
-            op: "llm.tool_call",
-            id: block.id,
-            name: block.name,
-            arguments: block.arguments,
-          });
-        }
-      }
+      messages.push(serializeAssistantMessage(message));
       continue;
     }
-    program.push({
-      op: "llm.tool_result",
-      id: message.toolCallId,
-      content: textFromMessageContent(message.content, "tool result"),
-    });
+    messages.push(serializeToolResultMessage(message));
   }
-  for (const tool of context.tools ?? []) {
-    program.push({
-      op: "llm.tool",
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.parameters,
-    });
-  }
-  if ((context.tools?.length ?? 0) > 0) {
-    program.push({ op: "llm.tool_choice", value: "auto" });
+  return messages;
+}
+
+function serializeAssistantMessage(
+  message: LlmAssistantMessage,
+): Record<string, unknown> {
+  const textParts: string[] = [];
+  const toolCalls: Record<string, unknown>[] = [];
+
+  for (const block of message.content) {
+    if (block.type === "text") {
+      textParts.push(block.text);
+      continue;
+    }
+    if (block.type === "toolCall") {
+      toolCalls.push({
+        function: {
+          arguments: JSON.stringify(block.arguments),
+          name: block.name,
+        },
+        id: block.id,
+        type: "function",
+      });
+    }
   }
 
-  const request = requestBodyForModel({
-    apiKey: options.apiKey,
-    model,
-    program,
-    stream,
-  });
-  const withServiceTier =
-    options.serviceTier === undefined
-      ? request.body
-      : { ...request.body, service_tier: options.serviceTier };
-  const nextBody = await options.onPayload?.(withServiceTier, model);
+  const serialized: Record<string, unknown> = { role: "assistant" };
+  if (textParts.length > 0) {
+    serialized.content = textParts.join("\n");
+  }
+  if (toolCalls.length > 0) {
+    serialized.tool_calls = toolCalls;
+  }
+  return serialized;
+}
+
+function serializeToolResultMessage(
+  message: LlmToolResultMessage,
+): Record<string, unknown> {
   return {
-    ...request,
-    body:
-      nextBody === undefined
-        ? withServiceTier
-        : assertRecord(nextBody, `${model.provider}/${model.id} payload`),
+    content: textFromMessageContent(message.content, "tool result"),
+    role: "tool",
+    tool_call_id: message.toolCallId,
   };
 }
 
-function requestBodyForModel({
-  apiKey,
-  model,
-  program,
-  stream,
-}: {
-  apiKey: string;
-  model: LlmModel;
-  program: Program;
-  stream: boolean;
-}): {
-  body: Record<string, unknown>;
-  translator: typeof OpenAIChatTranslator;
-  url: string;
-} {
-  if (model.api === "openai-completions") {
-    return {
-      body: {
-        ...assertRecord(
-          OpenAIChatTranslator.toBody(program, { strict: true }),
-          `${model.provider}/${model.id} chat payload`,
-        ),
-        stream,
-      },
-      translator: OpenAIChatTranslator,
-      url: joinUrl(model.baseUrl, "chat/completions"),
-    };
+function serializeTools(
+  tools: LlmContext["tools"],
+): Record<string, unknown>[] | undefined {
+  if (tools === undefined || tools.length === 0) {
+    return undefined;
   }
-
-  if (model.api === "openai-responses") {
-    return {
-      body: {
-        ...assertRecord(
-          OpenAIResponsesTranslator.toBody(program, { strict: true }),
-          `${model.provider}/${model.id} responses payload`,
-        ),
-        store: false,
-        stream,
-      },
-      translator: OpenAIResponsesTranslator,
-      url: joinUrl(model.baseUrl, "responses"),
-    };
-  }
-
-  if (model.api === "google-generative-ai") {
-    const body = assertRecord(
-      GeminiTranslator.toBody(program, { strict: true }),
-      `${model.provider}/${model.id} gemini payload`,
-    );
-    delete body.model;
-    return {
-      body,
-      translator: GeminiTranslator,
-      url: geminiUrl({
-        apiKey,
-        baseUrl: model.baseUrl,
-        modelId: model.id,
-        stream,
-      }),
-    };
-  }
-
-  throw new Error(
-    `Unsupported direct LLM provider/api combination: provider=${model.provider} model=${model.id} api=${model.api}.`,
-  );
+  return tools.map((tool) => ({
+    function: {
+      description: tool.description,
+      name: tool.name,
+      parameters: tool.parameters,
+    },
+    type: "function",
+  }));
 }
 
-function fiatProgramFromStreamEvent({
-  event,
-  translator,
-}: {
-  event: Record<string, unknown>;
-  translator: typeof OpenAIChatTranslator;
-}): Program {
-  try {
-    return translator.fromStreamResponse(event);
-  } catch (error) {
-    if (isIgnorableStreamEvent(event)) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-function isIgnorableStreamEvent(event: Record<string, unknown>): boolean {
-  return (
-    event.type === "response.created" ||
-    event.type === "response.in_progress" ||
-    event.type === "response.content_part.added" ||
-    event.type === "response.content_part.done" ||
-    event.type === "response.output_text.done"
-  );
-}
-
-function thinkingEffortForModel({
+function reasoningEffortForModel({
   model,
   options,
 }: {
   model: LlmModel;
-  options: DirectLlmRequestOptions;
-}): ThinkingEffort | undefined {
+  options: ChatCompletionBodyOptions;
+}): string | undefined {
   if (!model.reasoning) {
     return undefined;
   }
@@ -435,38 +364,19 @@ function thinkingEffortForModel({
   if (effort === undefined) {
     return undefined;
   }
-  if (model.api !== "openai-responses" && model.api !== "google-generative-ai") {
-    return undefined;
-  }
 
-  const mapped = model.thinkingLevelMap?.[effort as keyof typeof model.thinkingLevelMap];
+  const mapped = model.thinkingLevelMap?.[effort];
   if (mapped === null) {
     throw new Error(
       `Model ${model.provider}/${model.id} cannot use effort level ${effort}.`,
     );
   }
-  return asFiatThinkingEffort(mapped ?? effort, model);
-}
 
-function asFiatThinkingEffort(
-  effort: string,
-  model: LlmModel,
-): ThinkingEffort | undefined {
-  if (effort === "minimal") {
+  const resolved = mapped ?? effort;
+  if (resolved === "minimal") {
     return undefined;
   }
-  if (
-    effort === "low" ||
-    effort === "medium" ||
-    effort === "high" ||
-    effort === "xhigh" ||
-    effort === "max"
-  ) {
-    return effort;
-  }
-  throw new Error(
-    `Model ${model.provider}/${model.id} maps thinking effort to unsupported fiat effort ${effort}.`,
-  );
+  return resolved;
 }
 
 function textFromMessageContent(
@@ -480,7 +390,7 @@ function textFromMessageContent(
   return content
     .map((block) => {
       if (block.type !== "text") {
-        throw new Error(`Cannot serialize ${label} image content to fiat.`);
+        throw new Error(`Cannot serialize ${label} image content to chat completions.`);
       }
       return block.text;
     })
@@ -497,13 +407,13 @@ function createAssistantAccumulator({
   stream?: AssistantMessageEventStream;
 }): {
   finish: () => void;
-  pushProgram: (program: Program) => void;
+  pushChunk: (event: Record<string, unknown>) => void;
+  pushResponse: (event: Record<string, unknown>) => void;
 } {
   let currentTextBlock: LlmTextContent | null = null;
-  const toolCallsByIndex = new Map<number, LlmToolCall & { partialJson: string }>();
-  const toolCallsById = new Map<string, LlmToolCall & { partialJson: string }>();
+  const toolCallsByIndex = new Map<number, LlmToolCallState>();
 
-  const contentIndex = (block: LlmTextContent | LlmToolCall): number =>
+  const contentIndex = (block: LlmTextContent | LlmToolCallState): number =>
     output.content.indexOf(block);
   const ensureTextBlock = (): LlmTextContent => {
     if (currentTextBlock === null) {
@@ -529,41 +439,85 @@ function createAssistantAccumulator({
     });
     currentTextBlock = null;
   };
-  const ensureToolCall = (
-    index: number,
-    id: string | undefined,
-  ): LlmToolCall & { partialJson: string } => {
-    const existingById = id === undefined ? undefined : toolCallsById.get(id);
-    if (existingById !== undefined) {
-      return existingById;
-    }
-    const existingByIndex = toolCallsByIndex.get(index);
-    if (existingByIndex !== undefined) {
-      if (id !== undefined && existingByIndex.id !== id) {
-        toolCallsById.delete(existingByIndex.id);
-        existingByIndex.id = id;
-        toolCallsById.set(id, existingByIndex);
+  const ensureToolCall = (index: number, id?: string): LlmToolCallState => {
+    const existing = toolCallsByIndex.get(index);
+    if (existing !== undefined) {
+      if (id !== undefined && existing.id !== id) {
+        existing.id = id;
       }
-      return existingByIndex;
+      return existing;
     }
 
     finishTextBlock();
-    const toolCall = {
+    const toolCall: LlmToolCallState = {
       arguments: {},
       id: id ?? `call_${index}`,
       name: "",
       partialJson: "",
-      type: "toolCall" as const,
+      type: "toolCall",
     };
     output.content.push(toolCall);
     toolCallsByIndex.set(index, toolCall);
-    toolCallsById.set(toolCall.id, toolCall);
     stream?.push({
       contentIndex: contentIndex(toolCall),
       partial: output,
       type: "toolcall_start",
     });
     return toolCall;
+  };
+  const applyTextDelta = (content: string): void => {
+    if (content.length === 0) {
+      return;
+    }
+    const block = ensureTextBlock();
+    block.text += content;
+    stream?.push({
+      contentIndex: contentIndex(block),
+      delta: content,
+      partial: output,
+      type: "text_delta",
+    });
+  };
+  const applyToolCallDelta = (delta: Record<string, unknown>): void => {
+    const index = typeof delta.index === "number" ? delta.index : 0;
+    const toolCall = ensureToolCall(
+      index,
+      typeof delta.id === "string" ? delta.id : undefined,
+    );
+    const fn = nestedRecord(delta.function);
+    if (fn !== undefined) {
+      if (typeof fn.name === "string") {
+        toolCall.name = fn.name;
+      }
+      if (typeof fn.arguments === "string") {
+        toolCall.partialJson += fn.arguments;
+        stream?.push({
+          contentIndex: contentIndex(toolCall),
+          delta: fn.arguments,
+          partial: output,
+          type: "toolcall_delta",
+        });
+      }
+    }
+  };
+  const applyToolCalls = (toolCalls: unknown): void => {
+    if (!Array.isArray(toolCalls)) {
+      return;
+    }
+    for (const [index, toolCall] of toolCalls.entries()) {
+      const call = assertRecord(toolCall, "tool call");
+      const fn = assertRecord(call.function, "tool call function");
+      const entry = ensureToolCall(
+        typeof call.index === "number" ? call.index : index,
+        typeof call.id === "string" ? call.id : undefined,
+      );
+      entry.name = String(fn.name ?? entry.name);
+      const args =
+        typeof fn.arguments === "string"
+          ? fn.arguments
+          : JSON.stringify(fn.arguments ?? {});
+      entry.partialJson = args;
+    }
   };
 
   return {
@@ -587,84 +541,98 @@ function createAssistantAccumulator({
       }
       output.usage.cost = calculateCost(model, output.usage);
     },
-    pushProgram: (program) => {
-      for (const op of program) {
-        if (op.op === "response.text_delta") {
-          const block = ensureTextBlock();
-          const content = String(op.content);
-          block.text += content;
-          if (content.length > 0) {
-            stream?.push({
-              contentIndex: contentIndex(block),
-              delta: content,
-              partial: output,
-              type: "text_delta",
-            });
-          }
-          continue;
-        }
-
-        if (op.op === "llm.text" && op.role === "assistant") {
-          const block = ensureTextBlock();
-          const content = String(op.content);
-          block.text += content;
-          continue;
-        }
-
-        if (op.op === "response.tool_call_delta") {
-          const index = typeof op.index === "number" ? op.index : 0;
-          const toolCall = ensureToolCall(
-            index,
-            typeof op.id === "string" ? op.id : undefined,
-          );
-          if (typeof op.name === "string") {
-            toolCall.name = op.name;
-          }
-          if (typeof op.arguments === "string") {
-            toolCall.partialJson += op.arguments;
-            stream?.push({
-              contentIndex: contentIndex(toolCall),
-              delta: op.arguments,
-              partial: output,
-              type: "toolcall_delta",
-            });
-          }
-          continue;
-        }
-
-        if (op.op === "llm.tool_call") {
-          const call = op as Extract<Op, { op: "llm.tool_call" }>;
-          const index = toolCallsByIndex.size;
-          const toolCall = ensureToolCall(index, call.id);
-          toolCall.name = call.name;
-          toolCall.arguments = call.arguments;
-          toolCall.partialJson = JSON.stringify(call.arguments);
-          continue;
-        }
-
-        if (op.op === "response.stop") {
-          const stop = op as Extract<Op, { op: "response.stop" }>;
-          output.stopReason = stopReasonFromFiat(stop.reason);
-          continue;
-        }
-
-        if (op.op === "response.usage") {
-          const usage = op as Extract<Op, { op: "response.usage" }>;
-          output.usage = usageFromFiat(usage, output.usage);
-          continue;
-        }
-
-        applyProviderUsage({ op, output });
-        if (op.op === "llm.model") {
-          const modelOp = op as Extract<Op, { op: "llm.model" }>;
-          if (modelOp.model !== model.id) {
-            output.responseModel = modelOp.model;
-          }
-        }
-        applyResponseId({ op, output });
+    pushChunk: (event) => {
+      applyTopLevelFields({ event, model, output });
+      const choice = firstChoice(event);
+      if (choice === undefined) {
+        return;
       }
+      const delta = nestedRecord(choice.delta);
+      if (delta !== undefined) {
+        if (typeof delta.content === "string") {
+          applyTextDelta(delta.content);
+        }
+        if (delta.tool_calls !== undefined) {
+          for (const toolCall of asArray(delta.tool_calls)) {
+            applyToolCallDelta(assertRecord(toolCall, "tool call delta"));
+          }
+        }
+      }
+      applyFinishReason(choice.finish_reason, output);
+    },
+    pushResponse: (event) => {
+      applyTopLevelFields({ event, model, output });
+      const choice = firstChoice(event);
+      if (choice === undefined) {
+        return;
+      }
+      const message = nestedRecord(choice.message);
+      if (message !== undefined) {
+        if (typeof message.content === "string") {
+          applyTextDelta(message.content);
+        }
+        applyToolCalls(message.tool_calls);
+      }
+      applyFinishReason(choice.finish_reason, output);
     },
   };
+}
+
+type LlmToolCallState = {
+  arguments: Record<string, unknown>;
+  id: string;
+  name: string;
+  partialJson: string;
+  type: "toolCall";
+};
+
+function applyTopLevelFields({
+  event,
+  model,
+  output,
+}: {
+  event: Record<string, unknown>;
+  model: LlmModel;
+  output: LlmAssistantMessage;
+}): void {
+  if (typeof event.id === "string") {
+    output.responseId ??= event.id;
+  }
+  if (typeof event.model === "string" && event.model !== model.id) {
+    output.responseModel = event.model;
+  }
+  if (event.usage !== undefined) {
+    applyOpenAiChatUsage(assertRecord(event.usage, "usage"), output.usage);
+  }
+}
+
+function firstChoice(event: Record<string, unknown>): Record<string, unknown> | undefined {
+  const choices = event.choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return undefined;
+  }
+  return assertRecord(choices[0], "choice");
+}
+
+function applyFinishReason(
+  finishReason: unknown,
+  output: LlmAssistantMessage,
+): void {
+  if (finishReason === null || finishReason === undefined) {
+    return;
+  }
+  output.stopReason = stopReasonFromFinishReason(String(finishReason));
+}
+
+function applyOpenAiChatUsage(usage: Record<string, unknown>, current: LlmUsage): void {
+  const input = numberField(usage.prompt_tokens);
+  const outputTokens = numberField(usage.completion_tokens);
+  const cacheRead = numberField(nestedRecord(usage.prompt_tokens_details)?.cached_tokens);
+  current.input = Math.max(0, input - cacheRead);
+  current.output = outputTokens;
+  current.cacheRead = cacheRead;
+  current.totalTokens =
+    numberField(usage.total_tokens) || current.input + current.output + current.cacheRead;
 }
 
 function createInitialAssistantMessage(model: LlmModel): LlmAssistantMessage {
@@ -680,89 +648,6 @@ function createInitialAssistantMessage(model: LlmModel): LlmAssistantMessage {
   };
 }
 
-function usageFromFiat(op: Extract<Op, { op: "response.usage" }>, current: LlmUsage) {
-  const input = op.inputTokens ?? current.input;
-  const output = op.outputTokens ?? current.output;
-  return {
-    ...current,
-    input,
-    output,
-    totalTokens: input + output + current.cacheRead + current.cacheWrite,
-  };
-}
-
-function applyProviderUsage({
-  op,
-  output,
-}: {
-  op: Op;
-  output: LlmAssistantMessage;
-}): void {
-  if (op.op === "openai_chat.usage") {
-    const usage = (op as { usage?: Record<string, unknown> }).usage;
-    if (usage !== undefined) {
-      const cacheRead = numberField(
-        nestedRecord(usage.prompt_tokens_details)?.cached_tokens,
-      );
-      applyCacheReadTokens(output.usage, cacheRead);
-      output.usage.totalTokens =
-        numberField(usage.total_tokens) ||
-        output.usage.input + output.usage.output + output.usage.cacheRead;
-    }
-  }
-  if (op.op === "openai_responses.usage") {
-    const usage = (op as { usage?: Record<string, unknown> }).usage;
-    if (usage !== undefined) {
-      const cacheRead = numberField(
-        nestedRecord(usage.input_tokens_details)?.cached_tokens,
-      );
-      applyCacheReadTokens(output.usage, cacheRead);
-      output.usage.totalTokens =
-        numberField(usage.total_tokens) ||
-        output.usage.input + output.usage.output + output.usage.cacheRead;
-    }
-  }
-  if (op.op === "gemini.usage") {
-    const usage = (op as { usage?: Record<string, unknown> }).usage;
-    if (usage !== undefined) {
-      applyCacheReadTokens(
-        output.usage,
-        numberField(usage.cachedContentTokenCount),
-      );
-      output.usage.totalTokens =
-        numberField(usage.totalTokenCount) ||
-        output.usage.input + output.usage.output + output.usage.cacheRead;
-    }
-  }
-}
-
-function applyCacheReadTokens(usage: LlmUsage, cacheRead: number): void {
-  usage.cacheRead = cacheRead;
-  usage.input = Math.max(0, usage.input - cacheRead);
-}
-
-function applyResponseId({
-  op,
-  output,
-}: {
-  op: Op;
-  output: LlmAssistantMessage;
-}): void {
-  if (op.op !== "openai_chat.body_field" && op.op !== "openai_responses.body_field") {
-    return;
-  }
-  const field = op as { key?: string; value?: unknown };
-  if (field.key === "id" && typeof field.value === "string") {
-    output.responseId ??= field.value;
-  }
-  if (field.key === "response") {
-    const response = assertRecord(field.value, "response metadata");
-    if (typeof response.id === "string") {
-      output.responseId ??= response.id;
-    }
-  }
-}
-
 function parseToolArguments(raw: string, callId: string): Record<string, unknown> {
   if (raw.trim().length === 0) {
     return {};
@@ -775,22 +660,18 @@ function parseToolArguments(raw: string, callId: string): Record<string, unknown
   return parsed as Record<string, unknown>;
 }
 
-function stopReasonFromFiat(reason: string): LlmStopReason {
+function stopReasonFromFinishReason(reason: string): LlmStopReason {
   switch (reason) {
-    case "end_turn":
-    case "stop_sequence":
+    case "stop":
       return "stop";
-    case "max_tokens":
+    case "length":
       return "length";
-    case "tool_use":
+    case "tool_calls":
       return "toolUse";
     case "content_filter":
-    case "refusal":
-    case "model_context_window_exceeded":
-    case "pause_turn":
       return "error";
     default:
-      throw new Error(`Unsupported fiat stop reason: ${reason}`);
+      throw new Error(`Unsupported finish reason: ${reason}`);
   }
 }
 
@@ -844,38 +725,17 @@ async function* parseSseData(
   }
 }
 
-function authHeaders(
-  model: LlmModel,
-  connection: DirectLlmConnection,
-): Record<string, string> {
-  if (model.api === "google-generative-ai") {
+function authHeaders(connection: DirectLlmConnection): Record<string, string> {
+  const hasAuthorization = Object.keys(connection.headers).some(
+    (key) => key.toLowerCase() === "authorization",
+  );
+  if (hasAuthorization) {
     return connection.headers;
   }
-
   return {
     ...connection.headers,
     authorization: `Bearer ${connection.apiKey}`,
   };
-}
-
-function geminiUrl({
-  apiKey,
-  baseUrl,
-  modelId,
-  stream,
-}: {
-  apiKey: string;
-  baseUrl: string;
-  modelId: string;
-  stream: boolean;
-}): string {
-  const action = stream ? "streamGenerateContent" : "generateContent";
-  const url = new URL(`${joinUrl(baseUrl, `models/${modelId}:${action}`)}`);
-  url.searchParams.set("key", apiKey);
-  if (stream) {
-    url.searchParams.set("alt", "sse");
-  }
-  return url.toString();
 }
 
 function joinUrl(baseUrl: string, path: string): string {
@@ -897,6 +757,10 @@ function assertRecord(value: unknown, label: string): Record<string, unknown> {
 
 function parseJsonObject(value: string, label: string): Record<string, unknown> {
   return assertRecord(JSON.parse(value), label);
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 async function formatErrorResponse(response: Response): Promise<string> {
