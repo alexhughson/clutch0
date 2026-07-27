@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   getClutchConfigPaths,
+  OPENROUTER_PROVIDER_ID,
   saveClutchApiKey,
   saveClutchModelConfiguration,
 } from "../config/clutchConfig";
@@ -153,15 +154,18 @@ test("context item summarization uses the direct completion path", async () => {
   process.env.CLUTCH_CONFIG_DIR = configDir;
   const paths = getClutchConfigPaths(configDir);
   const model = modelFixture();
-  saveClutchApiKey({ apiKey: "test-token", paths, provider: "openai" });
-  saveClutchModelConfiguration({
-    agent: { metadata: model as never, model: model.id, provider: "openai" },
+  saveClutchApiKey({
+    apiKey: "test-token",
     paths,
-    primary: { metadata: model as never, model: model.id, provider: "openai" },
+    provider: OPENROUTER_PROVIDER_ID,
+  });
+  saveClutchModelConfiguration({
+    agent: { model: model.id, provider: OPENROUTER_PROVIDER_ID },
+    paths,
+    primary: { model: model.id, provider: OPENROUTER_PROVIDER_ID },
     summarization: {
-      metadata: model as never,
       model: model.id,
-      provider: "openai",
+      provider: OPENROUTER_PROVIDER_ID,
     },
   });
 

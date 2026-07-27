@@ -6,8 +6,8 @@ import type { CreateFileValidationResult } from "../lib/createFile/createFile";
 import type { PatchProgressState, PatchReviewState } from "../lib/patch/types";
 import type {
   ClutchAgentBackendConfig,
+  ClutchEndpoint,
   ClutchModelSelection,
-  SupportedClutchLlmProvider,
 } from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
 import type {
@@ -110,7 +110,8 @@ export type ContextItemViewerTaskState = {
 export type ConfigTaskState = {
   agent: ClutchModelSelection;
   agentBackend?: ClutchAgentBackendConfig;
-  configuredProviders: SupportedClutchLlmProvider[];
+  configuredProviders: string[];
+  endpoints: ClutchEndpoint[];
   kind: "config";
   mode: "first-run" | "settings";
   primary: ClutchModelSelection;

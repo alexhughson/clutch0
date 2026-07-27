@@ -1,43 +1,25 @@
 import { expect, test } from "bun:test";
-import type { Api, Model } from "@earendil-works/pi-ai";
-import {
-  configuredLlmRequestOptions,
-  maxOutputTokensForModel,
-  reasoningForEffortLevel,
-  serviceTierForRequest,
-  usesProviderSpecificRequestOptions,
-} from "./requestOptions";
+import type { LlmModel } from "./types";
+import { configuredLlmRequestOptions, reasoningForEffortLevel } from "./requestOptions";
 
 function modelFixture(
-  provider: string,
-  maxTokens: number,
-  api: Api = "openai-completions",
-  id = "model",
-): Model<Api> {
+  overrides: Partial<LlmModel> = {},
+): LlmModel {
   return {
-    api,
-    baseUrl: "https://example.test/v1",
+    api: "openai-completions",
+    baseUrl: "https://openrouter.ai/api/v1",
     contextWindow: 128_000,
     cost: { cacheRead: 0, cacheWrite: 0, input: 0, output: 0 },
-    id,
+    id: "google/gemini-3.1-flash-lite",
     input: ["text"],
-    maxTokens,
-    name: "Model",
-    provider,
-    reasoning: false,
+    maxTokens: 16_384,
+    name: "google/gemini-3.1-flash-lite",
+    provider: "openrouter",
+    reasoning: true,
+    thinkingLevelMap: { xhigh: "high" },
+    ...overrides,
   };
 }
-
-test("caps Cerebras output tokens below account token-per-minute limits", () => {
-  expect(maxOutputTokensForModel(modelFixture("cerebras", 32_000))).toBe(4_096);
-  expect(maxOutputTokensForModel(modelFixture("cerebras", 1_024))).toBe(1_024);
-});
-
-test("leaves other providers to their model defaults", () => {
-  expect(maxOutputTokensForModel(modelFixture("openai", 32_000))).toBe(
-    undefined,
-  );
-});
 
 test("maps model effort levels to simple reasoning options", () => {
   expect(reasoningForEffortLevel("off")).toBe(undefined);
@@ -46,7 +28,7 @@ test("maps model effort levels to simple reasoning options", () => {
 });
 
 test("builds configured simple request options", () => {
-  const model = modelFixture("cerebras", 32_000);
+  const model = modelFixture({ provider: "work-proxy" });
 
   expect(
     configuredLlmRequestOptions({
@@ -54,190 +36,166 @@ test("builds configured simple request options", () => {
       effortLevel: "medium",
       headers: { "x-test": "yes" },
       model,
-      serviceTier: "default",
+      requestDefaults: { temperature: 0.2 },
     }),
   ).toEqual({
     apiKey: "token",
     headers: { "x-test": "yes" },
-    maxTokens: 4_096,
+    onPayload: expect.any(Function),
     reasoning: "medium",
     signal: undefined,
   });
 });
 
-test("omits service tier by default for OpenAI API key responses models", () => {
-  const model = modelFixture("openai", 32_000, "openai-responses");
-
-  const request = {
+test("requestDefaults cannot clobber messages or stream", () => {
+  const options = configuredLlmRequestOptions({
     apiKey: "token",
-    effortLevel: "medium" as const,
-    model,
-    serviceTier: "default" as const,
-  };
+    effortLevel: "low",
+    model: modelFixture({ provider: "work-proxy" }),
+    requestDefaults: {
+      messages: [{ role: "system", content: "override" }],
+      model: "wrong-model",
+      stream: false,
+      temperature: 0.2,
+    },
+  });
 
-  expect(serviceTierForRequest(request)).toBe(undefined);
-  expect(usesProviderSpecificRequestOptions(request)).toBe(false);
-  expect(configuredLlmRequestOptions(request)).not.toHaveProperty(
-    "serviceTier",
-  );
-});
-
-test("uses priority service tier for configured OpenAI API key responses models", () => {
-  const model = modelFixture("openai", 32_000, "openai-responses");
-  const request = {
-    apiKey: "token",
-    effortLevel: "medium" as const,
-    model,
-    serviceTier: "priority" as const,
-  };
-
-  expect(serviceTierForRequest(request)).toBe("priority");
-  expect(usesProviderSpecificRequestOptions(request)).toBe(true);
-  expect(configuredLlmRequestOptions(request)).toMatchObject({
-    apiKey: "token",
-    reasoning: "medium",
-    reasoningEffort: "medium",
-    serviceTier: "priority",
+  expect(
+    options.onPayload?.(
+      {
+        messages: [{ role: "user", content: "hello" }],
+        model: "right-model",
+        stream: true,
+      },
+      modelFixture({ provider: "work-proxy" }),
+    ),
+  ).toEqual({
+    messages: [{ role: "user", content: "hello" }],
+    model: "right-model",
+    stream: true,
+    temperature: 0.2,
   });
 });
 
-test("adds OpenRouter priority service tier and reasoning to chat-completions payloads", () => {
-  const model = modelFixture(
-    "openrouter",
-    32_000,
-    "openai-completions",
-    "google/gemini-3.1-flash-lite",
-  );
-  const request = {
+test("injects openRouter provider object, service tier, and reasoning from capabilities", () => {
+  const model = modelFixture();
+  const options = configuredLlmRequestOptions({
     apiKey: "token",
-    effortLevel: "medium" as const,
+    effortLevel: "medium",
     model,
-    serviceTier: "priority" as const,
-  };
-  const options = configuredLlmRequestOptions(request);
+    openRouter: {
+      allowFallbacks: true,
+      capabilities: {
+        supportsReasoning: true,
+        supportsServiceTier: true,
+        vendors: ["Google"],
+      },
+      providerExtras: { data_collection: "deny" },
+      serviceTier: "priority",
+      sort: "latency",
+      vendor: "Google",
+    },
+  });
 
-  expect(serviceTierForRequest(request)).toBe("priority");
-  expect(usesProviderSpecificRequestOptions(request)).toBe(false);
-  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
+  expect(
+    options.onPayload?.({ model: "model", stream: true }, model),
+  ).toEqual({
     model: "model",
+    provider: {
+      allow_fallbacks: true,
+      data_collection: "deny",
+      only: ["Google"],
+      sort: "latency",
+    },
     reasoning: { effort: "medium", exclude: true },
     service_tier: "priority",
     stream: true,
   });
-  expect(options).not.toHaveProperty("serviceTier");
 });
 
-test("turns OpenRouter OpenAI-style reasoning off explicitly", () => {
-  const model = modelFixture(
-    "openrouter",
-    32_000,
-    "openai-completions",
-    "openai/gpt-5.4-mini",
-  );
+test("turns OpenRouter reasoning off explicitly with minimal effort for Gemini", () => {
+  const model = modelFixture();
   const options = configuredLlmRequestOptions({
     apiKey: "token",
     effortLevel: "off",
     model,
-    serviceTier: "default",
+    openRouter: {
+      capabilities: {
+        supportsReasoning: true,
+        supportsServiceTier: false,
+        vendors: [],
+      },
+    },
   });
 
-  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
-    model: "model",
-    reasoning: { effort: "none", exclude: true },
-    stream: true,
-  });
-});
-
-test("uses Gemini minimal as the lowest OpenRouter reasoning level", () => {
-  const model = modelFixture(
-    "openrouter",
-    32_000,
-    "openai-completions",
-    "google/gemini-3.5-flash",
-  );
-  const options = configuredLlmRequestOptions({
-    apiKey: "token",
-    effortLevel: "off",
-    model,
-    serviceTier: "priority",
-  });
-
-  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
+  expect(
+    options.onPayload?.({ model: "model", stream: true }, model),
+  ).toEqual({
     model: "model",
     reasoning: { effort: "minimal", exclude: true },
-    service_tier: "priority",
     stream: true,
   });
 });
 
-test("maps Gemini xhigh to OpenRouter's highest supported Gemini thinking level", () => {
-  const model = {
-    ...modelFixture(
-      "openrouter",
-      32_000,
-      "openai-completions",
-      "google/gemini-3.1-pro-preview",
-    ),
-    thinkingLevelMap: { xhigh: "high" },
-  } satisfies Model<Api>;
+test("sets allow_fallbacks false explicitly when vendor is pinned without fallbacks", () => {
+  const model = modelFixture();
   const options = configuredLlmRequestOptions({
     apiKey: "token",
-    effortLevel: "xhigh",
+    effortLevel: "low",
     model,
-    serviceTier: "default",
+    openRouter: {
+      allowFallbacks: false,
+      capabilities: {
+        supportsReasoning: false,
+        supportsServiceTier: false,
+        vendors: ["Google"],
+      },
+      vendor: "Google",
+    },
   });
 
-  expect(options.onPayload?.({ model: "model", stream: true }, model)).toEqual({
+  expect(
+    options.onPayload?.({ model: "model", stream: true }, model),
+  ).toEqual({
     model: "model",
-    reasoning: { effort: "high", exclude: true },
+    provider: {
+      allow_fallbacks: false,
+      only: ["Google"],
+    },
     stream: true,
   });
 });
 
-test("leaves non-reasoning OpenRouter model payloads unchanged without priority", () => {
-  const model = modelFixture(
-    "openrouter",
-    32_000,
-    "openai-completions",
-    "meta-llama/llama-4.1",
-  );
-  const options = configuredLlmRequestOptions({
-    apiKey: "token",
-    effortLevel: "off",
-    model,
-    serviceTier: "default",
-  });
-
-  expect(options.onPayload).toBeUndefined();
+test("throws when openRouter options are set without capabilities", () => {
+  const model = modelFixture({ id: "meta-llama/llama-4.1", reasoning: false });
+  expect(() =>
+    configuredLlmRequestOptions({
+      apiKey: "token",
+      effortLevel: "off",
+      model,
+      openRouter: {
+        serviceTier: "priority",
+        vendor: "Meta",
+      },
+    }),
+  ).toThrow("requires capabilities.supportsServiceTier");
 });
 
-test("rejects priority service tier for unsupported OpenRouter model families", () => {
-  const model = modelFixture(
-    "openrouter",
-    32_000,
-    "openai-completions",
-    "meta-llama/llama-4.1",
-  );
-
+test("throws when service tier is set without supportsServiceTier", () => {
+  const model = modelFixture();
   expect(() =>
     configuredLlmRequestOptions({
       apiKey: "token",
       effortLevel: "medium",
       model,
-      serviceTier: "priority",
+      openRouter: {
+        capabilities: {
+          supportsReasoning: false,
+          supportsServiceTier: false,
+          vendors: [],
+        },
+        serviceTier: "priority",
+      },
     }),
-  ).toThrow("OpenRouter anthropic/, google/, openai/ model IDs");
-});
-
-test("fails loudly for priority service tier on unsupported providers", () => {
-  const model = modelFixture("openai-codex", 32_000, "openai-codex-responses");
-
-  expect(() =>
-    configuredLlmRequestOptions({
-      apiKey: "token",
-      effortLevel: "medium",
-      model,
-      serviceTier: "priority",
-    }),
-  ).toThrow("Priority service tier is only supported");
+  ).toThrow("requires capabilities.supportsServiceTier");
 });

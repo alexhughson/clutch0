@@ -99,12 +99,13 @@ test("arms exit instead of closing first-run config", () => {
   expect(
     getCtrlCShortcutDecision({
       activeTask: {
-        agent: { model: "gpt-test", provider: "openai" },
+        agent: { model: "gpt-test", provider: "openrouter" },
         configuredProviders: [],
+        endpoints: [],
         kind: "config",
         mode: "first-run",
-        primary: { model: "gpt-test", provider: "openai" },
-        summarization: { model: "gpt-test", provider: "openai" },
+        primary: { model: "gpt-test", provider: "openrouter" },
+        summarization: { model: "gpt-test", provider: "openrouter" },
       },
       lastBaseCtrlCAt: null,
       now: 1000,

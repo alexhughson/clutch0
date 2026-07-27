@@ -1,28 +1,28 @@
 import {
   type Api,
   type AssistantMessage,
-  type Model,
   type TextContent,
   type ToolCall,
 } from "@earendil-works/pi-ai";
 import {
   DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
-  DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
   hasUsableApiKey,
-  isSupportedClutchProvider,
+  isClutchProviderId,
   loadClutchAuth,
+  loadClutchSettings,
+  OPENROUTER_BASE_URL,
+  OPENROUTER_PROVIDER_ID,
   resolveConfiguredLlmRequest,
   type ResolvedConfiguredLlmRequest,
-  type SupportedClutchLlmProvider,
 } from "../../src/lib/config/clutchConfig";
-import { modelsFromProviderResponse } from "../../src/lib/config/providerModels";
+import { openRouterModelTraits } from "../../src/lib/config/openRouterCapabilities";
 import { patchProposalFromToolCall } from "../../src/lib/llm/patchTool";
 import { renderPrompt } from "../../src/lib/llm/prompts";
 import {
   configuredLlmRequestOptions,
 } from "../../src/lib/llm/requestOptions";
 import { completeDirectLlmResponse } from "../../src/lib/llm/directLlmClient";
-import type { LlmContext } from "../../src/lib/llm/types";
+import type { LlmContext, LlmModel } from "../../src/lib/llm/types";
 import {
   getPatchProposalPaths,
   parseCodexPatch,
@@ -42,7 +42,7 @@ import {
 export type EvalModelSpec = {
   label: string;
   modelId: string;
-  provider: SupportedClutchLlmProvider;
+  provider: string;
 };
 
 export type EvalModelRequest = ResolvedConfiguredLlmRequest & {
@@ -91,8 +91,23 @@ export function parseEvalModelSpec(value: string): EvalModelSpec {
 
   const provider = value.slice(0, separator);
   const modelId = value.slice(separator + 1);
-  if (!isSupportedClutchProvider(provider)) {
-    throw new Error(`Unsupported eval model provider: ${provider}`);
+  if (provider === OPENROUTER_PROVIDER_ID) {
+    // built-in provider
+  } else {
+    try {
+      const settings = loadClutchSettings();
+      if (!isClutchProviderId(provider, settings)) {
+        throw new Error(`Unsupported eval model provider: ${provider}`);
+      }
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("is no longer supported")
+      ) {
+        throw new Error(`Unsupported eval model provider: ${provider}`);
+      }
+      throw error;
+    }
   }
   if (modelId.trim().length === 0) {
     throw new Error(`Eval model spec is missing a model id: ${value}`);
@@ -127,7 +142,6 @@ export async function resolveEvalModelRequest(
     effortLevel: DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
     label: spec.label,
     model: modelFromProviderAndId(spec),
-    serviceTier: DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
   };
 }
 
@@ -542,16 +556,36 @@ function getAssistantText(message: AssistantMessage): string {
     .join("\n");
 }
 
-function modelFromProviderAndId(spec: EvalModelSpec): Model<Api> {
-  const models = modelsFromProviderResponse({
-    provider: spec.provider,
-    responseJson: { data: [{ id: spec.modelId }] },
-  });
-  const model = models[0];
-  if (model === undefined) {
-    throw new Error(`Could not create model metadata for ${spec.label}`);
+function modelFromProviderAndId(spec: EvalModelSpec): LlmModel {
+  const settings = loadClutchSettings();
+  const endpoint =
+    spec.provider === OPENROUTER_PROVIDER_ID
+      ? { baseUrl: OPENROUTER_BASE_URL }
+      : settings.endpoints?.find((candidate) => candidate.id === spec.provider);
+  if (endpoint === undefined) {
+    throw new Error(`Could not resolve endpoint for ${spec.label}`);
   }
-  return model;
+
+  const traits =
+    spec.provider === OPENROUTER_PROVIDER_ID
+      ? openRouterModelTraits(spec.modelId)
+      : { reasoning: false as const };
+
+  return {
+    api: "openai-completions",
+    baseUrl: endpoint.baseUrl,
+    contextWindow: 128_000,
+    cost: { cacheRead: 0, cacheWrite: 0, input: 0, output: 0 },
+    id: spec.modelId,
+    input: ["text"],
+    maxTokens: 16_384,
+    name: spec.modelId,
+    provider: spec.provider,
+    reasoning: traits.reasoning,
+    ...(traits.thinkingLevelMap === undefined
+      ? {}
+      : { thinkingLevelMap: traits.thinkingLevelMap }),
+  };
 }
 
 function evalCaseRunPasses({

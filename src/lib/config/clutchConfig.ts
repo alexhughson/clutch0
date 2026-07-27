@@ -7,28 +7,26 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import type { Api, Model } from "@earendil-works/pi-ai";
+import type { LlmModel } from "../llm/types";
 import {
-  getOAuthApiKey,
-  type OAuthCredentials,
-} from "@earendil-works/pi-ai/oauth";
-import { normalizeClutchModelMetadata } from "./modelMetadata";
+  OPENROUTER_BASE_URL,
+  openRouterModelTraits,
+} from "./openRouterCapabilities";
 
 export const CLUTCH_CONFIG_DIR_ENV = "CLUTCH_CONFIG_DIR";
 
-export const SUPPORTED_CLUTCH_LLM_PROVIDERS = [
-  { id: "cerebras", label: "Cerebras" },
-  { id: "google", label: "Google Gemini" },
-  { id: "openai", label: "OpenAI" },
-  { id: "openai-codex", label: "OpenAI subscription" },
-  { id: "openrouter", label: "OpenRouter" },
-  { id: "opencode", label: "OpenCode Zen" },
-  { id: "opencode-go", label: "OpenCode Go" },
-  { id: "sambanova", label: "SambaNova" },
-] as const;
+export const OPENROUTER_PROVIDER_ID = "openrouter";
+export { OPENROUTER_BASE_URL };
 
-export type SupportedClutchLlmProvider =
-  (typeof SUPPORTED_CLUTCH_LLM_PROVIDERS)[number]["id"];
+const LEGACY_PROVIDER_IDS = new Set([
+  "cerebras",
+  "google",
+  "openai",
+  "openai-codex",
+  "opencode",
+  "opencode-go",
+  "sambanova",
+]);
 
 export type ClutchModelRole = "agent" | "primary" | "summarization";
 
@@ -46,7 +44,11 @@ export type ClutchModelEffortLevel =
 
 export const DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL: ClutchModelEffortLevel = "low";
 
-export const CLUTCH_MODEL_SERVICE_TIERS = ["default", "priority"] as const;
+export const CLUTCH_MODEL_SERVICE_TIERS = [
+  "default",
+  "flex",
+  "priority",
+] as const;
 
 export type ClutchModelServiceTier =
   (typeof CLUTCH_MODEL_SERVICE_TIERS)[number];
@@ -54,16 +56,39 @@ export type ClutchModelServiceTier =
 export const DEFAULT_CLUTCH_MODEL_SERVICE_TIER: ClutchModelServiceTier =
   "default";
 
+export type ClutchEndpoint = {
+  baseUrl: string;
+  headers?: Record<string, string>;
+  id: string;
+  label: string;
+  requestDefaults?: Record<string, unknown>;
+};
+
+export type OpenRouterCapabilities = {
+  supportsReasoning: boolean;
+  supportsServiceTier: boolean;
+  vendors: string[];
+};
+
+export type OpenRouterOptions = {
+  allowFallbacks?: boolean;
+  capabilities?: OpenRouterCapabilities;
+  providerExtras?: Record<string, unknown>;
+  serviceTier?: ClutchModelServiceTier;
+  sort?: "latency" | "price" | "throughput";
+  vendor?: string;
+};
+
 export type ClutchModelSelection = {
   effortLevel?: ClutchModelEffortLevel;
-  metadata?: Model<Api>;
   model: string;
-  provider: SupportedClutchLlmProvider;
-  serviceTier?: ClutchModelServiceTier;
+  openRouter?: OpenRouterOptions;
+  provider: string;
 };
 
 export type ClutchSettings = {
   agentBackend?: ClutchAgentBackendConfig;
+  endpoints?: ClutchEndpoint[];
   models?: Partial<Record<ClutchModelRole, ClutchModelSelection>>;
 };
 
@@ -78,15 +103,7 @@ export type ClutchApiKeyCredential = {
   type: "api_key";
 };
 
-export type ClutchOAuthCredential = OAuthCredentials & {
-  type: "oauth";
-};
-
-export type ClutchCredential = ClutchApiKeyCredential | ClutchOAuthCredential;
-
-export type ClutchAuth = Partial<
-  Record<SupportedClutchLlmProvider, ClutchCredential>
->;
+export type ClutchAuth = Partial<Record<string, ClutchApiKeyCredential>>;
 
 export type ClutchConfigPaths = {
   authPath: string;
@@ -95,18 +112,20 @@ export type ClutchConfigPaths = {
 };
 
 export type ResolvedConfiguredLlmModel = {
-  credential: ClutchCredential;
+  credential: ClutchApiKeyCredential;
   effortLevel: ClutchModelEffortLevel;
-  model: Model<Api>;
-  serviceTier: ClutchModelServiceTier;
+  model: LlmModel;
+  openRouter?: OpenRouterOptions;
+  requestDefaults?: Record<string, unknown>;
 };
 
 export type ResolvedConfiguredLlmRequest = {
   apiKey: string;
   effortLevel: ClutchModelEffortLevel;
   headers?: Record<string, string>;
-  model: Model<Api>;
-  serviceTier: ClutchModelServiceTier;
+  model: LlmModel;
+  openRouter?: OpenRouterOptions;
+  requestDefaults?: Record<string, unknown>;
 };
 
 const DEFAULT_AGENT_BACKEND: ClutchAgentBackendConfig = {
@@ -114,7 +133,13 @@ const DEFAULT_AGENT_BACKEND: ClutchAgentBackendConfig = {
   command: "cursor-agent",
 };
 
-const DEFAULT_PROVIDER: SupportedClutchLlmProvider = "openai";
+const DEFAULT_PROVIDER = OPENROUTER_PROVIDER_ID;
+const DEFAULT_LLM_COST = {
+  cacheRead: 0,
+  cacheWrite: 0,
+  input: 0,
+  output: 0,
+} as const;
 
 export function getClutchConfigPaths(
   configDir = process.env[CLUTCH_CONFIG_DIR_ENV] ?? join(homedir(), ".clutch"),
@@ -126,18 +151,26 @@ export function getClutchConfigPaths(
   };
 }
 
-export function getSupportedClutchProviderLabel(
-  provider: SupportedClutchLlmProvider,
+export function getClutchProviderLabel(
+  provider: string,
+  settings: ClutchSettings = {},
 ): string {
-  return getSupportedProviderMetadata(provider).label;
+  if (provider === OPENROUTER_PROVIDER_ID) {
+    return "OpenRouter";
+  }
+
+  const endpoint = settings.endpoints?.find((candidate) => candidate.id === provider);
+  return endpoint?.label ?? provider;
 }
 
-export function isSupportedClutchProvider(
+export function isClutchProviderId(
   provider: string,
-): provider is SupportedClutchLlmProvider {
-  return SUPPORTED_CLUTCH_LLM_PROVIDERS.some(
-    (candidate) => candidate.id === provider,
-  );
+  settings: ClutchSettings = {},
+): boolean {
+  if (provider === OPENROUTER_PROVIDER_ID) {
+    return true;
+  }
+  return settings.endpoints?.some((endpoint) => endpoint.id === provider) ?? false;
 }
 
 export function loadClutchSettings(
@@ -165,25 +198,11 @@ export function isClutchConfigured(paths = getClutchConfigPaths()): boolean {
   const auth = loadClutchAuth(paths);
 
   return (
-    hasUsableModelSelection(settings.models?.primary) &&
-    hasUsableModelSelection(settings.models?.summarization) &&
-    hasUsableModelMetadata(settings.models.primary) &&
-    hasUsableModelMetadata(settings.models.summarization) &&
+    hasUsableModelSelection(settings, settings.models?.primary) &&
+    hasUsableModelSelection(settings, settings.models?.summarization) &&
     isConfiguredAgentModel(settings, auth) &&
-    hasUsableCredential(auth[settings.models.primary.provider]) &&
-    hasUsableCredential(auth[settings.models.summarization.provider])
-  );
-}
-
-function isConfiguredAgentModel(
-  settings: ClutchSettings,
-  auth: ClutchAuth,
-): boolean {
-  const agent = getModelSelectionForRole(settings, "agent");
-  return (
-    hasUsableModelSelection(agent) &&
-    hasUsableModelMetadata(agent) &&
-    hasUsableCredential(auth[agent.provider])
+    hasUsableApiKey(auth[settings.models!.primary!.provider]) &&
+    hasUsableApiKey(auth[settings.models!.summarization!.provider])
   );
 }
 
@@ -195,29 +214,47 @@ export function resolveConfiguredLlmModel(
   const auth = loadClutchAuth(paths);
   const selection = getModelSelectionForRole(settings, role);
 
-  if (!hasUsableModelSelection(selection)) {
+  if (!hasUsableModelSelection(settings, selection)) {
     throw new Error(
       `Clutch ${role} model is not configured. Run /config to set up models and API keys.`,
     );
   }
 
-  if (!hasUsableModelMetadata(selection)) {
-    throw new Error(
-      `Clutch ${role} model "${selection.model}" for provider "${selection.provider}" is missing dynamic model metadata. Run /config to re-select it.`,
-    );
-  }
-  const credential = auth[selection.provider];
-  if (!hasUsableCredential(credential)) {
-    throw new Error(
-      `Missing Clutch credentials for provider "${selection.provider}". Run /config to configure credentials.`,
-    );
-  }
+  const credential = resolveApiKeyCredential(auth, selection.provider);
+  const endpoint = resolveEndpointConfig(selection.provider, settings);
+  const traits =
+    selection.provider === OPENROUTER_PROVIDER_ID
+      ? openRouterModelTraits(selection.model)
+      : { reasoning: false as const };
 
   return {
     credential,
     effortLevel: getClutchModelEffortLevel(selection),
-    model: normalizeClutchModelMetadata(selection.metadata),
-    serviceTier: getClutchModelServiceTier(selection),
+    model: {
+      api: "openai-completions",
+      baseUrl: endpoint.baseUrl,
+      contextWindow: 128_000,
+      cost: { ...DEFAULT_LLM_COST },
+      headers: endpoint.headers,
+      id: selection.model,
+      input: ["text"],
+      maxTokens: 16_384,
+      name: selection.model,
+      provider: selection.provider,
+      reasoning:
+        selection.provider === OPENROUTER_PROVIDER_ID
+          ? selection.openRouter?.capabilities?.supportsReasoning === true
+          : traits.reasoning,
+      ...(traits.thinkingLevelMap === undefined
+        ? {}
+        : { thinkingLevelMap: traits.thinkingLevelMap }),
+    },
+    ...(selection.openRouter === undefined
+      ? {}
+      : { openRouter: selection.openRouter }),
+    ...(endpoint.requestDefaults === undefined
+      ? {}
+      : { requestDefaults: endpoint.requestDefaults }),
   };
 }
 
@@ -229,58 +266,21 @@ export function resolveConfiguredAgentBackend(
   );
 }
 
-export async function resolveConfiguredLlmRequest(
+export function resolveConfiguredLlmRequest(
   role: ClutchModelRole,
   paths = getClutchConfigPaths(),
-): Promise<ResolvedConfiguredLlmRequest> {
-  const { credential, effortLevel, model, serviceTier } =
+): ResolvedConfiguredLlmRequest {
+  const { credential, effortLevel, model, openRouter, requestDefaults } =
     resolveConfiguredLlmModel(role, paths);
 
-  if (credential.type === "api_key") {
-    return {
-      apiKey: credential.key,
-      effortLevel,
-      model,
-      serviceTier,
-    };
-  }
-
-  const provider = model.provider;
-  assertOAuthProvider(provider);
-  const result = await getOAuthApiKey(provider, {
-    [provider]: credential,
-  });
-  if (result === null) {
-    throw new Error(
-      `Missing Clutch OAuth credentials for provider "${provider}". Run /config to log in.`,
-    );
-  }
-
-  if (oauthCredentialChanged(credential, result.newCredentials)) {
-    saveClutchOAuthCredential({
-      credential: result.newCredentials,
-      paths,
-      provider,
-    });
-  }
-
   return {
-    apiKey: result.apiKey,
+    apiKey: credential.key,
     effortLevel,
+    headers: model.headers,
     model,
-    serviceTier,
+    ...(openRouter === undefined ? {} : { openRouter }),
+    ...(requestDefaults === undefined ? {} : { requestDefaults }),
   };
-}
-
-function getModelSelectionForRole(
-  settings: ClutchSettings,
-  role: ClutchModelRole,
-): ClutchModelSelection | undefined {
-  if (role === "agent") {
-    return settings.models?.agent ?? settings.models?.primary;
-  }
-
-  return settings.models?.[role];
 }
 
 export function saveClutchConfiguration({
@@ -314,8 +314,9 @@ export function saveClutchApiKey({
 }: {
   apiKey: string;
   paths?: ClutchConfigPaths;
-  provider: SupportedClutchLlmProvider;
+  provider: string;
 }) {
+  assertClutchProviderId(provider, loadClutchSettings(paths));
   const normalizedApiKey = apiKey.trim();
   if (normalizedApiKey.length === 0) {
     throw new Error(`Missing Clutch API key for provider "${provider}".`);
@@ -332,28 +333,6 @@ export function saveClutchApiKey({
   });
 }
 
-export function saveClutchOAuthCredential({
-  credential,
-  paths = getClutchConfigPaths(),
-  provider,
-}: {
-  credential: OAuthCredentials;
-  paths?: ClutchConfigPaths;
-  provider: SupportedClutchLlmProvider;
-}) {
-  assertOAuthProvider(provider);
-
-  const existingAuth = loadClutchAuth(paths);
-  mkdirSync(paths.configDir, { recursive: true });
-  writeClutchAuth(paths, {
-    ...existingAuth,
-    [provider]: {
-      ...credential,
-      type: "oauth",
-    },
-  });
-}
-
 export function saveClutchModelConfiguration({
   agent,
   paths = getClutchConfigPaths(),
@@ -365,21 +344,29 @@ export function saveClutchModelConfiguration({
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 }) {
+  const settings = loadClutchSettings(paths);
   const agentSelection = normalizeModelSelectionForSave(agent ?? primary);
   const primarySelection = normalizeModelSelectionForSave(primary);
   const summarizationSelection = normalizeModelSelectionForSave(summarization);
-  assertUsableModelSelection(agentSelection, "agent");
-  assertUsableModelSelection(primarySelection, "primary");
-  assertUsableModelSelection(summarizationSelection, "summarization");
+  assertUsableModelSelection(settings, agentSelection, "agent");
+  assertUsableModelSelection(settings, primarySelection, "primary");
+  assertUsableModelSelection(settings, summarizationSelection, "summarization");
 
   const auth = loadClutchAuth(paths);
-  assertConfiguredProviderCredential(auth, agentSelection.provider);
-  assertConfiguredProviderCredential(auth, primarySelection.provider);
-  assertConfiguredProviderCredential(auth, summarizationSelection.provider);
+  assertConfiguredProviderCredential(settings, auth, agentSelection.provider);
+  assertConfiguredProviderCredential(settings, auth, primarySelection.provider);
+  assertConfiguredProviderCredential(
+    settings,
+    auth,
+    summarizationSelection.provider,
+  );
 
   mkdirSync(paths.configDir, { recursive: true });
   const existingSettings = loadClutchSettings(paths);
   writeJsonFile(paths.settingsPath, {
+    ...(existingSettings.endpoints === undefined
+      ? {}
+      : { endpoints: existingSettings.endpoints }),
     ...(existingSettings.agentBackend === undefined
       ? {}
       : { agentBackend: existingSettings.agentBackend }),
@@ -410,9 +397,10 @@ export function saveClutchAgentBackendConfiguration({
 export function createDefaultClutchConfigDraft(
   paths = getClutchConfigPaths(),
 ): {
-  agentBackend?: ClutchAgentBackendConfig;
   agent: ClutchModelSelection;
-  configuredProviders: SupportedClutchLlmProvider[];
+  agentBackend?: ClutchAgentBackendConfig;
+  configuredProviders: string[];
+  endpoints: ClutchEndpoint[];
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 } {
@@ -430,9 +418,8 @@ export function createDefaultClutchConfigDraft(
       model: settings.models?.agent ?? settings.models?.primary,
       provider: agentProvider,
     }),
-    configuredProviders: SUPPORTED_CLUTCH_LLM_PROVIDERS.map(
-      (candidate) => candidate.id,
-    ).filter((candidate) => hasUsableCredential(auth[candidate])),
+    configuredProviders: listConfiguredProviders(settings, auth),
+    endpoints: settings.endpoints ?? [],
     primary: getExistingOrEmptyModelSelection({
       model: settings.models?.primary,
       provider: primaryProvider,
@@ -444,12 +431,68 @@ export function createDefaultClutchConfigDraft(
   };
 }
 
+export function getClutchModelEffortLevel(
+  selection: ClutchModelSelection,
+): ClutchModelEffortLevel {
+  return selection.effortLevel ?? DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL;
+}
+
+export function getClutchOpenRouterServiceTier(
+  selection: ClutchModelSelection,
+): ClutchModelServiceTier {
+  return selection.openRouter?.serviceTier ?? DEFAULT_CLUTCH_MODEL_SERVICE_TIER;
+}
+
+export function hasUsableApiKey(
+  credential: ClutchApiKeyCredential | undefined,
+): credential is ClutchApiKeyCredential {
+  return credential?.type === "api_key" && credential.key.trim().length > 0;
+}
+
+export function listConfiguredProviders(
+  settings: ClutchSettings,
+  auth: ClutchAuth,
+): string[] {
+  const providers: string[] = [];
+  if (hasUsableApiKey(auth[OPENROUTER_PROVIDER_ID])) {
+    providers.push(OPENROUTER_PROVIDER_ID);
+  }
+  for (const endpoint of settings.endpoints ?? []) {
+    if (hasUsableApiKey(auth[endpoint.id])) {
+      providers.push(endpoint.id);
+    }
+  }
+  return providers;
+}
+
+function isConfiguredAgentModel(
+  settings: ClutchSettings,
+  auth: ClutchAuth,
+): boolean {
+  const agent = getModelSelectionForRole(settings, "agent");
+  return (
+    hasUsableModelSelection(settings, agent) &&
+    hasUsableApiKey(auth[agent!.provider])
+  );
+}
+
+function getModelSelectionForRole(
+  settings: ClutchSettings,
+  role: ClutchModelRole,
+): ClutchModelSelection | undefined {
+  if (role === "agent") {
+    return settings.models?.agent ?? settings.models?.primary;
+  }
+
+  return settings.models?.[role];
+}
+
 function getExistingOrEmptyModelSelection({
   model,
   provider,
 }: {
   model?: ClutchModelSelection;
-  provider: SupportedClutchLlmProvider;
+  provider: string;
 }): ClutchModelSelection {
   if (model?.provider === provider) {
     return normalizeModelSelectionForSave(model);
@@ -459,7 +502,7 @@ function getExistingOrEmptyModelSelection({
     effortLevel: DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
     model: "",
     provider,
-    serviceTier: DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
+    openRouter: { serviceTier: DEFAULT_CLUTCH_MODEL_SERVICE_TIER },
   };
 }
 
@@ -472,12 +515,92 @@ function parseClutchSettings(raw: Record<string, unknown>): ClutchSettings {
     throw new Error("Clutch settings field models must be an object.");
   }
 
+  const endpoints = parseEndpoints(raw.endpoints);
+
   return {
     agentBackend: parseAgentBackendConfig(raw.agentBackend),
+    ...(endpoints === undefined ? {} : { endpoints }),
     ...(models === undefined
       ? {}
-      : { models: parseModelSelections(models as Record<string, unknown>) }),
+      : {
+          models: parseModelSelections(
+            models as Record<string, unknown>,
+            endpoints ?? [],
+          ),
+        }),
   };
+}
+
+function parseEndpoints(raw: unknown): ClutchEndpoint[] | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error("Clutch settings field endpoints must be an array.");
+  }
+
+  const endpoints: ClutchEndpoint[] = [];
+  const seenIds = new Set<string>();
+  for (const [index, item] of raw.entries()) {
+    if (item === null || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error(`Clutch endpoints[${index}] must be an object.`);
+    }
+    const record = item as Record<string, unknown>;
+    const id = record.id;
+    const label = record.label;
+    const baseUrl = record.baseUrl;
+    if (typeof id !== "string" || id.trim().length === 0) {
+      throw new Error(`Clutch endpoints[${index}].id must be a non-empty string.`);
+    }
+    if (id === OPENROUTER_PROVIDER_ID) {
+      throw new Error(
+        `Clutch endpoint id "${OPENROUTER_PROVIDER_ID}" is reserved.`,
+      );
+    }
+    if (seenIds.has(id)) {
+      throw new Error(`Duplicate Clutch endpoint id "${id}".`);
+    }
+    seenIds.add(id);
+    if (typeof label !== "string" || label.trim().length === 0) {
+      throw new Error(
+        `Clutch endpoints[${index}].label must be a non-empty string.`,
+      );
+    }
+    if (typeof baseUrl !== "string" || baseUrl.trim().length === 0) {
+      throw new Error(
+        `Clutch endpoints[${index}].baseUrl must be a non-empty string.`,
+      );
+    }
+    const headers = record.headers;
+    if (headers !== undefined && !isStringRecord(headers)) {
+      throw new Error(
+        `Clutch endpoints[${index}].headers must be an object of strings.`,
+      );
+    }
+    const requestDefaults = record.requestDefaults;
+    if (
+      requestDefaults !== undefined &&
+      (requestDefaults === null ||
+        typeof requestDefaults !== "object" ||
+        Array.isArray(requestDefaults))
+    ) {
+      throw new Error(
+        `Clutch endpoints[${index}].requestDefaults must be an object.`,
+      );
+    }
+
+    endpoints.push({
+      baseUrl,
+      id,
+      label,
+      ...(headers === undefined ? {} : { headers }),
+      ...(requestDefaults === undefined
+        ? {}
+        : { requestDefaults: requestDefaults as Record<string, unknown> }),
+    });
+  }
+
+  return endpoints;
 }
 
 function parseAgentBackendConfig(
@@ -520,13 +643,15 @@ function normalizeAgentBackendConfig(
 
 function parseModelSelections(
   rawModels: Record<string, unknown>,
+  endpoints: readonly ClutchEndpoint[],
 ): Partial<Record<ClutchModelRole, ClutchModelSelection>> {
   return {
-    agent: parseModelSelection(rawModels.agent, "agent"),
-    primary: parseModelSelection(rawModels.primary, "primary"),
+    agent: parseModelSelection(rawModels.agent, "agent", endpoints),
+    primary: parseModelSelection(rawModels.primary, "primary", endpoints),
     summarization: parseModelSelection(
       rawModels.summarization,
       "summarization",
+      endpoints,
     ),
   };
 }
@@ -534,6 +659,7 @@ function parseModelSelections(
 function parseModelSelection(
   raw: unknown,
   role: ClutchModelRole,
+  endpoints: readonly ClutchEndpoint[],
 ): ClutchModelSelection | undefined {
   if (raw === undefined) {
     return undefined;
@@ -542,15 +668,11 @@ function parseModelSelection(
     throw new Error(`Clutch ${role} model config must be an object.`);
   }
 
-  const provider = (raw as Record<string, unknown>).provider;
-  const model = (raw as Record<string, unknown>).model;
-  const metadata = (raw as Record<string, unknown>).metadata;
+  const record = raw as Record<string, unknown>;
+  const provider = record.provider;
+  const model = record.model;
   const effortLevel = parseModelEffortLevel({
-    raw: (raw as Record<string, unknown>).effortLevel,
-    role,
-  });
-  const serviceTier = parseModelServiceTier({
-    raw: (raw as Record<string, unknown>).serviceTier,
+    raw: record.effortLevel,
     role,
   });
   if (typeof provider !== "string" || typeof model !== "string") {
@@ -558,29 +680,210 @@ function parseModelSelection(
       `Clutch ${role} model config must include provider and model strings.`,
     );
   }
-  if (!isSupportedClutchProvider(provider)) {
-    throw new Error(`Unsupported Clutch LLM provider: ${provider}`);
-  }
 
-  if (metadata === undefined) {
-    return { effortLevel, model, provider, serviceTier };
-  }
+  assertKnownProviderId(provider, endpoints);
+  const legacyServiceTier = parseLegacyServiceTier({
+    provider,
+    raw: record.serviceTier,
+    role,
+  });
+  const openRouter = parseOpenRouterOptions({
+    legacyServiceTier,
+    provider,
+    raw: record.openRouter,
+    role,
+  });
 
   return {
     effortLevel,
-    metadata: parseModelMetadata({ metadata, modelId: model, provider, role }),
     model,
     provider,
-    serviceTier,
+    ...(openRouter === undefined ? {} : { openRouter }),
   };
+}
+
+function parseOpenRouterOptions({
+  legacyServiceTier,
+  provider,
+  raw,
+  role,
+}: {
+  legacyServiceTier?: ClutchModelServiceTier;
+  provider: string;
+  raw: unknown;
+  role: ClutchModelRole;
+}): OpenRouterOptions | undefined {
+  let openRouter: OpenRouterOptions | undefined;
+  if (raw !== undefined) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+      throw new Error(`Clutch ${role} model openRouter must be an object.`);
+    }
+    openRouter = parseOpenRouterOptionsObject(raw as Record<string, unknown>, role);
+  }
+
+  if (provider !== OPENROUTER_PROVIDER_ID) {
+    return openRouter;
+  }
+
+  if (legacyServiceTier === undefined) {
+    return openRouter;
+  }
+
+  const serviceTier = openRouter?.serviceTier ?? legacyServiceTier;
+  const capabilities =
+    openRouter?.capabilities === undefined
+      ? {
+          vendors: [] as string[],
+          supportsReasoning: false,
+          supportsServiceTier: true,
+        }
+      : {
+          ...openRouter.capabilities,
+          ...(serviceTier !== DEFAULT_CLUTCH_MODEL_SERVICE_TIER &&
+          !openRouter.capabilities.supportsServiceTier
+            ? { supportsServiceTier: true }
+            : {}),
+        };
+
+  return {
+    ...(openRouter ?? {}),
+    serviceTier,
+    capabilities,
+  };
+}
+
+function parseOpenRouterOptionsObject(
+  raw: Record<string, unknown>,
+  role: ClutchModelRole,
+): OpenRouterOptions {
+  const vendor = raw.vendor;
+  if (vendor !== undefined && typeof vendor !== "string") {
+    throw new Error(`Clutch ${role} model openRouter.vendor must be a string.`);
+  }
+
+  const allowFallbacks = raw.allowFallbacks;
+  if (allowFallbacks !== undefined && typeof allowFallbacks !== "boolean") {
+    throw new Error(
+      `Clutch ${role} model openRouter.allowFallbacks must be a boolean.`,
+    );
+  }
+
+  const sort = raw.sort;
+  if (
+    sort !== undefined &&
+    sort !== "price" &&
+    sort !== "throughput" &&
+    sort !== "latency"
+  ) {
+    throw new Error(
+      `Clutch ${role} model openRouter.sort must be price, throughput, or latency.`,
+    );
+  }
+
+  const serviceTier = parseModelServiceTier({
+    raw: raw.serviceTier,
+    role,
+  });
+  const providerExtras = raw.providerExtras;
+  if (
+    providerExtras !== undefined &&
+    (providerExtras === null ||
+      typeof providerExtras !== "object" ||
+      Array.isArray(providerExtras))
+  ) {
+    throw new Error(
+      `Clutch ${role} model openRouter.providerExtras must be an object.`,
+    );
+  }
+
+  const capabilities = parseOpenRouterCapabilities(raw.capabilities, role);
+
+  return {
+    ...(vendor === undefined ? {} : { vendor }),
+    ...(allowFallbacks === undefined ? {} : { allowFallbacks }),
+    ...(sort === undefined ? {} : { sort }),
+    ...(serviceTier === DEFAULT_CLUTCH_MODEL_SERVICE_TIER &&
+    raw.serviceTier === undefined
+      ? {}
+      : { serviceTier }),
+    ...(providerExtras === undefined
+      ? {}
+      : { providerExtras: providerExtras as Record<string, unknown> }),
+    ...(capabilities === undefined ? {} : { capabilities }),
+  };
+}
+
+function parseOpenRouterCapabilities(
+  raw: unknown,
+  role: ClutchModelRole,
+): OpenRouterCapabilities | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      `Clutch ${role} model openRouter.capabilities must be an object.`,
+    );
+  }
+
+  const record = raw as Record<string, unknown>;
+  const vendors = record.vendors;
+  if (!Array.isArray(vendors) || !vendors.every((item) => typeof item === "string")) {
+    throw new Error(
+      `Clutch ${role} model openRouter.capabilities.vendors must be a string array.`,
+    );
+  }
+
+  const supportsReasoning = record.supportsReasoning;
+  if (typeof supportsReasoning !== "boolean") {
+    throw new Error(
+      `Clutch ${role} model openRouter.capabilities.supportsReasoning must be a boolean.`,
+    );
+  }
+
+  const supportsServiceTier = record.supportsServiceTier;
+  if (typeof supportsServiceTier !== "boolean") {
+    throw new Error(
+      `Clutch ${role} model openRouter.capabilities.supportsServiceTier must be a boolean.`,
+    );
+  }
+
+  return {
+    supportsReasoning,
+    supportsServiceTier,
+    vendors,
+  };
+}
+
+function parseLegacyServiceTier({
+  provider,
+  raw,
+  role,
+}: {
+  provider: string;
+  raw: unknown;
+  role: ClutchModelRole;
+}): ClutchModelServiceTier | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (provider !== OPENROUTER_PROVIDER_ID) {
+    throw new Error(
+      `Clutch ${role} model serviceTier is only supported on OpenRouter selections. Re-run /config.`,
+    );
+  }
+  return parseModelServiceTier({ raw, role });
 }
 
 function parseClutchAuth(raw: Record<string, unknown>): ClutchAuth {
   const auth: ClutchAuth = {};
   for (const [provider, credential] of Object.entries(raw)) {
-    if (!isSupportedClutchProvider(provider)) {
-      continue;
+    if (LEGACY_PROVIDER_IDS.has(provider)) {
+      throw new Error(
+        `Legacy provider "${provider}" is no longer supported. Re-run /config.`,
+      );
     }
+
     if (
       credential === null ||
       typeof credential !== "object" ||
@@ -592,23 +895,24 @@ function parseClutchAuth(raw: Record<string, unknown>): ClutchAuth {
     }
 
     const type = (credential as Record<string, unknown>).type;
-    if (type === "api_key") {
-      const key = (credential as Record<string, unknown>).key;
-      if (typeof key !== "string") {
-        throw new Error(
-          `Clutch auth credential for ${provider} with type "api_key" must include key string.`,
-        );
-      }
-      auth[provider] = { key, type };
-      continue;
-    }
     if (type === "oauth") {
-      auth[provider] = parseOAuthCredential(provider, credential);
-      continue;
+      throw new Error(
+        "Legacy OAuth credentials are no longer supported. Re-run /config.",
+      );
     }
-    throw new Error(
-      `Clutch auth credential for ${provider} must include type "api_key" or "oauth".`,
-    );
+    if (type !== "api_key") {
+      throw new Error(
+        `Clutch auth credential for ${provider} must include type "api_key".`,
+      );
+    }
+
+    const key = (credential as Record<string, unknown>).key;
+    if (typeof key !== "string") {
+      throw new Error(
+        `Clutch auth credential for ${provider} with type "api_key" must include key string.`,
+      );
+    }
+    auth[provider] = { key, type: "api_key" };
   }
 
   return auth;
@@ -638,130 +942,53 @@ function writeClutchAuth(paths: ClutchConfigPaths, auth: ClutchAuth) {
   chmodSync(paths.authPath, 0o600);
 }
 
-function parseModelMetadata({
-  metadata,
-  modelId,
-  provider,
-  role,
-}: {
-  metadata: unknown;
-  modelId: string;
-  provider: SupportedClutchLlmProvider;
-  role: ClutchModelRole;
-}): Model<Api> {
-  if (
-    metadata === null ||
-    typeof metadata !== "object" ||
-    Array.isArray(metadata)
-  ) {
-    throw new Error(`Clutch ${role} model metadata must be an object.`);
-  }
-
-  const candidate = metadata as Record<string, unknown>;
-  if (candidate.id !== modelId) {
-    throw new Error(`Clutch ${role} model metadata id must match model.`);
-  }
-  if (candidate.provider !== provider) {
-    throw new Error(
-      `Clutch ${role} model metadata provider must match provider.`,
-    );
-  }
-  if (typeof candidate.name !== "string" || candidate.name.length === 0) {
-    throw new Error(`Clutch ${role} model metadata name must be a string.`);
-  }
-  if (typeof candidate.api !== "string" || candidate.api.length === 0) {
-    throw new Error(`Clutch ${role} model metadata api must be a string.`);
-  }
-  if (typeof candidate.baseUrl !== "string" || candidate.baseUrl.length === 0) {
-    throw new Error(`Clutch ${role} model metadata baseUrl must be a string.`);
-  }
-  if (typeof candidate.reasoning !== "boolean") {
-    throw new Error(
-      `Clutch ${role} model metadata reasoning must be a boolean.`,
-    );
-  }
-  if (!isStringArray(candidate.input)) {
-    throw new Error(
-      `Clutch ${role} model metadata input must be a string array.`,
-    );
-  }
-  if (!isPositiveNumber(candidate.contextWindow)) {
-    throw new Error(
-      `Clutch ${role} model metadata contextWindow must be a positive number.`,
-    );
-  }
-  if (!isPositiveNumber(candidate.maxTokens)) {
-    throw new Error(
-      `Clutch ${role} model metadata maxTokens must be a positive number.`,
-    );
-  }
-  if (!isCostObject(candidate.cost)) {
-    throw new Error(
-      `Clutch ${role} model metadata cost must include numeric token costs.`,
-    );
-  }
-
-  return candidate as unknown as Model<Api>;
-}
-
 function assertUsableModelSelection(
+  settings: ClutchSettings,
   selection: ClutchModelSelection,
   role: ClutchModelRole,
 ) {
-  if (!hasUsableModelSelection(selection)) {
+  if (!hasUsableModelSelection(settings, selection)) {
     throw new Error(`Clutch ${role} model is not configured.`);
-  }
-  if (!hasUsableModelMetadata(selection)) {
-    throw new Error(
-      `Clutch ${role} model "${selection.model}" for provider "${selection.provider}" is missing dynamic model metadata.`,
-    );
   }
 }
 
 function assertConfiguredProviderCredential(
+  settings: ClutchSettings,
   auth: ClutchAuth,
-  provider: SupportedClutchLlmProvider,
+  provider: string,
 ) {
-  if (!hasUsableCredential(auth[provider])) {
+  assertClutchProviderId(provider, settings);
+  if (!hasUsableApiKey(auth[provider])) {
     throw new Error(`Missing Clutch credentials for provider "${provider}".`);
   }
 }
 
 function hasUsableModelSelection(
+  settings: ClutchSettings,
   selection: ClutchModelSelection | undefined,
 ): selection is ClutchModelSelection {
   return (
     selection !== undefined &&
-    isSupportedClutchProvider(selection.provider) &&
+    isClutchProviderId(selection.provider, settings) &&
     selection.model.length > 0
   );
-}
-
-function hasUsableModelMetadata(
-  selection: ClutchModelSelection,
-): selection is ClutchModelSelection & { metadata: Model<Api> } {
-  return selection.metadata !== undefined;
-}
-
-export function getClutchModelEffortLevel(
-  selection: ClutchModelSelection,
-): ClutchModelEffortLevel {
-  return selection.effortLevel ?? DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL;
-}
-
-export function getClutchModelServiceTier(
-  selection: ClutchModelSelection,
-): ClutchModelServiceTier {
-  return selection.serviceTier ?? DEFAULT_CLUTCH_MODEL_SERVICE_TIER;
 }
 
 function normalizeModelSelectionForSave(
   selection: ClutchModelSelection,
 ): ClutchModelSelection {
+  const { openRouter, ...rest } = selection;
   return {
-    ...selection,
+    ...rest,
     effortLevel: getClutchModelEffortLevel(selection),
-    serviceTier: getClutchModelServiceTier(selection),
+    ...(selection.provider === OPENROUTER_PROVIDER_ID
+      ? {
+          openRouter: {
+            ...(openRouter ?? {}),
+            serviceTier: getClutchOpenRouterServiceTier(selection),
+          },
+        }
+      : {}),
   };
 }
 
@@ -828,100 +1055,61 @@ function isStringRecord(value: unknown): value is Record<string, string> {
   );
 }
 
-function isPositiveNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0;
-}
-
-function isCostObject(value: unknown): boolean {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    return false;
-  }
-
-  const cost = value as Record<string, unknown>;
-  return (
-    typeof cost.input === "number" &&
-    typeof cost.output === "number" &&
-    typeof cost.cacheRead === "number" &&
-    typeof cost.cacheWrite === "number"
-  );
-}
-
-export function hasUsableApiKey(
-  credential: ClutchApiKeyCredential | undefined,
-): credential is ClutchApiKeyCredential {
-  return credential?.type === "api_key" && credential.key.trim().length > 0;
-}
-
-export function hasUsableCredential(
-  credential: ClutchCredential | undefined,
-): credential is ClutchCredential {
-  if (credential === undefined) {
-    return false;
-  }
-  if (credential.type === "api_key") {
-    return hasUsableApiKey(credential);
-  }
-  return (
-    credential.access.trim().length > 0 &&
-    credential.refresh.trim().length > 0 &&
-    Number.isFinite(credential.expires)
-  );
-}
-
-function parseOAuthCredential(
+function assertKnownProviderId(
   provider: string,
-  credential: object,
-): ClutchOAuthCredential {
-  assertOAuthProvider(provider);
-
-  const raw = credential as Record<string, unknown>;
-  if (
-    typeof raw.access !== "string" ||
-    typeof raw.refresh !== "string" ||
-    typeof raw.expires !== "number" ||
-    !Number.isFinite(raw.expires)
-  ) {
+  endpoints: readonly ClutchEndpoint[],
+) {
+  if (LEGACY_PROVIDER_IDS.has(provider)) {
     throw new Error(
-      `Clutch auth credential for ${provider} with type "oauth" must include access, refresh, and expires.`,
+      `Legacy provider "${provider}" is no longer supported. Re-run /config.`,
     );
   }
-
-  return {
-    ...(raw as OAuthCredentials),
-    access: raw.access,
-    expires: raw.expires,
-    refresh: raw.refresh,
-    type: "oauth",
-  };
+  if (!isClutchProviderId(provider, { endpoints: [...endpoints] })) {
+    throw new Error(`Unknown Clutch provider "${provider}". Re-run /config.`);
+  }
 }
 
-function assertOAuthProvider(
-  provider: string,
-): asserts provider is "openai-codex" {
-  if (provider !== "openai-codex") {
+function assertClutchProviderId(provider: string, settings: ClutchSettings) {
+  if (LEGACY_PROVIDER_IDS.has(provider)) {
     throw new Error(
-      `Provider "${provider}" does not support Clutch OAuth login.`,
+      `Legacy provider "${provider}" is no longer supported. Re-run /config.`,
     );
   }
-}
-
-function oauthCredentialChanged(
-  current: ClutchOAuthCredential,
-  next: OAuthCredentials,
-): boolean {
-  return (
-    current.access !== next.access ||
-    current.refresh !== next.refresh ||
-    current.expires !== next.expires
-  );
-}
-
-function getSupportedProviderMetadata(provider: SupportedClutchLlmProvider) {
-  const metadata = SUPPORTED_CLUTCH_LLM_PROVIDERS.find(
-    (candidate) => candidate.id === provider,
-  );
-  if (metadata === undefined) {
-    throw new Error(`Unsupported Clutch LLM provider: ${provider}`);
+  if (!isClutchProviderId(provider, settings)) {
+    throw new Error(`Unknown Clutch provider "${provider}". Re-run /config.`);
   }
-  return metadata;
+}
+
+function resolveEndpointConfig(
+  provider: string,
+  settings: ClutchSettings,
+): {
+  baseUrl: string;
+  headers?: Record<string, string>;
+  requestDefaults?: Record<string, unknown>;
+} {
+  assertClutchProviderId(provider, settings);
+  if (provider === OPENROUTER_PROVIDER_ID) {
+    return { baseUrl: OPENROUTER_BASE_URL };
+  }
+
+  const endpoint = settings.endpoints?.find((candidate) => candidate.id === provider);
+  if (endpoint === undefined) {
+    throw new Error(`Unknown Clutch endpoint "${provider}". Re-run /config.`);
+  }
+
+  return endpoint;
+}
+
+function resolveApiKeyCredential(
+  auth: ClutchAuth,
+  provider: string,
+): ClutchApiKeyCredential {
+  const credential = auth[provider];
+  if (!hasUsableApiKey(credential)) {
+    throw new Error(
+      `Missing Clutch credentials for provider "${provider}". Run /config to configure credentials.`,
+    );
+  }
+  return credential;
 }

@@ -1,4 +1,3 @@
-import type { Api, Model } from "@earendil-works/pi-ai";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +8,7 @@ import {
   isClutchConfigured,
   loadClutchAuth,
   loadClutchSettings,
+  OPENROUTER_PROVIDER_ID,
   resolveConfiguredAgentBackend,
   resolveConfiguredLlmModel,
   resolveConfiguredLlmRequest,
@@ -16,66 +16,21 @@ import {
   saveClutchApiKey,
   saveClutchConfiguration,
   saveClutchModelConfiguration,
-  saveClutchOAuthCredential,
 } from "./clutchConfig";
 
 async function createTempConfigPaths() {
   return getClutchConfigPaths(await mkdtemp(join(tmpdir(), "clutch-config-")));
 }
 
-function modelFixture({
-  id,
-  provider = "openai",
-}: {
-  id: string;
-  provider?: string;
-}): Model<Api> {
-  const profile =
-    provider === "openai-codex"
-      ? {
-          api: "openai-codex-responses" as const,
-          baseUrl: "https://chatgpt.com/backend-api",
-        }
-      : provider === "google"
-        ? {
-            api: "google-generative-ai" as const,
-            baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-          }
-        : provider === "openai"
-          ? {
-              api: "openai-responses" as const,
-              baseUrl: "https://api.openai.com/v1",
-            }
-          : {
-              api: "openai-completions" as const,
-              baseUrl: "https://openrouter.ai/api/v1",
-            };
-
-  return {
-    api: profile.api,
-    baseUrl: profile.baseUrl,
-    contextWindow: 128_000,
-    cost: { cacheRead: 0, cacheWrite: 0, input: 1, output: 2 },
-    id,
-    input: ["text"],
-    maxTokens: 16_384,
-    name: id,
-    provider,
-    reasoning: false,
-  };
-}
-
 test("saves model settings separately from API credentials", async () => {
   const paths = await createTempConfigPaths();
   const primary = {
-    metadata: modelFixture({ id: "gpt-live-primary" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
+    model: "anthropic/claude-sonnet-4",
+    provider: OPENROUTER_PROVIDER_ID,
   };
   const summarization = {
-    metadata: modelFixture({ id: "gpt-live-summary" }),
-    model: "gpt-live-summary",
-    provider: "openai" as const,
+    model: "google/gemini-2.5-flash",
+    provider: OPENROUTER_PROVIDER_ID,
   };
 
   saveClutchConfiguration({
@@ -88,32 +43,328 @@ test("saves model settings separately from API credentials", async () => {
   const settingsText = await readFile(paths.settingsPath, "utf-8");
   const auth = loadClutchAuth(paths);
   expect(settingsText).toContain(primary.model);
-  expect(settingsText).toContain('"metadata"');
+  expect(settingsText).not.toContain('"metadata"');
   expect(settingsText).toContain('"effortLevel": "low"');
   expect(settingsText).toContain('"serviceTier": "default"');
   expect(settingsText).not.toContain("secret-token");
-  expect(auth.openai).toEqual({ key: "secret-token", type: "api_key" });
+  expect(auth.openrouter).toEqual({ key: "secret-token", type: "api_key" });
   expect(isClutchConfigured(paths)).toBe(true);
+});
+
+test("parses settings with endpoints and openRouter block", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      endpoints: [
+        {
+          baseUrl: "https://proxy.example/v1",
+          id: "work-proxy",
+          label: "Work Proxy",
+          headers: { "x-proxy": "1" },
+          requestDefaults: { temperature: 0.2 },
+        },
+      ],
+      models: {
+        primary: {
+          model: "anthropic/claude-sonnet-4",
+          openRouter: {
+            capabilities: {
+              supportsReasoning: true,
+              supportsServiceTier: true,
+              vendors: ["Anthropic"],
+            },
+            serviceTier: "priority",
+            sort: "latency",
+            vendor: "Anthropic",
+          },
+          provider: OPENROUTER_PROVIDER_ID,
+        },
+      },
+    }),
+    "utf-8",
+  );
+
+  const settings = loadClutchSettings(paths);
+  expect(settings.endpoints).toHaveLength(1);
+  expect(settings.models?.primary?.openRouter).toMatchObject({
+    serviceTier: "priority",
+    sort: "latency",
+    vendor: "Anthropic",
+  });
+});
+
+test("rejects legacy provider ids and oauth credentials loudly", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      models: {
+        primary: { model: "gpt-4", provider: "openai" },
+      },
+    }),
+    "utf-8",
+  );
+  expect(() => loadClutchSettings(paths)).toThrow(
+    'Legacy provider "openai" is no longer supported. Re-run /config.',
+  );
+
+  await writeFile(
+    paths.authPath,
+    JSON.stringify({
+      openai: { key: "token", type: "api_key" },
+    }),
+    "utf-8",
+  );
+  expect(() => loadClutchAuth(paths)).toThrow(
+    'Legacy provider "openai" is no longer supported. Re-run /config.',
+  );
+
+  await writeFile(
+    paths.authPath,
+    JSON.stringify({
+      openrouter: {
+        access: "a",
+        expires: 1,
+        refresh: "r",
+        type: "oauth",
+      },
+    }),
+    "utf-8",
+  );
+  expect(() => loadClutchAuth(paths)).toThrow(
+    "Legacy OAuth credentials are no longer supported. Re-run /config.",
+  );
+});
+
+test("migrates legacy top-level serviceTier to openRouter.serviceTier", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      models: {
+        primary: {
+          model: "anthropic/claude-sonnet-4",
+          provider: OPENROUTER_PROVIDER_ID,
+          serviceTier: "priority",
+        },
+      },
+    }),
+    "utf-8",
+  );
+
+  expect(loadClutchSettings(paths).models?.primary?.openRouter).toEqual({
+    capabilities: {
+      supportsReasoning: false,
+      supportsServiceTier: true,
+      vendors: [],
+    },
+    serviceTier: "priority",
+  });
+});
+
+test("legacy serviceTier migration seeds capabilities for request injection", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      models: {
+        primary: {
+          model: "anthropic/claude-sonnet-4",
+          provider: OPENROUTER_PROVIDER_ID,
+          serviceTier: "priority",
+        },
+        summarization: {
+          model: "google/gemini-2.5-flash",
+          provider: OPENROUTER_PROVIDER_ID,
+        },
+      },
+    }),
+    "utf-8",
+  );
+  await writeFile(
+    paths.authPath,
+    JSON.stringify({
+      openrouter: { key: "token", type: "api_key" },
+    }),
+    "utf-8",
+  );
+
+  const resolved = resolveConfiguredLlmRequest("primary", paths);
+  expect(resolved.openRouter?.serviceTier).toBe("priority");
+  expect(resolved.openRouter?.capabilities?.supportsServiceTier).toBe(true);
+
+  const { configuredLlmRequestOptions } = await import("../llm/requestOptions");
+  const options = configuredLlmRequestOptions(resolved);
+  expect(
+    options.onPayload?.({ model: "model", stream: true }, resolved.model),
+  ).toEqual({
+    model: "model",
+    service_tier: "priority",
+    stream: true,
+  });
+});
+
+test("openrouter reasoning requires capabilities snapshot", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchApiKey({
+    apiKey: "openrouter-token",
+    paths,
+    provider: OPENROUTER_PROVIDER_ID,
+  });
+  saveClutchModelConfiguration({
+    paths,
+    primary: {
+      model: "google/gemini-3.1-flash-lite",
+      provider: OPENROUTER_PROVIDER_ID,
+    },
+    summarization: {
+      model: "google/gemini-3.1-flash-lite",
+      provider: OPENROUTER_PROVIDER_ID,
+    },
+  });
+
+  const resolved = resolveConfiguredLlmRequest("primary", paths);
+  expect(resolved.model.reasoning).toBe(false);
+
+  const { configuredLlmRequestOptions } = await import("../llm/requestOptions");
+  const options = configuredLlmRequestOptions(resolved);
+  expect(options.onPayload).toBeUndefined();
+});
+
+test("strips openRouter from non-openrouter model saves", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      endpoints: [
+        {
+          baseUrl: "https://proxy.example/v1",
+          id: "work-proxy",
+          label: "Work Proxy",
+        },
+      ],
+    }),
+    "utf-8",
+  );
+  saveClutchApiKey({
+    apiKey: "proxy-token",
+    paths,
+    provider: "work-proxy",
+  });
+  saveClutchModelConfiguration({
+    paths,
+    primary: {
+      model: "vendor/model",
+      openRouter: { serviceTier: "priority", vendor: "Anthropic" },
+      provider: "work-proxy",
+    },
+    summarization: {
+      model: "vendor/model",
+      provider: "work-proxy",
+    },
+  });
+
+  const settings = loadClutchSettings(paths);
+  expect(settings.models?.primary?.openRouter).toBeUndefined();
+});
+
+test("resolve builds LlmModel without metadata", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchApiKey({
+    apiKey: "openrouter-token",
+    paths,
+    provider: OPENROUTER_PROVIDER_ID,
+  });
+  saveClutchModelConfiguration({
+    paths,
+    primary: {
+      model: "google/gemini-3.1-flash-lite",
+      provider: OPENROUTER_PROVIDER_ID,
+    },
+    summarization: {
+      model: "google/gemini-3.1-flash-lite",
+      provider: OPENROUTER_PROVIDER_ID,
+    },
+  });
+
+  const resolved = resolveConfiguredLlmModel("primary", paths);
+  expect(resolved.model).toMatchObject({
+    api: "openai-completions",
+    baseUrl: "https://openrouter.ai/api/v1",
+    id: "google/gemini-3.1-flash-lite",
+    provider: OPENROUTER_PROVIDER_ID,
+    reasoning: false,
+    thinkingLevelMap: { xhigh: "high" },
+  });
+  expect(resolveConfiguredLlmRequest("primary", paths)).toEqual({
+    apiKey: "openrouter-token",
+    effortLevel: "low",
+    model: resolved.model,
+    openRouter: { serviceTier: "default" },
+  });
+});
+
+test("resolves custom endpoint models with request defaults", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      endpoints: [
+        {
+          baseUrl: "https://proxy.example/v1",
+          id: "work-proxy",
+          label: "Work Proxy",
+          headers: { "x-proxy": "1" },
+          requestDefaults: { temperature: 0.2 },
+        },
+      ],
+    }),
+    "utf-8",
+  );
+  saveClutchApiKey({
+    apiKey: "proxy-token",
+    paths,
+    provider: "work-proxy",
+  });
+  saveClutchModelConfiguration({
+    paths,
+    primary: {
+      model: "vendor/model",
+      provider: "work-proxy",
+    },
+    summarization: {
+      model: "vendor/model",
+      provider: "work-proxy",
+    },
+  });
+
+  const resolved = resolveConfiguredLlmRequest("primary", paths);
+  expect(resolved.model).toMatchObject({
+    api: "openai-completions",
+    baseUrl: "https://proxy.example/v1",
+    headers: { "x-proxy": "1" },
+    provider: "work-proxy",
+    reasoning: false,
+  });
+  expect(resolved.requestDefaults).toEqual({ temperature: 0.2 });
 });
 
 test("resolves primary, agent, and summarization models independently", async () => {
   const paths = await createTempConfigPaths();
   const primary = {
-    metadata: modelFixture({ id: "gpt-live-primary" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
+    model: "anthropic/claude-sonnet-4",
+    provider: OPENROUTER_PROVIDER_ID,
   };
   const summarization = {
-    metadata: modelFixture({ id: "gpt-live-summary" }),
-    model: "gpt-live-summary",
-    provider: "openai" as const,
+    model: "google/gemini-2.5-flash",
+    provider: OPENROUTER_PROVIDER_ID,
   };
   const agent = {
     effortLevel: "high" as const,
-    metadata: modelFixture({ id: "gpt-live-agent" }),
-    model: "gpt-live-agent",
-    provider: "openai" as const,
-    serviceTier: "priority" as const,
+    model: "openai/gpt-4.1-mini",
+    openRouter: { serviceTier: "priority" as const },
+    provider: OPENROUTER_PROVIDER_ID,
   };
 
   saveClutchConfiguration({
@@ -127,55 +378,33 @@ test("resolves primary, agent, and summarization models independently", async ()
   expect(resolveConfiguredLlmModel("primary", paths).model.id).toBe(
     primary.model,
   );
-  expect(resolveConfiguredLlmModel("summarization", paths).model.id).toBe(
-    summarization.model,
-  );
   expect(resolveConfiguredLlmModel("agent", paths).model.id).toBe(agent.model);
-  expect(resolveConfiguredLlmModel("primary", paths).effortLevel).toBe("low");
   expect(resolveConfiguredLlmModel("agent", paths).effortLevel).toBe("high");
-  expect(resolveConfiguredLlmModel("primary", paths).serviceTier).toBe(
-    "default",
-  );
-  expect(resolveConfiguredLlmModel("agent", paths).serviceTier).toBe(
-    "priority",
-  );
-  expect(resolveConfiguredLlmModel("primary", paths).credential).toEqual({
-    key: "secret-token",
-    type: "api_key",
-  });
-  await expect(resolveConfiguredLlmRequest("primary", paths)).resolves.toEqual({
-    apiKey: "secret-token",
-    effortLevel: "low",
-    model: primary.metadata,
-    serviceTier: "default",
-  });
+  expect(
+    resolveConfiguredLlmModel("agent", paths).openRouter?.serviceTier,
+  ).toBe("priority");
 });
 
 test("agent model falls back to primary for legacy settings", async () => {
   const paths = await createTempConfigPaths();
-  const primary = {
-    metadata: modelFixture({ id: "gpt-live-primary" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
-  };
-  const summarization = {
-    metadata: modelFixture({ id: "gpt-live-summary" }),
-    model: "gpt-live-summary",
-    provider: "openai" as const,
-  };
-
   saveClutchConfiguration({
     apiKey: "secret-token",
     paths,
-    primary,
-    summarization,
+    primary: {
+      model: "anthropic/claude-sonnet-4",
+      provider: OPENROUTER_PROVIDER_ID,
+    },
+    summarization: {
+      model: "google/gemini-2.5-flash",
+      provider: OPENROUTER_PROVIDER_ID,
+    },
   });
   const settings = JSON.parse(await readFile(paths.settingsPath, "utf-8"));
   delete settings.models.agent;
   await writeFile(paths.settingsPath, JSON.stringify(settings), "utf-8");
 
   expect(resolveConfiguredLlmModel("agent", paths).model.id).toBe(
-    primary.model,
+    "anthropic/claude-sonnet-4",
   );
   expect(isClutchConfigured(paths)).toBe(true);
 });
@@ -193,334 +422,6 @@ test("uses cursor agent as the default ACP backend", async () => {
   });
 });
 
-test("parses explicit ACP agent backend settings", async () => {
-  const paths = await createTempConfigPaths();
-  await writeFile(
-    paths.settingsPath,
-    JSON.stringify({
-      agentBackend: {
-        args: ["--stdio", "--profile", "work"],
-        command: "custom-acp-agent",
-        env: { CURSOR_AGENT_LOG: "1" },
-      },
-    }),
-    "utf-8",
-  );
-
-  expect(resolveConfiguredAgentBackend(paths)).toEqual({
-    args: ["--stdio", "--profile", "work"],
-    command: "custom-acp-agent",
-    env: { CURSOR_AGENT_LOG: "1" },
-  });
-});
-
-test("saves ACP agent backend settings while preserving models", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" });
-  const primary = {
-    metadata: modelFixture({ id: "gpt-live-primary" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
-  };
-  saveClutchModelConfiguration({
-    paths,
-    primary,
-    summarization: primary,
-  });
-
-  saveClutchAgentBackendConfiguration({
-    backend: {
-      args: ["--acp"],
-      command: "custom-agent",
-      env: { ACP_PROFILE: "work" },
-    },
-    paths,
-  });
-
-  expect(resolveConfiguredAgentBackend(paths)).toEqual({
-    args: ["--acp"],
-    command: "custom-agent",
-    env: { ACP_PROFILE: "work" },
-  });
-  expect(resolveConfiguredLlmModel("primary", paths).model.id).toBe(
-    "gpt-live-primary",
-  );
-});
-
-test("saves command-only ACP agent backend without empty args or env", async () => {
-  const paths = await createTempConfigPaths();
-
-  saveClutchAgentBackendConfiguration({
-    backend: {
-      command: "acp-agent",
-    },
-    paths,
-  });
-
-  expect(loadClutchSettings(paths).agentBackend).toEqual({
-    command: "acp-agent",
-  });
-});
-
-test("config draft includes ACP agent backend", async () => {
-  const paths = await createTempConfigPaths();
-  await writeFile(
-    paths.settingsPath,
-    JSON.stringify({
-      agentBackend: {
-        args: ["--stdio"],
-        command: "acp-agent",
-      },
-    }),
-    "utf-8",
-  );
-
-  expect(createDefaultClutchConfigDraft(paths).agentBackend).toEqual({
-    args: ["--stdio"],
-    command: "acp-agent",
-  });
-});
-
-test("rejects malformed ACP agent backend settings", async () => {
-  const paths = await createTempConfigPaths();
-  await writeFile(
-    paths.settingsPath,
-    JSON.stringify({
-      agentBackend: {
-        command: "cursor-agent",
-        env: { CURSOR_AGENT_LOG: 1 },
-      },
-    }),
-    "utf-8",
-  );
-
-  expect(() => resolveConfiguredAgentBackend(paths)).toThrow(
-    "Clutch agentBackend.env must be an object of strings.",
-  );
-});
-
-test("preserves ACP agent backend when saving model settings", async () => {
-  const paths = await createTempConfigPaths();
-  await writeFile(
-    paths.settingsPath,
-    JSON.stringify({
-      agentBackend: {
-        args: ["--acp"],
-        command: "custom-agent",
-      },
-    }),
-    "utf-8",
-  );
-  saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" });
-  const primary = {
-    metadata: modelFixture({ id: "gpt-live-primary" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
-  };
-
-  saveClutchModelConfiguration({
-    paths,
-    primary,
-    summarization: primary,
-  });
-
-  expect(loadClutchSettings(paths).agentBackend).toEqual({
-    args: ["--acp"],
-    command: "custom-agent",
-  });
-});
-
-test("supports different providers for primary and summarization models", async () => {
-  const paths = await createTempConfigPaths();
-  await Promise.all([
-    saveClutchApiKey({ apiKey: "openai-token", paths, provider: "openai" }),
-    saveClutchApiKey({
-      apiKey: "openrouter-token",
-      paths,
-      provider: "openrouter",
-    }),
-  ]);
-  const primary = {
-    metadata: modelFixture({ id: "gpt-live-primary", provider: "openai" }),
-    model: "gpt-live-primary",
-    provider: "openai" as const,
-  };
-  const summarization = {
-    metadata: modelFixture({
-      id: "anthropic/live-summary",
-      provider: "openrouter",
-    }),
-    model: "anthropic/live-summary",
-    provider: "openrouter" as const,
-  };
-
-  saveClutchModelConfiguration({
-    paths,
-    primary,
-    summarization,
-  });
-
-  await expect(resolveConfiguredLlmRequest("primary", paths)).resolves.toEqual({
-    apiKey: "openai-token",
-    effortLevel: "low",
-    model: primary.metadata,
-    serviceTier: "default",
-  });
-  await expect(
-    resolveConfiguredLlmRequest("summarization", paths),
-  ).resolves.toEqual({
-    apiKey: "openrouter-token",
-    effortLevel: "low",
-    model: summarization.metadata,
-    serviceTier: "default",
-  });
-  expect(resolveConfiguredLlmModel("primary", paths).credential).toEqual({
-    key: "openai-token",
-    type: "api_key",
-  });
-  expect(resolveConfiguredLlmModel("summarization", paths).credential).toEqual({
-    key: "openrouter-token",
-    type: "api_key",
-  });
-  expect(isClutchConfigured(paths)).toBe(true);
-});
-
-test("supports Google Gemini API key credentials", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "google-token", paths, provider: "google" });
-  const primary = {
-    metadata: modelFixture({ id: "gemini-3.5-flash", provider: "google" }),
-    model: "gemini-3.5-flash",
-    provider: "google" as const,
-  };
-
-  saveClutchModelConfiguration({
-    paths,
-    primary,
-    summarization: primary,
-  });
-
-  await expect(resolveConfiguredLlmRequest("primary", paths)).resolves.toEqual({
-    apiKey: "google-token",
-    effortLevel: "low",
-    model: primary.metadata,
-    serviceTier: "default",
-  });
-  expect(loadClutchAuth(paths).google).toEqual({
-    key: "google-token",
-    type: "api_key",
-  });
-  expect(isClutchConfigured(paths)).toBe(true);
-});
-
-test("normalizes saved OpenCode DeepSeek V4 metadata on resolve", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({
-    apiKey: "opencode-token",
-    paths,
-    provider: "opencode-go",
-  });
-  const staleMetadata = {
-    ...modelFixture({ id: "deepseek-v4-flash", provider: "opencode-go" }),
-    baseUrl: "https://opencode.ai/zen/go/v1",
-    compat: {
-      requiresReasoningContentOnAssistantMessages: true,
-      thinkingFormat: "deepseek",
-    },
-    reasoning: true,
-    thinkingLevelMap: {
-      minimal: null,
-      low: null,
-      medium: null,
-      high: "high",
-      xhigh: "max",
-    },
-  } satisfies Model<Api>;
-  const selection = {
-    metadata: staleMetadata,
-    model: "deepseek-v4-flash",
-    provider: "opencode-go" as const,
-  };
-
-  saveClutchModelConfiguration({
-    paths,
-    primary: selection,
-    summarization: selection,
-  });
-
-  const resolved = resolveConfiguredLlmModel("primary", paths).model;
-  expect(resolved).toMatchObject({
-    api: "openai-completions",
-    baseUrl: "https://opencode.ai/zen/go/v1",
-    provider: "opencode-go",
-    reasoning: true,
-    thinkingLevelMap: {
-      minimal: null,
-      low: "low",
-      medium: "medium",
-      high: "high",
-      xhigh: "max",
-    },
-    compat: {
-      requiresReasoningContentOnAssistantMessages: true,
-    },
-  });
-  expect(resolved.compat).not.toHaveProperty("thinkingFormat");
-});
-
-test("supports OpenAI subscription OAuth credentials", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchOAuthCredential({
-    credential: {
-      access: "subscription-access-token",
-      expires: Date.now() + 60_000,
-      refresh: "subscription-refresh-token",
-    },
-    paths,
-    provider: "openai-codex",
-  });
-  const primary = {
-    metadata: modelFixture({
-      id: "gpt-5.3-codex-spark",
-      provider: "openai-codex",
-    }),
-    model: "gpt-5.3-codex-spark",
-    provider: "openai-codex" as const,
-  };
-
-  saveClutchModelConfiguration({
-    paths,
-    primary,
-    summarization: primary,
-  });
-
-  expect(loadClutchAuth(paths)["openai-codex"]).toMatchObject({
-    access: "subscription-access-token",
-    refresh: "subscription-refresh-token",
-    type: "oauth",
-  });
-  await expect(resolveConfiguredLlmRequest("primary", paths)).resolves.toEqual({
-    apiKey: "subscription-access-token",
-    effortLevel: "low",
-    model: primary.metadata,
-    serviceTier: "default",
-  });
-  expect(isClutchConfigured(paths)).toBe(true);
-});
-
-test("requires dynamic model metadata for configured models", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "secret-token", paths, provider: "openai" });
-
-  expect(() =>
-    saveClutchModelConfiguration({
-      paths,
-      primary: { model: "legacy-primary", provider: "openai" },
-      summarization: { model: "legacy-summary", provider: "openai" },
-    }),
-  ).toThrow("missing dynamic model metadata");
-});
-
 test("requires credentials for the configured provider", async () => {
   const paths = await createTempConfigPaths();
 
@@ -528,37 +429,15 @@ test("requires credentials for the configured provider", async () => {
     saveClutchConfiguration({
       paths,
       primary: {
-        metadata: modelFixture({ id: "gpt-live-primary" }),
-        model: "gpt-live-primary",
-        provider: "openai",
+        model: "anthropic/claude-sonnet-4",
+        provider: OPENROUTER_PROVIDER_ID,
       },
       summarization: {
-        metadata: modelFixture({ id: "gpt-live-summary" }),
-        model: "gpt-live-summary",
-        provider: "openai",
+        model: "google/gemini-2.5-flash",
+        provider: OPENROUTER_PROVIDER_ID,
       },
     }),
-  ).toThrow('Missing Clutch credentials for provider "openai".');
-});
-
-test("legacy metadata-less settings are not considered configured", async () => {
-  const paths = await createTempConfigPaths();
-  saveClutchApiKey({ apiKey: "secret-token", paths, provider: "openai" });
-  await writeFile(
-    paths.settingsPath,
-    JSON.stringify({
-      models: {
-        primary: { model: "legacy-primary", provider: "openai" },
-        summarization: { model: "legacy-summary", provider: "openai" },
-      },
-    }),
-    "utf-8",
-  );
-
-  expect(isClutchConfigured(paths)).toBe(false);
-  expect(() => resolveConfiguredLlmModel("primary", paths)).toThrow(
-    "missing dynamic model metadata",
-  );
+  ).toThrow('Missing Clutch credentials for provider "openrouter".');
 });
 
 test("malformed settings fail loudly", async () => {
@@ -577,9 +456,9 @@ test("malformed model service tier fails loudly", async () => {
     JSON.stringify({
       models: {
         primary: {
-          model: "gpt-live-primary",
-          provider: "openai",
-          serviceTier: "turbo",
+          model: "anthropic/claude-sonnet-4",
+          openRouter: { serviceTier: "turbo" },
+          provider: OPENROUTER_PROVIDER_ID,
         },
       },
     }),

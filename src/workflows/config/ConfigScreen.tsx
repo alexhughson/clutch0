@@ -4,30 +4,28 @@ import {
   type KeyEvent,
 } from "@opentui/core";
 import { useKeyboard, usePaste } from "@opentui/react";
-import type { Api, Model } from "@earendil-works/pi-ai";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ConfigTaskState } from "../../app/appTypes";
 import {
   CLUTCH_MODEL_EFFORT_LEVELS,
   CLUTCH_MODEL_SERVICE_TIERS,
-  getSupportedClutchProviderLabel,
   getClutchModelEffortLevel,
-  getClutchModelServiceTier,
+  getClutchOpenRouterServiceTier,
+  getClutchProviderLabel,
+  OPENROUTER_PROVIDER_ID,
   saveClutchAgentBackendConfiguration,
   saveClutchApiKey,
   saveClutchModelConfiguration,
-  SUPPORTED_CLUTCH_LLM_PROVIDERS,
   type ClutchAgentBackendConfig,
+  type ClutchEndpoint,
   type ClutchModelEffortLevel,
   type ClutchModelSelection,
   type ClutchModelServiceTier,
-  type SupportedClutchLlmProvider,
 } from "../../lib/config/clutchConfig";
 import {
-  loginClutchOpenAiSubscription,
-  type OpenAiSubscriptionDeviceCode,
-} from "../../lib/config/openAiSubscriptionAuth";
-import { fetchClutchProviderModels } from "../../lib/config/providerModels";
+  fetchClutchProviderModels,
+  type ClutchProviderModel,
+} from "../../lib/config/providerModels";
 import { useAppStore } from "../../store/appStore";
 
 type ConfigScreenProps = {
@@ -42,7 +40,6 @@ type ConfigStage =
   | "model-service-tier"
   | "model-settings"
   | "providers"
-  | "subscription-login"
   | "token";
 type ModelEntry = "agent" | "primary" | "summarization";
 type ModelSettingsRow =
@@ -57,25 +54,20 @@ type AgentBackendForm = {
 };
 type ModelLoadState =
   | {
-      models: Model<Api>[];
-      provider: SupportedClutchLlmProvider;
+      models: ClutchProviderModel[];
+      provider: string;
       status: "loaded";
     }
   | {
       errorMessage: string;
       models: [];
-      provider: SupportedClutchLlmProvider;
+      provider: string;
       status: "error";
     }
-  | { models: []; provider: SupportedClutchLlmProvider; status: "loading" }
+  | { models: []; provider: string; status: "loading" }
   | { models: []; provider: null; status: "idle" };
 
 type AppActions = ReturnType<typeof useAppStore.getState>["actions"];
-type SubscriptionLoginState =
-  | { status: "idle" }
-  | { status: "waiting-for-device"; info: OpenAiSubscriptionDeviceCode }
-  | { status: "working"; message: string }
-  | { status: "error"; message: string };
 
 const MODEL_SETTINGS_ROWS: ModelSettingsRow[] = [
   { entry: "primary", kind: "model" },
@@ -101,13 +93,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const actions = useAppStore((state) => state.actions);
   const [stage, setStage] = useState<ConfigStage>("providers");
   const [providerIndex, setProviderIndex] = useState(0);
-  const [tokenProvider, setTokenProvider] =
-    useState<SupportedClutchLlmProvider>(SUPPORTED_CLUTCH_LLM_PROVIDERS[0].id);
-  const [subscriptionLogin, setSubscriptionLogin] =
-    useState<SubscriptionLoginState>({
-      status: "idle",
-    });
-  const loginAbortController = useRef<AbortController | null>(null);
+  const [tokenProvider, setTokenProvider] = useState(OPENROUTER_PROVIDER_ID);
   const [token, setToken] = useState("");
   const [modelSettingsIndex, setModelSettingsIndex] = useState(0);
   const [activeModelEntry, setActiveModelEntry] =
@@ -128,15 +114,12 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const [configuredProviders, setConfiguredProviders] = useState(
     task.configuredProviders,
   );
+  const [endpoints] = useState(task.endpoints);
   const [modelLoad, setModelLoad] = useState<ModelLoadState>({
     models: [],
     provider: null,
     status: "idle",
   });
-
-  useEffect(() => {
-    return () => loginAbortController.current?.abort();
-  }, []);
 
   const activeSelection = getModelEntrySelection({
     agent,
@@ -210,12 +193,12 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       handleProvidersKey({
         actions,
         configuredProviders,
+        endpoints,
         event,
         providerIndex,
         agentBackendConfigured: agentBackendForm.command.trim().length > 0,
         setMessage,
         setProviderIndex,
-        setSubscriptionLogin,
         setStage,
         setToken,
         setTokenProvider,
@@ -237,22 +220,10 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       return;
     }
 
-    if (stage === "subscription-login") {
-      handleSubscriptionLoginKey({
-        configuredProviders,
-        event,
-        loginAbortController,
-        setConfiguredProviders,
-        setMessage,
-        setStage,
-        setSubscriptionLogin,
-      });
-      return;
-    }
-
     if (stage === "token") {
       handleTokenKey({
         configuredProviders,
+        endpoints,
         event,
         setConfiguredProviders,
         setMessage,
@@ -279,6 +250,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         setModelSettingsIndex,
         setStage,
         summarization,
+        endpoints,
       });
       return;
     }
@@ -299,6 +271,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         setStage,
         setSummarization,
         summarization,
+        endpoints,
       });
       return;
     }
@@ -385,16 +358,19 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
           <ProvidersStep
             agentBackendConfigured={agentBackendForm.command.trim().length > 0}
             configuredProviders={configuredProviders}
+            endpoints={endpoints}
             message={message}
             providerIndex={providerIndex}
             task={task}
           />
         ) : null}
         {stage === "token" ? (
-          <TokenStep message={message} token={token} provider={tokenProvider} />
-        ) : null}
-        {stage === "subscription-login" ? (
-          <SubscriptionLoginStep login={subscriptionLogin} />
+          <TokenStep
+            endpoints={endpoints}
+            message={message}
+            token={token}
+            provider={tokenProvider}
+          />
         ) : null}
         {stage === "agent-backend" ? (
           <AgentBackendStep
@@ -406,6 +382,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         {stage === "model-settings" ? (
           <ModelSettingsStep
             agent={agent}
+            endpoints={endpoints}
             message={message}
             primary={primary}
             rowIndex={modelSettingsIndex}
@@ -415,6 +392,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         {stage === "model-provider" ? (
           <ModelProviderStep
             activeModelEntry={activeModelEntry}
+            endpoints={endpoints}
             message={message}
             providerIndex={modelProviderIndex}
           />
@@ -423,6 +401,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
           <ModelChoiceStep
             activeModelEntry={activeModelEntry}
             agent={agent}
+            endpoints={endpoints}
             filter={modelFilter}
             message={message}
             modelIndex={modelIndex}
@@ -453,12 +432,14 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
 function ProvidersStep({
   agentBackendConfigured,
   configuredProviders,
+  endpoints,
   message,
   providerIndex,
   task,
 }: {
   agentBackendConfigured: boolean;
-  configuredProviders: readonly SupportedClutchLlmProvider[];
+  configuredProviders: readonly string[];
+  endpoints: readonly ClutchEndpoint[];
   message: string | null;
   providerIndex: number;
   task: ConfigTaskState;
@@ -473,6 +454,7 @@ function ProvidersStep({
       {providerRows({
         agentBackendConfigured,
         configuredProviders,
+        endpoints,
       }).map((row, index) => (
         <text
           key={row.key}
@@ -511,17 +493,19 @@ function AgentBackendStep({
 }
 
 function TokenStep({
+  endpoints,
   message,
   provider,
   token,
 }: {
+  endpoints: readonly ClutchEndpoint[];
   message: string | null;
-  provider: SupportedClutchLlmProvider;
+  provider: string;
   token: string;
 }) {
   return (
     <>
-      <text>{`Provider: ${getSupportedClutchProviderLabel(provider)}`}</text>
+      <text>{`Provider: ${getClutchProviderLabel(provider, { endpoints: [...endpoints] })}`}</text>
       <text>{`Token: ${token.length === 0 ? "" : "*".repeat(token.length)}`}</text>
       <text style={{ fg: "gray" }}>Paste or type the API token.</text>
       {message === null ? null : <text style={{ fg: "red" }}>{message}</text>}
@@ -529,39 +513,16 @@ function TokenStep({
   );
 }
 
-function SubscriptionLoginStep({ login }: { login: SubscriptionLoginState }) {
-  return (
-    <>
-      <text>{`Provider: ${getSupportedClutchProviderLabel("openai-codex")}`}</text>
-      <text>Use your ChatGPT Plus or Pro subscription.</text>
-      {login.status === "idle" ? (
-        <text style={{ fg: "gray" }}>
-          Press Enter to start device-code login.
-        </text>
-      ) : null}
-      {login.status === "working" ? <text>{login.message}</text> : null}
-      {login.status === "waiting-for-device" ? (
-        <>
-          <text>{`Open: ${login.info.verificationUri}`}</text>
-          <text>{`Code: ${login.info.userCode}`}</text>
-          <text style={{ fg: "gray" }}>Waiting for browser approval…</text>
-        </>
-      ) : null}
-      {login.status === "error" ? (
-        <text style={{ fg: "red" }}>{login.message}</text>
-      ) : null}
-    </>
-  );
-}
-
 function ModelSettingsStep({
   agent,
+  endpoints,
   message,
   primary,
   rowIndex,
   summarization,
 }: {
   agent: ClutchModelSelection;
+  endpoints: readonly ClutchEndpoint[];
   message: string | null;
   primary: ClutchModelSelection;
   rowIndex: number;
@@ -575,7 +536,7 @@ function ModelSettingsStep({
           key={modelSettingsRowKey(row)}
           style={index === rowIndex ? selectedStyle : undefined}
         >
-          {`${index === rowIndex ? ">" : " "} ${modelSettingsRowLabel({ agent, primary, row, summarization })}`}
+          {`${index === rowIndex ? ">" : " "} ${modelSettingsRowLabel({ agent, endpoints, primary, row, summarization })}`}
         </text>
       ))}
       {message === null ? null : (
@@ -641,17 +602,19 @@ function ModelServiceTierStep({
 
 function ModelProviderStep({
   activeModelEntry,
+  endpoints,
   message,
   providerIndex,
 }: {
   activeModelEntry: ModelEntry;
+  endpoints: readonly ClutchEndpoint[];
   message: string | null;
   providerIndex: number;
 }) {
   return (
     <>
       <text>{`Choose provider for ${entryLabel(activeModelEntry)}.`}</text>
-      {modelProvidersForEntry(activeModelEntry).map((provider, index) => (
+      {modelProvidersForEntry(endpoints).map((provider, index) => (
         <text
           key={provider.id}
           style={index === providerIndex ? selectedStyle : undefined}
@@ -669,6 +632,7 @@ function ModelProviderStep({
 function ModelChoiceStep({
   activeModelEntry,
   agent,
+  endpoints,
   filter,
   message,
   modelIndex,
@@ -678,6 +642,7 @@ function ModelChoiceStep({
 }: {
   activeModelEntry: ModelEntry;
   agent: ClutchModelSelection;
+  endpoints: readonly ClutchEndpoint[];
   filter: string;
   message: string | null;
   modelIndex: number;
@@ -699,6 +664,7 @@ function ModelChoiceStep({
       <text>{`Choose model for ${entryLabel(activeModelEntry)}.`}</text>
       <text style={{ fg: "gray" }}>
         {modelChoiceStatusLabel({
+          endpoints,
           filter,
           modelLoad,
           provider: selection.provider,
@@ -728,11 +694,11 @@ function handleProvidersKey({
   actions,
   agentBackendConfigured,
   configuredProviders,
+  endpoints,
   event,
   providerIndex,
   setMessage,
   setProviderIndex,
-  setSubscriptionLogin,
   setStage,
   setToken,
   setTokenProvider,
@@ -740,15 +706,15 @@ function handleProvidersKey({
 }: {
   actions: AppActions;
   agentBackendConfigured: boolean;
-  configuredProviders: readonly SupportedClutchLlmProvider[];
+  configuredProviders: readonly string[];
+  endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   providerIndex: number;
   setMessage: (message: string | null) => void;
   setProviderIndex: (index: number) => void;
-  setSubscriptionLogin: (login: SubscriptionLoginState) => void;
   setStage: (stage: ConfigStage) => void;
   setToken: (token: string) => void;
-  setTokenProvider: (provider: SupportedClutchLlmProvider) => void;
+  setTokenProvider: (provider: string) => void;
   task: ConfigTaskState;
 }) {
   if (event.name === "escape" && task.mode === "settings") {
@@ -760,6 +726,7 @@ function handleProvidersKey({
   const rows = providerRows({
     agentBackendConfigured,
     configuredProviders,
+    endpoints,
   });
   if (event.name === "up" || event.name === "down") {
     setProviderIndex(
@@ -788,14 +755,6 @@ function handleProvidersKey({
 
   if (row.kind === "agent-backend") {
     setStage("agent-backend");
-    setMessage(null);
-    prevent(event);
-    return;
-  }
-
-  if (row.kind === "subscription-provider") {
-    setSubscriptionLogin({ status: "idle" });
-    setStage("subscription-login");
     setMessage(null);
     prevent(event);
     return;
@@ -904,6 +863,7 @@ function handleAgentBackendKey({
 
 function handleTokenKey({
   configuredProviders,
+  endpoints,
   event,
   setConfiguredProviders,
   setMessage,
@@ -912,14 +872,15 @@ function handleTokenKey({
   token,
   tokenProvider,
 }: {
-  configuredProviders: readonly SupportedClutchLlmProvider[];
+  configuredProviders: readonly string[];
+  endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
-  setConfiguredProviders: (providers: SupportedClutchLlmProvider[]) => void;
+  setConfiguredProviders: (providers: string[]) => void;
   setMessage: (message: string | null) => void;
   setStage: (stage: ConfigStage) => void;
   setToken: (token: string) => void;
   token: string;
-  tokenProvider: SupportedClutchLlmProvider;
+  tokenProvider: string;
 }) {
   if (event.name === "escape") {
     setStage("providers");
@@ -937,7 +898,7 @@ function handleTokenKey({
       setToken("");
       setStage("providers");
       setMessage(
-        `Saved token for ${getSupportedClutchProviderLabel(tokenProvider)}.`,
+        `Saved token for ${getClutchProviderLabel(tokenProvider, { endpoints: [...endpoints] })}.`,
       );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -966,93 +927,10 @@ function handleTokenKey({
   }
 }
 
-function handleSubscriptionLoginKey({
-  configuredProviders,
-  event,
-  loginAbortController,
-  setConfiguredProviders,
-  setMessage,
-  setStage,
-  setSubscriptionLogin,
-}: {
-  configuredProviders: readonly SupportedClutchLlmProvider[];
-  event: KeyEvent;
-  loginAbortController: { current: AbortController | null };
-  setConfiguredProviders: (providers: SupportedClutchLlmProvider[]) => void;
-  setMessage: (message: string | null) => void;
-  setStage: (stage: ConfigStage) => void;
-  setSubscriptionLogin: (login: SubscriptionLoginState) => void;
-}) {
-  if (event.name === "escape") {
-    loginAbortController.current?.abort();
-    loginAbortController.current = null;
-    setSubscriptionLogin({ status: "idle" });
-    setStage("providers");
-    setMessage(null);
-    prevent(event);
-    return;
-  }
-
-  if (event.name !== "return") {
-    return;
-  }
-
-  if (loginAbortController.current !== null) {
-    setMessage("OpenAI subscription login is already running.");
-    prevent(event);
-    return;
-  }
-
-  const controller = new AbortController();
-  loginAbortController.current = controller;
-  setMessage(null);
-  setSubscriptionLogin({
-    message: "Starting OpenAI subscription login...",
-    status: "working",
-  });
-  void loginClutchOpenAiSubscription({
-    onDeviceCode: (info) =>
-      setSubscriptionLogin({ info, status: "waiting-for-device" }),
-    signal: controller.signal,
-  })
-    .then(() => {
-      if (
-        controller.signal.aborted ||
-        loginAbortController.current !== controller
-      ) {
-        return;
-      }
-      loginAbortController.current = null;
-      setConfiguredProviders(
-        Array.from(new Set([...configuredProviders, "openai-codex"])),
-      );
-      setSubscriptionLogin({ status: "idle" });
-      setStage("providers");
-      setMessage("Saved OpenAI subscription login.");
-    })
-    .catch((error) => {
-      if (controller.signal.aborted) {
-        if (loginAbortController.current === controller) {
-          loginAbortController.current = null;
-          setSubscriptionLogin({ status: "idle" });
-        }
-        return;
-      }
-      if (loginAbortController.current !== controller) {
-        return;
-      }
-      loginAbortController.current = null;
-      setSubscriptionLogin({
-        message: error instanceof Error ? error.message : String(error),
-        status: "error",
-      });
-    });
-  prevent(event);
-}
-
 function handleModelSettingsKey({
   actions,
   agent,
+  endpoints,
   event,
   modelSettingsIndex,
   primary,
@@ -1067,6 +945,7 @@ function handleModelSettingsKey({
 }: {
   actions: AppActions;
   agent: ClutchModelSelection;
+  endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelSettingsIndex: number;
   primary: ClutchModelSelection;
@@ -1131,11 +1010,13 @@ function handleModelSettingsKey({
     setStage("model-effort");
   } else if (row.kind === "service-tier") {
     setModelServiceTierIndex(
-      serviceTierIndexFor(getClutchModelServiceTier(selection)),
+      serviceTierIndexFor(getClutchOpenRouterServiceTier(selection)),
     );
     setStage("model-service-tier");
   } else {
-    setModelProviderIndex(providerIndexFor(selection.provider, row.entry));
+    setModelProviderIndex(
+      providerIndexFor(selection.provider, endpoints),
+    );
     setStage("model-provider");
   }
   setMessage(null);
@@ -1145,6 +1026,7 @@ function handleModelSettingsKey({
 function handleModelProviderKey({
   activeModelEntry,
   agent,
+  endpoints,
   event,
   modelProviderIndex,
   primary,
@@ -1160,6 +1042,7 @@ function handleModelProviderKey({
 }: {
   activeModelEntry: ModelEntry;
   agent: ClutchModelSelection;
+  endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelProviderIndex: number;
   primary: ClutchModelSelection;
@@ -1181,7 +1064,7 @@ function handleModelProviderKey({
   }
 
   if (event.name === "up" || event.name === "down") {
-    const providers = modelProvidersForEntry(activeModelEntry);
+    const providers = modelProvidersForEntry(endpoints);
     setModelProviderIndex(
       cycleIndex(
         modelProviderIndex,
@@ -1199,7 +1082,7 @@ function handleModelProviderKey({
   }
 
   const provider =
-    modelProvidersForEntry(activeModelEntry)[modelProviderIndex]?.id;
+    modelProvidersForEntry(endpoints)[modelProviderIndex]?.id;
   if (provider === undefined) {
     throw new Error(`Invalid model provider row index: ${modelProviderIndex}`);
   }
@@ -1217,7 +1100,13 @@ function handleModelProviderKey({
           effortLevel: getClutchModelEffortLevel(currentSelection),
           model: "",
           provider,
-          serviceTier: getClutchModelServiceTier(currentSelection),
+          ...(provider === OPENROUTER_PROVIDER_ID
+            ? {
+                openRouter: {
+                  serviceTier: getClutchOpenRouterServiceTier(currentSelection),
+                },
+              }
+            : {}),
         };
   setActiveSelection({
     activeModelEntry,
@@ -1375,7 +1264,13 @@ function handleModelServiceTierKey({
   });
   setActiveSelection({
     activeModelEntry,
-    selection: { ...selection, serviceTier },
+    selection: {
+      ...selection,
+      openRouter: {
+        ...(selection.openRouter ?? {}),
+        serviceTier,
+      },
+    },
     setAgent,
     setPrimary,
     setSummarization,
@@ -1465,7 +1360,7 @@ function handleModelChoiceKey({
 
     setActiveSelection({
       activeModelEntry,
-      selection: { ...selection, metadata: model, model: model.id },
+      selection: { ...selection, model: model.id },
       setAgent,
       setPrimary,
       setSummarization,
@@ -1507,11 +1402,13 @@ function handleModelChoiceKey({
 
 function modelSettingsRowLabel({
   agent,
+  endpoints,
   primary,
   row,
   summarization,
 }: {
   agent: ClutchModelSelection;
+  endpoints: readonly ClutchEndpoint[];
   primary: ClutchModelSelection;
   row: ModelSettingsRow;
   summarization: ClutchModelSelection;
@@ -1530,10 +1427,10 @@ function modelSettingsRowLabel({
     return `${entryLabel(row.entry)} effort: ${getClutchModelEffortLevel(selection)}`;
   }
   if (row.kind === "service-tier") {
-    return `${entryLabel(row.entry)} service tier: ${getClutchModelServiceTier(selection)}`;
+    return `${entryLabel(row.entry)} service tier: ${getClutchOpenRouterServiceTier(selection)}`;
   }
 
-  return `${entryLabel(row.entry)} model: ${getSupportedClutchProviderLabel(selection.provider)} / ${selection.model.length === 0 ? "(choose model)" : selection.model}`;
+  return `${entryLabel(row.entry)} model: ${getClutchProviderLabel(selection.provider, { endpoints: [...endpoints] })} / ${selection.model.length === 0 ? "(choose model)" : selection.model}`;
 }
 
 function modelSettingsRowKey(row: ModelSettingsRow): string {
@@ -1543,22 +1440,25 @@ function modelSettingsRowKey(row: ModelSettingsRow): string {
 function providerRows({
   agentBackendConfigured,
   configuredProviders,
+  endpoints,
 }: {
   agentBackendConfigured: boolean;
-  configuredProviders: readonly SupportedClutchLlmProvider[];
+  configuredProviders: readonly string[];
+  endpoints: readonly ClutchEndpoint[];
 }) {
   return [
-    ...SUPPORTED_CLUTCH_LLM_PROVIDERS.map((provider) => {
-      const configured = configuredProviders.includes(provider.id);
-      return {
-        key: provider.id,
-        kind: isSubscriptionProvider(provider.id)
-          ? ("subscription-provider" as const)
-          : ("provider" as const),
-        label: `${provider.label}${configured ? " ✓" : ""}`,
-        provider: provider.id,
-      };
-    }),
+    {
+      key: OPENROUTER_PROVIDER_ID,
+      kind: "provider" as const,
+      label: `OpenRouter${configuredProviders.includes(OPENROUTER_PROVIDER_ID) ? " ✓" : ""}`,
+      provider: OPENROUTER_PROVIDER_ID,
+    },
+    ...endpoints.map((endpoint) => ({
+      key: endpoint.id,
+      kind: "provider" as const,
+      label: `${endpoint.label}${configuredProviders.includes(endpoint.id) ? " ✓" : ""}`,
+      provider: endpoint.id,
+    })),
     {
       key: "models",
       kind: "models" as const,
@@ -1670,25 +1570,28 @@ function updateAgentBackendField(
   }
 }
 
-function isSubscriptionProvider(provider: SupportedClutchLlmProvider): boolean {
-  return provider === "openai-codex";
-}
-
-function modelProvidersForEntry(entry: ModelEntry) {
-  void entry;
-  return SUPPORTED_CLUTCH_LLM_PROVIDERS;
+function modelProvidersForEntry(endpoints: readonly ClutchEndpoint[]) {
+  return [
+    { id: OPENROUTER_PROVIDER_ID, label: "OpenRouter" },
+    ...endpoints.map((endpoint) => ({
+      id: endpoint.id,
+      label: endpoint.label,
+    })),
+  ];
 }
 
 function modelChoiceStatusLabel({
+  endpoints,
   filter,
   modelLoad,
   provider,
 }: {
+  endpoints: readonly ClutchEndpoint[];
   filter: string;
   modelLoad: ModelLoadState;
-  provider: SupportedClutchLlmProvider;
+  provider: string;
 }): string {
-  const base = `Provider: ${getSupportedClutchProviderLabel(provider)}`;
+  const base = `Provider: ${getClutchProviderLabel(provider, { endpoints: [...endpoints] })}`;
   const loadedCount =
     modelLoad.status === "loaded" ? ` · ${modelLoad.models.length} models` : "";
   return `${base}${loadedCount}${filter.length === 0 ? "" : ` · filter: ${filter}`}`;
@@ -1746,7 +1649,7 @@ function matchingModels({
   models,
 }: {
   filter: string;
-  models: readonly Model<Api>[];
+  models: readonly ClutchProviderModel[];
 }) {
   const normalizedFilter = filter.trim().toLowerCase();
   if (normalizedFilter.length === 0) {
@@ -1778,7 +1681,7 @@ function getVisibleModels<T>({
 
 function indexOfModel(
   selection: ClutchModelSelection,
-  models: readonly Model<Api>[],
+  models: readonly ClutchProviderModel[],
 ): number {
   return Math.max(
     0,
@@ -1787,16 +1690,14 @@ function indexOfModel(
 }
 
 function providerIndexFor(
-  provider: SupportedClutchLlmProvider,
-  entry: ModelEntry,
+  provider: string,
+  endpoints: readonly ClutchEndpoint[],
 ): number {
-  const index = modelProvidersForEntry(entry).findIndex(
+  const index = modelProvidersForEntry(endpoints).findIndex(
     (candidate) => candidate.id === provider,
   );
   if (index === -1) {
-    throw new Error(
-      `Provider ${provider} is not supported for ${entryLabel(entry)} models.`,
-    );
+    throw new Error(`Provider ${provider} is not configured.`);
   }
   return index;
 }
@@ -1841,8 +1742,6 @@ function stageTitle({
       return task.mode === "first-run" ? "Setup providers" : "Providers";
     case "token":
       return "Provider token";
-    case "subscription-login":
-      return "OpenAI subscription";
     case "model-settings":
       return "Model settings";
     case "model-effort":
@@ -1864,8 +1763,6 @@ function hotkeysForStage(stage: ConfigStage, task: ConfigTaskState): string {
       return `${task.mode === "settings" ? "Esc return · " : ""}↑/↓ select · Enter open`;
     case "token":
       return "Esc back · paste/type token · Ctrl+u clear · Enter save";
-    case "subscription-login":
-      return "Esc back · Enter start";
     case "model-settings":
       return "Esc providers · ↑/↓ select · Enter edit/done";
     case "model-effort":

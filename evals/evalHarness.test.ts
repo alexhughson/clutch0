@@ -236,11 +236,14 @@ test("normalizes assistant messages into classifier results", () => {
 });
 
 test("parses direct eval model specs", () => {
-  expect(parseEvalModelSpec("cerebras:gpt-oss-120b")).toEqual({
-    label: "cerebras:gpt-oss-120b",
-    modelId: "gpt-oss-120b",
-    provider: "cerebras",
+  expect(parseEvalModelSpec("openrouter:anthropic/claude-sonnet-4")).toEqual({
+    label: "openrouter:anthropic/claude-sonnet-4",
+    modelId: "anthropic/claude-sonnet-4",
+    provider: "openrouter",
   });
+  expect(() => parseEvalModelSpec("cerebras:gpt-oss-120b")).toThrow(
+    "Unsupported eval model provider",
+  );
   expect(() => parseEvalModelSpec("missing")).toThrow("provider:model");
 });
 
