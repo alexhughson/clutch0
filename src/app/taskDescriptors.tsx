@@ -82,7 +82,13 @@ const findFilesTaskDescriptor = {
   normalizeOnRestore: (task) =>
     task.status === "searching"
       ? {
-          ...task,
+          agentOutput: task.agentOutput,
+          goal: task.goal,
+          hints: task.hints,
+          kind: "find-files",
+          ...(task.rejectComposer === undefined
+            ? {}
+            : { rejectComposer: task.rejectComposer }),
           errorMessage: "Interrupted while searching for files.",
           status: "error",
         }
@@ -115,8 +121,7 @@ const responseTaskDescriptor = {
   normalizeOnRestore: normalizeResponseTask,
   presentationTitle: "Response",
   render: (task) => <LlmResponseScreen request={task.request} />,
-  restoreFromSnapshot: (task) =>
-    task as Extract<AppTask, { kind: "response" }>,
+  restoreFromSnapshot: (task) => task as Extract<AppTask, { kind: "response" }>,
   serializedSchema: ResponseTaskSchema,
   serializeToSnapshot: (task) => ({
     ...task,
@@ -238,7 +243,9 @@ export function getTaskPresentationTitle(task: AppTask): string {
 }
 
 export function isWorkspacePaneTask(task: AppTask | null): task is AppTask {
-  return task !== null && descriptorFor(task).isWorkspacePaneTask(task as never);
+  return (
+    task !== null && descriptorFor(task).isWorkspacePaneTask(task as never)
+  );
 }
 
 export function canUseContextListKeyboardWithPane(task: AppTask): boolean {

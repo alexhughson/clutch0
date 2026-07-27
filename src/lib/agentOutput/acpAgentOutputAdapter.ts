@@ -195,8 +195,10 @@ function formatSessionUpdate({
           ];
     case "config_option_update":
     case "user_message_chunk":
+      // These updates carry no agent-facing content; emitting nothing is the protocol-correct no-op.
       return [];
     default:
+      // Unknown update types intentionally no-op to stay forward-compatible with the ACP protocol.
       return [];
   }
 }

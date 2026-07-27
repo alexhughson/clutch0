@@ -140,7 +140,11 @@ export function streamDirectLlmResponse(
         throw new Error(await formatErrorResponse(response));
       }
 
-      const accumulator = createLegacyAssistantAccumulator({ model, output, stream });
+      const accumulator = createLegacyAssistantAccumulator({
+        model,
+        output,
+        stream,
+      });
       for await (const event of parseSseData(response, options.signal)) {
         if (event === "[DONE]") {
           continue;
@@ -167,8 +171,10 @@ export function streamDirectLlmResponse(
       });
       stream.end();
     } catch (error) {
-      output.stopReason = options.signal?.aborted === true ? "aborted" : "error";
-      output.errorMessage = error instanceof Error ? error.message : String(error);
+      output.stopReason =
+        options.signal?.aborted === true ? "aborted" : "error";
+      output.errorMessage =
+        error instanceof Error ? error.message : String(error);
       stream.push({ error: output, reason: output.stopReason, type: "error" });
       stream.end();
     }
@@ -216,7 +222,9 @@ export async function completeDirectLlmResponse(
 
   const output = createInitialAssistantMessage(model);
   const accumulator = createLegacyAssistantAccumulator({ model, output });
-  accumulator.pushProgram(request.translator.fromResponse(await response.json()));
+  accumulator.pushProgram(
+    request.translator.fromResponse(await response.json()),
+  );
   accumulator.finish();
   const text = output.content
     .filter((block): block is LlmTextContent => block.type === "text")
@@ -298,7 +306,7 @@ export async function buildDirectRequest({
       content: textFromMessageContent(message.content, "tool result"),
     });
   }
-  for (const tool of context.tools ?? []) {
+  for (const tool of context.tools) {
     program.push({
       op: "llm.tool",
       name: tool.name,
@@ -306,7 +314,7 @@ export async function buildDirectRequest({
       inputSchema: tool.parameters,
     });
   }
-  if ((context.tools?.length ?? 0) > 0) {
+  if (context.tools.length > 0) {
     program.push({ op: "llm.tool_choice", value: "auto" });
   }
 
@@ -439,11 +447,15 @@ function thinkingEffortForModel({
   if (effort === undefined) {
     return undefined;
   }
-  if (model.api !== "openai-responses" && model.api !== "google-generative-ai") {
+  if (
+    model.api !== "openai-responses" &&
+    model.api !== "google-generative-ai"
+  ) {
     return undefined;
   }
 
-  const mapped = model.thinkingLevelMap?.[effort as keyof typeof model.thinkingLevelMap];
+  const mapped =
+    model.thinkingLevelMap?.[effort as keyof typeof model.thinkingLevelMap];
   if (mapped === null) {
     throw new Error(
       `Model ${model.provider}/${model.id} cannot use effort level ${effort}.`,
@@ -504,8 +516,14 @@ export function createLegacyAssistantAccumulator({
   pushProgram: (program: Program) => void;
 } {
   let currentTextBlock: LlmTextContent | null = null;
-  const toolCallsByIndex = new Map<number, LlmToolCall & { partialJson: string }>();
-  const toolCallsById = new Map<string, LlmToolCall & { partialJson: string }>();
+  const toolCallsByIndex = new Map<
+    number,
+    LlmToolCall & { partialJson: string }
+  >();
+  const toolCallsById = new Map<
+    string,
+    LlmToolCall & { partialJson: string }
+  >();
 
   const contentIndex = (block: LlmTextContent | LlmToolCall): number =>
     output.content.indexOf(block);
@@ -574,7 +592,10 @@ export function createLegacyAssistantAccumulator({
     finish: () => {
       finishTextBlock();
       for (const toolCall of toolCallsByIndex.values()) {
-        toolCall.arguments = parseToolArguments(toolCall.partialJson, toolCall.id);
+        toolCall.arguments = parseToolArguments(
+          toolCall.partialJson,
+          toolCall.id,
+        );
         delete (toolCall as { partialJson?: string }).partialJson;
         stream?.push({
           contentIndex: contentIndex(toolCall),
@@ -684,7 +705,10 @@ function createInitialAssistantMessage(model: LlmModel): LlmAssistantMessage {
   };
 }
 
-function usageFromFiat(op: Extract<Op, { op: "response.usage" }>, current: LlmUsage) {
+function usageFromFiat(
+  op: Extract<Op, { op: "response.usage" }>,
+  current: LlmUsage,
+) {
   const input = op.inputTokens ?? current.input;
   const output = op.outputTokens ?? current.output;
   return {
@@ -752,7 +776,10 @@ function applyResponseId({
   op: Op;
   output: LlmAssistantMessage;
 }): void {
-  if (op.op !== "openai_chat.body_field" && op.op !== "openai_responses.body_field") {
+  if (
+    op.op !== "openai_chat.body_field" &&
+    op.op !== "openai_responses.body_field"
+  ) {
     return;
   }
   const field = op as { key?: string; value?: unknown };
@@ -767,7 +794,10 @@ function applyResponseId({
   }
 }
 
-function parseToolArguments(raw: string, callId: string): Record<string, unknown> {
+function parseToolArguments(
+  raw: string,
+  callId: string,
+): Record<string, unknown> {
   if (raw.trim().length === 0) {
     return {};
   }
@@ -899,7 +929,10 @@ function assertRecord(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function parseJsonObject(value: string, label: string): Record<string, unknown> {
+function parseJsonObject(
+  value: string,
+  label: string,
+): Record<string, unknown> {
   return assertRecord(JSON.parse(value), label);
 }
 

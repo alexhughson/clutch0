@@ -18,6 +18,7 @@ import type {
   PatchProgressState,
   PatchReviewState,
 } from "../../lib/patch/types";
+import { formatPatchValidationError } from "../../lib/patch/patchToolOutput";
 
 type SetAppState = (
   partial:
@@ -545,9 +546,7 @@ function formatPatchValidationErrors(patch: PatchReviewState): string {
     return "Patch could not be applied cleanly.";
   }
 
-  return patch.errors
-    .map((error) => `${error.path || "<unknown>"}: ${error.message}`)
-    .join("\n");
+  return patch.errors.map(formatPatchValidationError).join("\n");
 }
 
 function updateLiveLlmResponseItem(

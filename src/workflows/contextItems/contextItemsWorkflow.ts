@@ -74,7 +74,6 @@ function startSavedDiffApply(
 
   return {
     activeTask: {
-      applyErrorMessage: undefined,
       applyStatus: "applying",
       itemId: item.id,
       kind: "context-item-viewer",

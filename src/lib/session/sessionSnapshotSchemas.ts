@@ -76,7 +76,7 @@ export const CreateFileValidationResultSchema = Type.Union([
 const PatchValidationErrorSchema = Type.Object({
   editIndex: NonNegativeSafeInteger,
   message: Type.String(),
-  path: Type.String(),
+  path: Type.Optional(Type.String()),
 });
 
 const PatchApplyStatusSchema = Type.Union([
@@ -166,30 +166,46 @@ export const LlmRequestStateSchema = Type.Union([
   ErrorLlmRequestStateSchema,
 ]);
 
-export const ContextItemViewerTaskSchema = Type.Object({
-  applyErrorMessage: Type.Optional(Type.String()),
-  applyStatus: Type.Union([
-    Type.Literal("apply-error"),
-    Type.Literal("applying"),
-    Type.Literal("idle"),
+export const ContextItemViewerTaskSchema = Type.Intersect([
+  Type.Object({
+    itemId: Type.String(),
+    kind: Type.Literal("context-item-viewer"),
+    rejectComposer: Type.Optional(ComposerStateSchema),
+  }),
+  Type.Union([
+    Type.Object({
+      applyStatus: Type.Literal("idle"),
+    }),
+    Type.Object({
+      applyStatus: Type.Literal("applying"),
+    }),
+    Type.Object({
+      applyErrorMessage: Type.String(),
+      applyStatus: Type.Literal("apply-error"),
+    }),
   ]),
-  itemId: Type.String(),
-  kind: Type.Literal("context-item-viewer"),
-  rejectComposer: Type.Optional(ComposerStateSchema),
-});
+]);
 
-export const CreateFileTaskSchema = Type.Object({
-  applyErrorMessage: Type.Optional(Type.String()),
-  applyStatus: Type.Union([
-    Type.Literal("apply-error"),
-    Type.Literal("applying"),
-    Type.Literal("pending"),
+export const CreateFileTaskSchema = Type.Intersect([
+  Type.Object({
+    id: PositiveSafeInteger,
+    kind: Type.Literal("create-file"),
+    prompt: Type.String(),
+    rejectComposer: Type.Optional(ComposerStateSchema),
+  }),
+  Type.Union([
+    Type.Object({
+      applyStatus: Type.Literal("pending"),
+    }),
+    Type.Object({
+      applyStatus: Type.Literal("applying"),
+    }),
+    Type.Object({
+      applyErrorMessage: Type.String(),
+      applyStatus: Type.Literal("apply-error"),
+    }),
   ]),
-  id: PositiveSafeInteger,
-  kind: Type.Literal("create-file"),
-  prompt: Type.String(),
-  rejectComposer: Type.Optional(ComposerStateSchema),
-});
+]);
 
 const CreateFileTaskParseSchema = Type.Intersect([
   CreateFileTaskSchema,
@@ -200,20 +216,28 @@ const CreateFileTaskParseSchema = Type.Intersect([
 
 export { CreateFileTaskParseSchema };
 
-export const FindFilesTaskSchema = Type.Object({
-  candidates: Type.Array(RelevantFileCandidateSchema),
-  errorMessage: Type.Optional(Type.String()),
-  goal: Type.String(),
-  hints: Type.Array(Type.String()),
-  kind: Type.Literal("find-files"),
-  rejectComposer: Type.Optional(ComposerStateSchema),
-  selectedIndex: NonNegativeSafeInteger,
-  status: Type.Union([
-    Type.Literal("error"),
-    Type.Literal("results"),
-    Type.Literal("searching"),
+export const FindFilesTaskSchema = Type.Intersect([
+  Type.Object({
+    goal: Type.String(),
+    hints: Type.Array(Type.String()),
+    kind: Type.Literal("find-files"),
+    rejectComposer: Type.Optional(ComposerStateSchema),
+  }),
+  Type.Union([
+    Type.Object({
+      status: Type.Literal("searching"),
+    }),
+    Type.Object({
+      candidates: Type.Array(RelevantFileCandidateSchema),
+      selectedIndex: NonNegativeSafeInteger,
+      status: Type.Literal("results"),
+    }),
+    Type.Object({
+      errorMessage: Type.String(),
+      status: Type.Literal("error"),
+    }),
   ]),
-});
+]);
 
 const FindFilesTaskParseSchema = Type.Intersect([
   FindFilesTaskSchema,
@@ -224,35 +248,51 @@ const FindFilesTaskParseSchema = Type.Intersect([
 
 export { FindFilesTaskParseSchema };
 
-export const ShellCommandTaskSchema = Type.Object({
-  errorMessage: Type.Optional(Type.String()),
-  id: PositiveSafeInteger,
-  kind: Type.Literal("shell-command"),
-  prompt: Type.String(),
-  rejectComposer: Type.Optional(ComposerStateSchema),
-  replacement: Type.Optional(ShellCommandReplacementTargetSchema),
-  result: Type.Optional(ShellCommandResultSchema),
-  savedContextItemId: Type.Optional(Type.String()),
-  status: Type.Union([
-    Type.Literal("done"),
-    Type.Literal("error"),
-    Type.Literal("running"),
+export const ShellCommandTaskSchema = Type.Intersect([
+  Type.Object({
+    id: PositiveSafeInteger,
+    kind: Type.Literal("shell-command"),
+    prompt: Type.String(),
+    rejectComposer: Type.Optional(ComposerStateSchema),
+    replacement: Type.Optional(ShellCommandReplacementTargetSchema),
+  }),
+  Type.Union([
+    Type.Object({
+      status: Type.Literal("running"),
+    }),
+    Type.Object({
+      result: ShellCommandResultSchema,
+      savedContextItemId: Type.Optional(Type.String()),
+      status: Type.Literal("done"),
+    }),
+    Type.Object({
+      errorMessage: Type.String(),
+      status: Type.Literal("error"),
+    }),
   ]),
-});
+]);
 
-export const ShowContextTaskSchema = Type.Object({
-  content: Type.Optional(Type.String()),
-  errorMessage: Type.Optional(Type.String()),
-  id: PositiveSafeInteger,
-  kind: Type.Literal("show-context"),
-  question: Type.String(),
-  rejectComposer: Type.Optional(ComposerStateSchema),
-  status: Type.Union([
-    Type.Literal("done"),
-    Type.Literal("error"),
-    Type.Literal("loading"),
+export const ShowContextTaskSchema = Type.Intersect([
+  Type.Object({
+    id: PositiveSafeInteger,
+    kind: Type.Literal("show-context"),
+    question: Type.String(),
+    rejectComposer: Type.Optional(ComposerStateSchema),
+  }),
+  Type.Union([
+    Type.Object({
+      status: Type.Literal("loading"),
+    }),
+    Type.Object({
+      content: Type.String(),
+      status: Type.Literal("done"),
+    }),
+    Type.Object({
+      errorMessage: Type.String(),
+      status: Type.Literal("error"),
+    }),
   ]),
-});
+]);
 
 export const ResponseTaskSchema = Type.Object({
   kind: Type.Literal("response"),
@@ -310,7 +350,10 @@ export const RawAppSnapshotSchema = Type.Object({
 });
 
 export type RawAppSnapshot = Static<typeof RawAppSnapshotSchema>;
-export type SerializedLlmRequestState = Omit<LlmRequestState, "contextItems"> & {
+export type SerializedLlmRequestState = Omit<
+  LlmRequestState,
+  "contextItems"
+> & {
   contextItems: PersistentContextItem[];
 };
 export type SerializedResponseTaskState = Omit<
@@ -339,7 +382,10 @@ export type SerializedWorkspace = Omit<
 > & {
   contextItems: PersistentContextItem[];
 };
-export type AppSnapshot = Omit<Static<typeof RawAppSnapshotSchema>, "activeTask" | "workspace"> & {
+export type AppSnapshot = Omit<
+  Static<typeof RawAppSnapshotSchema>,
+  "activeTask" | "workspace"
+> & {
   activeTask: SerializedAppTask | null;
   workspace: SerializedWorkspace;
 };

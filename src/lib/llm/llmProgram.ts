@@ -7,7 +7,12 @@ import {
   type Translator,
 } from "fiat";
 import type { ClutchModelEffortLevel } from "../config/clutchConfigSchemas";
-import type { LlmContext, LlmModel, LlmThinkingLevel, LlmUserMessage } from "./types";
+import type {
+  LlmContext,
+  LlmModel,
+  LlmThinkingLevel,
+  LlmUserMessage,
+} from "./types";
 
 export type LlmRequestOptions = {
   apiKey: string;
@@ -30,7 +35,11 @@ export type LlmRequestOptions = {
 };
 
 const OPENROUTER_GEMINI_PREFIX = "google/gemini-3";
-const OPENROUTER_OPENAI_PREFIXES = ["openai/gpt-5", "openai/o", "xai/grok"] as const;
+const OPENROUTER_OPENAI_PREFIXES = [
+  "openai/gpt-5",
+  "openai/o",
+  "xai/grok",
+] as const;
 
 export function translatorForModel(model: LlmModel): Translator {
   if (model.api === "openai-completions") return OpenAIChatTranslator;
@@ -110,7 +119,7 @@ export function buildLlmProgram(
       content: textFromMessageContent(message.content, "tool result"),
     });
   }
-  for (const tool of context.tools ?? []) {
+  for (const tool of context.tools) {
     program.push({
       op: "llm.tool",
       name: tool.name,
@@ -118,7 +127,7 @@ export function buildLlmProgram(
       inputSchema: tool.parameters,
     });
   }
-  if ((context.tools?.length ?? 0) > 0) {
+  if (context.tools.length > 0) {
     program.push({ op: "llm.tool_choice", value: "auto" });
   }
   return program;
@@ -140,7 +149,8 @@ function appendThinkingOp(
     return;
   }
   if (
-    (model.api === "openai-responses" || model.api === "google-generative-ai") &&
+    (model.api === "openai-responses" ||
+      model.api === "google-generative-ai") &&
     model.reasoning
   ) {
     program.push({
@@ -169,7 +179,8 @@ function mapThinkingEffort(
   effort: ClutchModelEffortLevel | LlmThinkingLevel,
 ): ThinkingEffort {
   if (effort === "off") return "off";
-  const mapped = model.thinkingLevelMap?.[effort as keyof typeof model.thinkingLevelMap];
+  const mapped =
+    model.thinkingLevelMap?.[effort as keyof typeof model.thinkingLevelMap];
   if (mapped === null) {
     throw new Error(
       `Model ${model.provider}/${model.id} cannot use effort level ${effort}.`,

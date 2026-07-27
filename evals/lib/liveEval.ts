@@ -20,9 +20,7 @@ import {
 import { modelsFromProviderResponse } from "../../src/lib/config/providerModels";
 import { patchProposalFromToolCall } from "../../src/lib/llm/patchTool";
 import { renderPrompt } from "../../src/lib/llm/prompts";
-import {
-  configuredLlmRequestOptions,
-} from "../../src/lib/llm/requestOptions";
+import { configuredLlmRequestOptions } from "../../src/lib/llm/requestOptions";
 import { completeDirectLlmResponse } from "../../src/lib/llm/llmClient";
 import type { LlmContext } from "../../src/lib/llm/types";
 import {
@@ -498,6 +496,7 @@ async function judgeEvalAttempt({
           timestamp: Date.now(),
         },
       ],
+      tools: [],
     },
     request: judgeRequest,
   });

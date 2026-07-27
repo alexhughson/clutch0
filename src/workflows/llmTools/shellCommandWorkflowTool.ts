@@ -66,7 +66,8 @@ export const shellCommandWorkflowTool: LlmWorkflowToolController = {
           proposal: {
             patch,
             summary: "Apply patch from shell command",
-            toolCallId: toolCall.id.split("|")[0] ?? toolCall.id,
+            // split("|") always returns an array of length >= 1, so [0] is never undefined.
+            toolCallId: toolCall.id.split("|")[0]!,
           },
           root,
         }),
@@ -81,13 +82,13 @@ export const shellCommandWorkflowTool: LlmWorkflowToolController = {
               editIndex: 0,
               message:
                 'patch detected without explicit call to apply_patch. Rerun as ["apply_patch", "<patch>"]',
-              path: "",
             },
           ],
           proposal: {
             patch: command,
             summary: "Invalid implicit apply_patch shell command",
-            toolCallId: toolCall.id.split("|")[0] ?? toolCall.id,
+            // split("|") always returns an array of length >= 1, so [0] is never undefined.
+            toolCallId: toolCall.id.split("|")[0]!,
           },
           status: "invalid" as const,
         },

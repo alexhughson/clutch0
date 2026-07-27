@@ -32,7 +32,7 @@ export type PatchAffectedPaths = {
 export type PatchValidationError = {
   editIndex: number;
   message: string;
-  path: FilePath;
+  path?: FilePath;
 };
 
 export type PatchValidationResult =

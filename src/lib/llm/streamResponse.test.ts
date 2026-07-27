@@ -1,4 +1,5 @@
-import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { LlmContext } from "./types";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ import {
 
 test("builds a tool-result continuation context from an assistant tool call", () => {
   const assistantMessage = assistantMessageFixture();
-  const context: Context = {
+  const context: LlmContext = {
     messages: [
       {
         content: "Edit the selected file.",
@@ -65,6 +66,7 @@ test("marks continuation tool results as errors when requested", () => {
     assistantMessage,
     context: {
       messages: [],
+      tools: [],
     },
     timestamp: 3,
     toolOutput: {
@@ -664,7 +666,7 @@ test("stops apply_patch-only continuations when the step budget is exhausted", a
   });
 });
 
-function continuationBaseContext(): Context {
+function continuationBaseContext(): LlmContext {
   return {
     messages: [
       {

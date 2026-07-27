@@ -109,12 +109,14 @@ export type ResponseTaskState = {
 };
 
 export type ContextItemViewerTaskState = {
-  applyErrorMessage?: string;
-  applyStatus: "apply-error" | "applying" | "idle";
   itemId: string;
   kind: "context-item-viewer";
   rejectComposer?: ComposerState;
-};
+} & (
+  | { applyStatus: "idle" }
+  | { applyStatus: "applying" }
+  | { applyStatus: "apply-error"; applyErrorMessage: string }
+);
 
 export type ConfigTaskState = {
   activeModelEntry: ConfigModelEntry;
@@ -145,48 +147,55 @@ export type ConfigTaskState = {
 };
 
 export type CreateFileTaskState = {
-  applyErrorMessage?: string;
-  applyStatus: "apply-error" | "applying" | "pending";
   id: number;
   kind: "create-file";
   prompt: string;
   rejectComposer?: ComposerState;
   validation: CreateFileValidationResult;
-};
+} & (
+  | { applyStatus: "pending" }
+  | { applyStatus: "applying" }
+  | { applyStatus: "apply-error"; applyErrorMessage: string }
+);
 
 export type ShowContextTaskState = {
-  content?: string;
-  errorMessage?: string;
   id: number;
   kind: "show-context";
   question: string;
   rejectComposer?: ComposerState;
-  status: "done" | "error" | "loading";
-};
+} & (
+  | { status: "loading" }
+  | { status: "done"; content: string }
+  | { status: "error"; errorMessage: string }
+);
 
 export type ShellCommandTaskState = {
-  errorMessage?: string;
   id: number;
   kind: "shell-command";
   prompt: string;
   rejectComposer?: ComposerState;
   replacement?: ShellCommandReplacementTarget;
-  result?: ShellCommandResult;
-  savedContextItemId?: string;
-  status: "done" | "error" | "running";
-};
+} & (
+  | { status: "running" }
+  | { status: "done"; result: ShellCommandResult; savedContextItemId?: string }
+  | { status: "error"; errorMessage: string }
+);
 
 export type FindFilesTaskState = {
   agentOutput: AgentOutputBlock[];
-  candidates: RelevantFileCandidate[];
-  errorMessage?: string;
   goal: string;
   hints: string[];
   kind: "find-files";
   rejectComposer?: ComposerState;
-  selectedIndex: number;
-  status: "searching" | "results" | "error";
-};
+} & (
+  | { status: "searching" }
+  | {
+      status: "results";
+      candidates: RelevantFileCandidate[];
+      selectedIndex: number;
+    }
+  | { status: "error"; errorMessage: string }
+);
 
 export type FindFilesScreenState = FindFilesTaskState;
 export type ContextItemViewerScreenState = ContextItemViewerTaskState;

@@ -226,11 +226,11 @@ function decodeModelSelection(
         });
 
   return {
-    effortLevel: raw.effortLevel ?? DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
+    effortLevel: raw.effortLevel,
     ...(metadata === undefined ? {} : { metadata }),
     model: raw.model,
     provider,
-    serviceTier: raw.serviceTier ?? DEFAULT_CLUTCH_MODEL_SERVICE_TIER,
+    serviceTier: raw.serviceTier,
   };
 }
 
@@ -254,7 +254,11 @@ function decodeClutchCredential(
   label: string,
   provider: SupportedClutchLlmProvider,
 ): ClutchCredential {
-  if (credential === null || typeof credential !== "object" || Array.isArray(credential)) {
+  if (
+    credential === null ||
+    typeof credential !== "object" ||
+    Array.isArray(credential)
+  ) {
     throw new Error(`${label} must be an object.`);
   }
 
@@ -271,9 +275,7 @@ function decodeClutchCredential(
     return parseOAuthCredential(provider, credential);
   }
 
-  throw new Error(
-    `${label} must include type "api_key" or "oauth".`,
-  );
+  throw new Error(`${label} must include type "api_key" or "oauth".`);
 }
 
 function parseModelMetadata({

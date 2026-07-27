@@ -37,9 +37,14 @@ function openRouterBody(
   model: Model<Api>,
   options: ReturnType<typeof configuredLlmRequestOptions>,
 ) {
-  const program = buildLlmProgram(model, {
-    messages: [{ content: "hi", role: "user", timestamp: 1 }],
-  }, options);
+  const program = buildLlmProgram(
+    model,
+    {
+      messages: [{ content: "hi", role: "user", timestamp: 1 }],
+      tools: [],
+    },
+    options,
+  );
   return translatorForModel(model).toBody(program, {
     strict: true,
     variant: clientVariantForModel(model),

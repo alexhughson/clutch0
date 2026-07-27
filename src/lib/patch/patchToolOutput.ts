@@ -5,6 +5,15 @@ import type {
   PatchValidationResult,
 } from "./types";
 
+export function formatPatchValidationError(error: {
+  message: string;
+  path?: string;
+}): string {
+  return error.path !== undefined && error.path.length > 0
+    ? `${error.path}: ${error.message}`
+    : error.message;
+}
+
 export type PatchToolOutput = {
   content: string;
   exitCode: 0 | 1;
@@ -75,13 +84,7 @@ export function buildPatchValidationFailureToolOutput({
   result: Extract<PatchValidationResult, { status: "invalid" }>;
 }): PatchToolOutput {
   return buildFailedPatchToolOutput({
-    errorMessage: result.errors
-      .map((error) =>
-        error.path.length === 0
-          ? error.message
-          : `${error.path}: ${error.message}`,
-      )
-      .join("\n"),
+    errorMessage: result.errors.map(formatPatchValidationError).join("\n"),
   });
 }
 

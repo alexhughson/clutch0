@@ -131,7 +131,7 @@ export type LlmTool<TParameters extends TSchema = TSchema> = {
 export type LlmContext = {
   messages: LlmMessage[];
   systemPrompt?: string;
-  tools?: LlmTool[];
+  tools: readonly LlmTool[];
 };
 
 export type AssistantMessageEvent =
@@ -198,9 +198,7 @@ export type AssistantMessageEvent =
       type: "error";
     };
 
-export class AssistantMessageEventStream
-  implements AsyncIterable<AssistantMessageEvent>
-{
+export class AssistantMessageEventStream implements AsyncIterable<AssistantMessageEvent> {
   private done = false;
   private readonly finalResult: Promise<LlmAssistantMessage>;
   private queue: AssistantMessageEvent[] = [];

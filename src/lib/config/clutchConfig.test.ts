@@ -180,6 +180,24 @@ test("agent model falls back to primary for legacy settings", async () => {
   expect(isClutchConfigured(paths)).toBe(true);
 });
 
+test("summarization and agent providers inherit primary when omitted", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      models: {
+        primary: { model: "openrouter/primary", provider: "openrouter" },
+      },
+    }),
+    "utf-8",
+  );
+
+  const draft = createDefaultClutchConfigDraft(paths);
+  expect(draft.primary.provider).toBe("openrouter");
+  expect(draft.summarization.provider).toBe("openrouter");
+  expect(draft.agent.provider).toBe("openrouter");
+});
+
 test("uses cursor agent as the default ACP backend", async () => {
   const paths = await createTempConfigPaths();
 

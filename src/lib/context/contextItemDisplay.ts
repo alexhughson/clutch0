@@ -87,7 +87,8 @@ function insertFile(root: FileTreeNode, item: FileContextItem) {
     node = next;
   }
 
-  node.files.set(parts[parts.length - 1] ?? item.filePath, item);
+  // parts non-empty – early return above guarantees length > 0, so last element exists.
+  node.files.set(parts[parts.length - 1]!, item);
 }
 
 function renderNodeChildren(

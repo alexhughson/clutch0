@@ -160,7 +160,6 @@ function saveShellCommandOutputToContext(
     state.activeTask?.kind !== "shell-command" ||
     state.activeTask.id !== requestId ||
     state.activeTask.status !== "done" ||
-    state.activeTask.result === undefined ||
     state.activeTask.savedContextItemId !== undefined
   ) {
     return state;

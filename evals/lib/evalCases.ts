@@ -227,7 +227,7 @@ export function renderEvalCasePromptMarkdown(
     "",
     "## Tools",
     "",
-    prepared.context.tools === undefined || prepared.context.tools.length === 0
+    prepared.context.tools.length === 0
       ? "(none)"
       : fence("json", JSON.stringify(prepared.context.tools, null, 2)),
     "",

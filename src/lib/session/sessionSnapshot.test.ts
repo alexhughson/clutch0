@@ -1,5 +1,8 @@
-import { test, expect } from "bun:test";
-import type { AppState } from "../../app/appTypes";
+import { afterEach, test, expect } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import type { AppState, AppTask } from "../../app/appTypes";
 import { createInitialAppState } from "../../app/appInitialState";
 import {
   createFileContextItem,
@@ -8,13 +11,27 @@ import {
   createSavedLlmResponseContextItem,
 } from "../context/contextItemFactories";
 import type { PiAgentContextItem } from "../context/contextItemTypes";
+import { decodeSchema } from "../schemaDecode";
 import { CONTEXT_RECORDS_V1_SNAPSHOT } from "./contextRecordsV1.fixture";
+import {
+  CreateFileTaskSchema,
+  FindFilesTaskSchema,
+  ShellCommandTaskSchema,
+  ShowContextTaskSchema,
+} from "./sessionSnapshotSchemas";
 import {
   parseAppSnapshot,
   restoreAppStateFromSnapshot,
   serializeAppSnapshot,
   serializeInterruptedAppSnapshot,
 } from "./sessionSnapshot";
+import {
+  createSessionMetadata,
+  initializeSession,
+  loadSessionById,
+  resolveWorkspaceRoot,
+  writeSessionSnapshot,
+} from "./sessionStorage";
 
 test("literal v1 snapshot restores workspace and request records separately", () => {
   const restored = restoreAppStateFromSnapshot(
@@ -70,11 +87,9 @@ test("restore normalizes searching find-files before render", () => {
     actions: {} as AppState["actions"],
     activeTask: {
       agentOutput: [],
-      candidates: [],
       goal: "Find parser",
       hints: [],
       kind: "find-files",
-      selectedIndex: 0,
       status: "searching",
     },
   };
@@ -405,11 +420,9 @@ test("snapshot parser rejects malformed known active tasks and counters", () => 
       ...baseSnapshot,
       activeTask: {
         agentOutput: [{ kind: "stream" }],
-        candidates: [],
         goal: "find",
         hints: [],
         kind: "find-files",
-        selectedIndex: 0,
         status: "searching",
       },
     }),
@@ -635,7 +648,11 @@ test("snapshot round-trips every task kind byte-identically through parse", () =
     },
     {
       kind: "response",
-      request: { ...responseBase, responseText: "streaming", status: "streaming" },
+      request: {
+        ...responseBase,
+        responseText: "streaming",
+        status: "streaming",
+      },
     },
     {
       kind: "response",
@@ -663,3 +680,616 @@ test("snapshot round-trips every task kind byte-identically through parse", () =
     expect(roundTripped, activeTask.kind).toEqual(snapshot);
   }
 });
+
+const originalConfigDir = process.env.CLUTCH_CONFIG_DIR;
+const tempRoots: string[] = [];
+
+afterEach(async () => {
+  if (originalConfigDir === undefined) {
+    delete process.env.CLUTCH_CONFIG_DIR;
+  } else {
+    process.env.CLUTCH_CONFIG_DIR = originalConfigDir;
+  }
+
+  await Promise.all(
+    tempRoots
+      .splice(0)
+      .map((path) => rm(path, { force: true, recursive: true })),
+  );
+});
+
+test("every persisted task variant round-trips through serialize, parse, and restore", () => {
+  const base = snapshotRoundTripBaseState();
+  const workspaceRoot = "/repo";
+  const shellResult = {
+    command: "bun test",
+    durationMs: 10,
+    exitCode: 0,
+    stderr: "",
+    stdout: "ok",
+    timedOut: false,
+    truncated: false,
+  };
+  const createFileValidation = {
+    proposal: {
+      content: "export const value = 1;\n",
+      path: "src/new.ts",
+      summary: "Create helper",
+    },
+    status: "valid" as const,
+  };
+  const findFilesAgentOutput = [
+    {
+      id: "status:1",
+      kind: "status" as const,
+      message: "searching",
+      timestamp: 1,
+    },
+  ];
+  const responseRequestBase = snapshotResponseRequestBase();
+  const patchProposal = {
+    patch:
+      "*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n*** End Patch",
+    summary: "Update helper",
+  };
+
+  const cases: Array<{
+    activeTask: NonNullable<AppState["activeTask"]>;
+    expectedActiveTask?: NonNullable<AppState["activeTask"]>;
+    name: string;
+  }> = [
+    {
+      name: "show-context loading",
+      activeTask: {
+        id: 1,
+        kind: "show-context",
+        question: "show files",
+        status: "loading",
+      },
+      expectedActiveTask: {
+        errorMessage: "Interrupted while rendering context.",
+        id: 1,
+        kind: "show-context",
+        question: "show files",
+        status: "error",
+      },
+    },
+    {
+      name: "show-context done",
+      activeTask: {
+        content: "rendered context",
+        id: 2,
+        kind: "show-context",
+        question: "show files",
+        status: "done",
+      },
+    },
+    {
+      name: "show-context error",
+      activeTask: {
+        errorMessage: "render failed",
+        id: 3,
+        kind: "show-context",
+        question: "show files",
+        status: "error",
+      },
+    },
+    {
+      name: "shell-command running",
+      activeTask: {
+        id: 4,
+        kind: "shell-command",
+        prompt: "bun test",
+        status: "running",
+      },
+      expectedActiveTask: {
+        errorMessage: "Interrupted while running shell command.",
+        id: 4,
+        kind: "shell-command",
+        prompt: "bun test",
+        status: "error",
+      },
+    },
+    {
+      name: "shell-command done without savedContextItemId",
+      activeTask: {
+        id: 5,
+        kind: "shell-command",
+        prompt: "bun test",
+        result: shellResult,
+        status: "done",
+      },
+    },
+    {
+      name: "shell-command done with savedContextItemId",
+      activeTask: {
+        id: 6,
+        kind: "shell-command",
+        prompt: "bun test",
+        replacement: { contextItemId: "saved:3" },
+        result: shellResult,
+        savedContextItemId: "shell:6",
+        status: "done",
+      },
+    },
+    {
+      name: "shell-command error",
+      activeTask: {
+        errorMessage: "command failed",
+        id: 7,
+        kind: "shell-command",
+        prompt: "bun test",
+        status: "error",
+      },
+    },
+    {
+      name: "find-files searching",
+      activeTask: {
+        agentOutput: findFilesAgentOutput,
+        goal: "find parser",
+        hints: ["src"],
+        kind: "find-files",
+        status: "searching",
+      },
+      expectedActiveTask: {
+        agentOutput: findFilesAgentOutput,
+        errorMessage: "Interrupted while searching for files.",
+        goal: "find parser",
+        hints: ["src"],
+        kind: "find-files",
+        status: "error",
+      },
+    },
+    {
+      name: "find-files results",
+      activeTask: {
+        agentOutput: findFilesAgentOutput,
+        candidates: [
+          {
+            confidence: "high",
+            path: "src/a.ts",
+            reason: "matches goal",
+          },
+        ],
+        goal: "find parser",
+        hints: ["src"],
+        kind: "find-files",
+        selectedIndex: 0,
+        status: "results",
+      },
+    },
+    {
+      name: "find-files error",
+      activeTask: {
+        agentOutput: findFilesAgentOutput,
+        errorMessage: "search failed",
+        goal: "find parser",
+        hints: ["src"],
+        kind: "find-files",
+        status: "error",
+      },
+    },
+    {
+      name: "create-file pending",
+      activeTask: {
+        applyStatus: "pending",
+        id: 8,
+        kind: "create-file",
+        prompt: "add helper",
+        validation: createFileValidation,
+      },
+    },
+    {
+      name: "create-file applying",
+      activeTask: {
+        applyStatus: "applying",
+        id: 9,
+        kind: "create-file",
+        prompt: "add helper",
+        validation: createFileValidation,
+      },
+      expectedActiveTask: {
+        applyErrorMessage: "Interrupted while creating file.",
+        applyStatus: "apply-error",
+        id: 9,
+        kind: "create-file",
+        prompt: "add helper",
+        validation: createFileValidation,
+      },
+    },
+    {
+      name: "create-file apply-error",
+      activeTask: {
+        applyErrorMessage: "write failed",
+        applyStatus: "apply-error",
+        id: 10,
+        kind: "create-file",
+        prompt: "add helper",
+        validation: createFileValidation,
+      },
+    },
+    {
+      name: "context-item-viewer idle",
+      activeTask: {
+        applyStatus: "idle",
+        itemId: "file:src/a.ts",
+        kind: "context-item-viewer",
+      },
+    },
+    {
+      name: "context-item-viewer applying",
+      activeTask: {
+        applyStatus: "applying",
+        itemId: "file:src/a.ts",
+        kind: "context-item-viewer",
+      },
+      expectedActiveTask: {
+        applyErrorMessage: "Interrupted while applying changes.",
+        applyStatus: "apply-error",
+        itemId: "file:src/a.ts",
+        kind: "context-item-viewer",
+      },
+    },
+    {
+      name: "context-item-viewer apply-error",
+      activeTask: {
+        applyErrorMessage: "apply failed",
+        applyStatus: "apply-error",
+        itemId: "file:src/a.ts",
+        kind: "context-item-viewer",
+      },
+    },
+    {
+      name: "response loading",
+      activeTask: {
+        kind: "response",
+        request: { ...responseRequestBase, status: "loading" },
+      },
+      expectedActiveTask: {
+        kind: "response",
+        request: {
+          ...responseRequestBase,
+          errorMessage: "Interrupted while waiting for model response.",
+          status: "error",
+        },
+      },
+    },
+    {
+      name: "response streaming",
+      activeTask: {
+        kind: "response",
+        request: {
+          ...responseRequestBase,
+          responseText: "streaming",
+          status: "streaming",
+        },
+      },
+      expectedActiveTask: {
+        kind: "response",
+        request: {
+          ...responseRequestBase,
+          errorMessage: "Interrupted while waiting for model response.",
+          responseText: "streaming",
+          status: "error",
+        },
+      },
+    },
+    {
+      name: "response done",
+      activeTask: {
+        kind: "response",
+        request: { ...responseRequestBase, status: "done" },
+      },
+    },
+    {
+      name: "response done with invalid patch validation errors",
+      activeTask: {
+        kind: "response",
+        request: {
+          ...responseRequestBase,
+          patch: {
+            applyStatus: "pending",
+            errors: [
+              { editIndex: 0, message: "bad hunk" },
+              { editIndex: 1, message: "bad path", path: "src/a.ts" },
+            ],
+            proposal: patchProposal,
+            status: "invalid",
+          },
+          status: "done",
+        },
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const snapshot = serializeAppSnapshot({
+      state: { ...base, activeTask: testCase.activeTask },
+      workspaceRoot,
+    });
+    const parsed = parseAppSnapshot(
+      JSON.parse(JSON.stringify(snapshot)) as unknown,
+    );
+    const restored = restoreAppStateFromSnapshot(parsed);
+
+    expect(restored.activeTask, testCase.name).toEqual(
+      testCase.expectedActiveTask ?? testCase.activeTask,
+    );
+  }
+});
+
+test("disk round-trip preserves one terminal variant per persisted task kind", async () => {
+  const configDir = await tempDir("clutch-snapshot-config-");
+  const workspaceRoot = await resolveWorkspaceRoot(
+    await tempDir("clutch-snapshot-root-"),
+  );
+  process.env.CLUTCH_CONFIG_DIR = configDir;
+
+  const base = snapshotRoundTripBaseState();
+  const createFileValidation = {
+    proposal: {
+      content: "export const value = 1;\n",
+      path: "src/new.ts",
+      summary: "Create helper",
+    },
+    status: "valid" as const,
+  };
+  const responseRequestBase = snapshotResponseRequestBase();
+  const cases: Array<{
+    activeTask: NonNullable<AppState["activeTask"]>;
+    name: string;
+  }> = [
+    {
+      name: "show-context done",
+      activeTask: {
+        content: "rendered context",
+        id: 1,
+        kind: "show-context",
+        question: "show files",
+        status: "done",
+      },
+    },
+    {
+      name: "shell-command done",
+      activeTask: {
+        id: 2,
+        kind: "shell-command",
+        prompt: "bun test",
+        result: {
+          command: "bun test",
+          durationMs: 10,
+          exitCode: 0,
+          stderr: "",
+          stdout: "ok",
+          timedOut: false,
+          truncated: false,
+        },
+        savedContextItemId: "shell:2",
+        status: "done",
+      },
+    },
+    {
+      name: "find-files results",
+      activeTask: {
+        agentOutput: [],
+        candidates: [{ path: "src/a.ts", reason: "match" }],
+        goal: "find parser",
+        hints: [],
+        kind: "find-files",
+        selectedIndex: 0,
+        status: "results",
+      },
+    },
+    {
+      name: "create-file apply-error",
+      activeTask: {
+        applyErrorMessage: "write failed",
+        applyStatus: "apply-error",
+        id: 3,
+        kind: "create-file",
+        prompt: "add helper",
+        validation: createFileValidation,
+      },
+    },
+    {
+      name: "context-item-viewer apply-error",
+      activeTask: {
+        applyErrorMessage: "apply failed",
+        applyStatus: "apply-error",
+        itemId: "file:src/a.ts",
+        kind: "context-item-viewer",
+      },
+    },
+    {
+      name: "response done with invalid patch",
+      activeTask: {
+        kind: "response",
+        request: {
+          ...responseRequestBase,
+          patch: {
+            applyStatus: "pending",
+            errors: [
+              { editIndex: 0, message: "bad hunk" },
+              { editIndex: 1, message: "bad path", path: "src/a.ts" },
+            ],
+            proposal: {
+              patch:
+                "*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n*** End Patch",
+              summary: "Update helper",
+            },
+            status: "invalid",
+          },
+          status: "done",
+        },
+      },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const metadata = await createSessionMetadata({ workspaceRoot });
+    await initializeSession(metadata);
+    const inputTask = testCase.activeTask;
+
+    await writeSessionSnapshot({
+      metadata,
+      snapshot: serializeAppSnapshot({
+        state: { ...base, activeTask: inputTask },
+        workspaceRoot,
+      }),
+    });
+
+    const loaded = await loadSessionById({
+      sessionId: metadata.id,
+      workspaceRoot,
+    });
+    const restored = restoreAppStateFromSnapshot(loaded.snapshot);
+
+    expect(restored.activeTask, testCase.name).toEqual(inputTask);
+  }
+});
+
+test("task schemas reject invalid status payload combinations", () => {
+  expect(() =>
+    decodeSchema(
+      ShowContextTaskSchema,
+      {
+        id: 1,
+        kind: "show-context",
+        question: "show",
+        status: "done",
+      },
+      "activeTask",
+    ),
+  ).toThrow();
+
+  expect(() =>
+    decodeSchema(
+      ShellCommandTaskSchema,
+      {
+        id: 1,
+        kind: "shell-command",
+        prompt: "run",
+        status: "done",
+      },
+      "activeTask",
+    ),
+  ).toThrow();
+
+  expect(() =>
+    decodeSchema(
+      CreateFileTaskSchema,
+      {
+        applyStatus: "apply-error",
+        id: 1,
+        kind: "create-file",
+        prompt: "create",
+      },
+      "activeTask",
+    ),
+  ).toThrow();
+
+  expect(() =>
+    decodeSchema(
+      FindFilesTaskSchema,
+      {
+        goal: "find",
+        hints: [],
+        kind: "find-files",
+        selectedIndex: 0,
+        status: "results",
+      },
+      "activeTask",
+    ),
+  ).toThrow();
+
+  const baseSnapshot = serializeAppSnapshot({
+    state: { ...createInitialAppState(), actions: {} as AppState["actions"] },
+    workspaceRoot: "/repo",
+  });
+
+  expect(() =>
+    parseAppSnapshot({
+      ...baseSnapshot,
+      activeTask: {
+        id: 1,
+        kind: "show-context",
+        question: "show",
+        status: "done",
+      },
+    }),
+  ).toThrow();
+
+  expect(() =>
+    parseAppSnapshot({
+      ...baseSnapshot,
+      activeTask: {
+        id: 1,
+        kind: "shell-command",
+        prompt: "run",
+        status: "done",
+      },
+    }),
+  ).toThrow();
+});
+
+function snapshotRoundTripBaseState(): AppState {
+  return {
+    ...createInitialAppState(),
+    actions: {} as AppState["actions"],
+    nextContextItemId: 12,
+    nextLlmRequestId: 9,
+    workspace: {
+      ...createInitialAppState().workspace,
+      composer: { cursorPosition: 4, message: "draft" },
+      contextItems: [createFileContextItem("src/a.ts")],
+      focusedContextItemId: "file:src/a.ts",
+    },
+  };
+}
+
+function snapshotResponseRequestBase(): Omit<
+  Extract<AppTask, { kind: "response" }>["request"],
+  "status" | "errorMessage"
+> {
+  return {
+    contextItems: [
+      createSavedLlmResponseContextItem({
+        createdAt: 1,
+        id: "saved:3",
+        output: "prior answer",
+        prompt: "prior",
+        sourceRequestId: 3,
+      }),
+    ],
+    focusedContextItemId: "saved:3",
+    id: 4,
+    latencyStats: { totalMs: 120, ttftMs: 40 },
+    patch: {
+      applyStatus: "pending",
+      diffText: "diff --git a/src/a.ts b/src/a.ts\n",
+      proposal: {
+        patch:
+          "*** Begin Patch\n*** Update File: src/a.ts\n@@\n-old\n+new\n*** End Patch",
+        summary: "Update helper",
+      },
+      status: "valid",
+    },
+    patchProgress: {
+      files: [{ operation: "update", path: "src/a.ts" }],
+      patchCharacterCount: 88,
+    },
+    question: "continue",
+    replacement: {
+      contextItemId: "saved:3",
+      expectedResult: "text",
+    },
+    responseText: "answer",
+    savedContextItemId: "saved:3",
+  };
+}
+
+async function tempDir(prefix: string): Promise<string> {
+  const path = await mkdtemp(join(tmpdir(), prefix));
+  tempRoots.push(path);
+  return path;
+}

@@ -140,36 +140,32 @@ test("renders prompts through real Clutch context and tools", async () => {
   expect(prompt).toContain("<user_request>");
 });
 
-test(
-  "renders the AGENTS.md edit regression with oversized automatic context",
-  async () => {
-    const evalCase = (await loadEvalCases()).find(
-      (candidate) =>
-        candidate.path === "edit-hard/agents-md-clarify-pi-ai-adapter",
-    );
-    expect(evalCase).toBeDefined();
+test("renders the AGENTS.md edit regression with oversized automatic context", async () => {
+  const evalCase = (await loadEvalCases()).find(
+    (candidate) =>
+      candidate.path === "edit-hard/agents-md-clarify-pi-ai-adapter",
+  );
+  expect(evalCase).toBeDefined();
 
-    const prepared = await prepareEvalCase(evalCase!);
-    const automaticMessage = String(prepared.context.messages[0]?.content ?? "");
-    const userMessages = joinTextUserMessages(prepared.context);
+  const prepared = await prepareEvalCase(evalCase!);
+  const automaticMessage = String(prepared.context.messages[0]?.content ?? "");
+  const userMessages = joinTextUserMessages(prepared.context);
 
-    expect(userMessages.length).toBeGreaterThan(250_000);
-    expect(automaticMessage).toContain('<automatic_context name="current_diff">');
-    expect(automaticMessage).toContain(
-      '<automatic_context name="directory_tree">',
-    );
-    expect(automaticMessage).toContain("[Context truncated.]");
-    expect(automaticMessage).toContain(
-      "synthetic/project/packages/very-long-generated-eval-run-output-path-0000",
-    );
-    expect(userMessages).toContain('<file path="AGENTS.md" focused="true">');
-    expect(prepared.context.tools?.map((tool) => tool.name)).toEqual([
-      "apply_patch",
-    ]);
-    expect(evalCase!.expected.repeat).toEqual({ passThreshold: "all" });
-  },
-  15_000,
-);
+  expect(userMessages.length).toBeGreaterThan(250_000);
+  expect(automaticMessage).toContain('<automatic_context name="current_diff">');
+  expect(automaticMessage).toContain(
+    '<automatic_context name="directory_tree">',
+  );
+  expect(automaticMessage).toContain("[Context truncated.]");
+  expect(automaticMessage).toContain(
+    "synthetic/project/packages/very-long-generated-eval-run-output-path-0000",
+  );
+  expect(userMessages).toContain('<file path="AGENTS.md" focused="true">');
+  expect(prepared.context.tools.map((tool) => tool.name)).toEqual([
+    "apply_patch",
+  ]);
+  expect(evalCase!.expected.repeat).toEqual({ passThreshold: "all" });
+}, 15_000);
 
 test("slash command cases restrict tools using Clutch slash command metadata", async () => {
   const cases = await loadEvalCases();
@@ -192,7 +188,7 @@ test("slash command cases restrict tools using Clutch slash command metadata", a
 
   const preparedEdit = await prepareEvalCase(editCase!);
 
-  expect(preparedEdit.context.tools?.map((tool) => tool.name)).toEqual([
+  expect(preparedEdit.context.tools.map((tool) => tool.name)).toEqual([
     "apply_patch",
   ]);
   expect(preparedEdit.context.systemPrompt).toContain("apply_patch");

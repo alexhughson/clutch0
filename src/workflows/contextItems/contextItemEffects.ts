@@ -1,4 +1,5 @@
 import { getContextItemById } from "../../lib/context/contextItemFactories";
+import { formatPatchValidationError } from "../../lib/patch/patchToolOutput";
 import { applyAgentSandboxDiff } from "../agentAsk/agentSandbox";
 import { useAppStore } from "../../store/appStore";
 import { applyPatchProposalWithRuntimeEvents } from "../patch/patchApplyRuntime";
@@ -25,7 +26,7 @@ export async function applySavedDiffContextItem(itemId: string) {
       if (result.status === "invalid") {
         useAppStore.getState().actions.contextItems.failSavedDiffApply({
           errorMessage: result.errors
-            .map((error) => `${error.path || "<unknown>"}: ${error.message}`)
+            .map(formatPatchValidationError)
             .join("\n"),
           itemId,
         });

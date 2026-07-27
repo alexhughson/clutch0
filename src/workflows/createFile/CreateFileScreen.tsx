@@ -3,6 +3,7 @@ import { useKeyboard } from "@opentui/react";
 import type { CreateFileTaskState } from "../../app/appTypes";
 import { HighlightedCode } from "../../components/SyntaxHighlightedContent";
 import { applyCreateFileProposal } from "../../lib/createFile/createFile";
+import { formatPatchValidationError } from "../../lib/patch/patchToolOutput";
 import { isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 
@@ -47,7 +48,7 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
             <text style={{ fg: "red" }}>File cannot be created:</text>
             {task.validation.errors.map((error, index) => (
               <text key={`${index}:${error.path}`} style={{ fg: "red" }}>
-                {error.path || "<unknown>"}: {error.message}
+                {formatPatchValidationError(error)}
               </text>
             ))}
           </box>
@@ -61,9 +62,9 @@ export function CreateFileScreen({ task }: CreateFileScreenProps) {
             />
           </box>
         </scrollbox>
-        {task.applyErrorMessage === undefined ? null : (
+        {task.applyStatus === "apply-error" ? (
           <text style={{ fg: "red" }}>{task.applyErrorMessage}</text>
-        )}
+        ) : null}
       </box>
     </box>
   );
@@ -111,9 +112,7 @@ async function applyCreateFile(
 
     if (result.status === "invalid") {
       actions.failApply({
-        errorMessage: result.errors
-          .map((error) => `${error.path || "<unknown>"}: ${error.message}`)
-          .join("\n"),
+        errorMessage: result.errors.map(formatPatchValidationError).join("\n"),
         requestId: task.id,
       });
       return;

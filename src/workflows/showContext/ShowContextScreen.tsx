@@ -33,9 +33,7 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
   return (
     <box
       title={`Rendered LLM context (${task.status})`}
-      bottomTitle={
-        canNavigate ? "Enter clear · Esc edit prompt" : undefined
-      }
+      bottomTitle={canNavigate ? "Enter clear · Esc edit prompt" : undefined}
       bottomTitleAlignment="right"
       borderStyle="rounded"
       style={{
@@ -59,7 +57,7 @@ export function ShowContextScreen({ task }: ShowContextScreenProps) {
         ) : null}
         {task.status === "done" ? (
           <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
-            <text>{task.content ?? ""}</text>
+            <text>{task.content}</text>
           </scrollbox>
         ) : null}
       </box>

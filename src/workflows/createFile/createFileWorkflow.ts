@@ -65,11 +65,18 @@ function updateCreateFileApplyState(
     return state;
   }
 
+  const task = state.activeTask;
+
   return {
     activeTask: {
-      ...state.activeTask,
-      applyErrorMessage: undefined,
       applyStatus,
+      id: task.id,
+      kind: "create-file",
+      prompt: task.prompt,
+      validation: task.validation,
+      ...(task.rejectComposer === undefined
+        ? {}
+        : { rejectComposer: task.rejectComposer }),
     },
   };
 }

@@ -121,11 +121,11 @@ test("formats pathless validation failures without an unknown path", () => {
             editIndex: 0,
             message:
               'patch detected without explicit call to apply_patch. Rerun as ["apply_patch", "<patch>"]',
-            path: "",
           },
         ],
         proposal: {
-          patch: "*** Begin Patch\n*** Add File: hello.txt\n+hello\n*** End Patch",
+          patch:
+            "*** Begin Patch\n*** Add File: hello.txt\n+hello\n*** End Patch",
           summary: "Implicit patch",
         },
         status: "invalid",
@@ -144,7 +144,6 @@ test("formats empty patch validation failures with Codex's managed-tool rejectio
           {
             editIndex: 0,
             message: "patch rejected: empty patch",
-            path: "",
           },
         ],
         proposal: {

@@ -302,11 +302,9 @@ function hydrateStoreWithContextItem(
 function searchingFindFilesScreen() {
   return {
     agentOutput: [],
-    candidates: [],
     goal: "Find routing code",
     hints: ["router"],
     kind: "find-files" as const,
-    selectedIndex: 0,
     status: "searching" as const,
   };
 }

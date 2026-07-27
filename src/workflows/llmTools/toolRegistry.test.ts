@@ -293,7 +293,6 @@ test("rejects implicit shell patch bodies as patch validation failures", async (
         {
           message:
             'patch detected without explicit call to apply_patch. Rerun as ["apply_patch", "<patch>"]',
-          path: "",
         },
       ],
       status: "invalid",

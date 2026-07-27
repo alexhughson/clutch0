@@ -6,7 +6,7 @@ import { resolveConfiguredLlmRequest } from "../config/clutchConfig";
 import { contextItemSummarySystemPrompt, renderPrompt } from "./prompts";
 import { configuredLlmRequestOptions } from "./requestOptions";
 import { completeDirectLlmResponse } from "./llmClient";
-import type { LlmContext } from "./types";
+import type { LlmAssistantMessage, LlmContext, LlmTextContent } from "./types";
 
 const MAX_SUMMARY_INPUT_CHARACTERS = 30_000;
 const MAX_ONE_LINE_CHARACTERS = 100;
@@ -33,6 +33,7 @@ export async function generateContextItemSummary(
       },
     ],
     systemPrompt: contextItemSummarySystemPrompt,
+    tools: [],
   } satisfies LlmContext;
   const requestOptions = configuredLlmRequestOptions(request);
   const message = await completeDirectLlmResponse(
@@ -94,11 +95,11 @@ function truncateSummaryText(text: string, maxCharacters: number): string {
   return `${normalized.slice(0, maxCharacters - 1)}…`;
 }
 
-function getAssistantText(message: {
-  content: readonly { text?: string; type: string }[];
-}): string {
+function getAssistantText(
+  message: Pick<LlmAssistantMessage, "content">,
+): string {
   return message.content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text ?? "")
+    .filter((block): block is LlmTextContent => block.type === "text")
+    .map((block) => block.text)
     .join("\n");
 }

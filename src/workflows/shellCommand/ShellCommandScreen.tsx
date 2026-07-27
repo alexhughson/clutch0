@@ -43,12 +43,12 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
         {task.status === "error" ? (
           <text style={{ fg: "red" }}>{task.errorMessage}</text>
         ) : null}
-        {task.result === undefined ? null : (
+        {task.status === "done" ? (
           <ShellCommandResultView result={task.result} />
-        )}
-        {task.savedContextItemId === undefined ? null : (
+        ) : null}
+        {task.status === "done" && task.savedContextItemId !== undefined ? (
           <text style={{ fg: "green" }}>Saved to context.</text>
-        )}
+        ) : null}
       </box>
     </box>
   );

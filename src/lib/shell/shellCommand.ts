@@ -69,6 +69,8 @@ export async function runShellCommand({
       stderr = appendStream(stderr, error.message);
     });
     child.on("close", (exitCode, exitSignal) => {
+      // Node emits `null` for exitSignal on normal exits; finish() takes an optional
+      // `undefined`-typed parameter. The ?? bridges Node's `null` to that signature.
       finish(exitCode, exitSignal ?? undefined);
     });
 

@@ -183,9 +183,9 @@ export function ContextItemViewerScreen({
       {screen.applyStatus === "applying" ? (
         <text>Applying patch...</text>
       ) : null}
-      {screen.applyErrorMessage === undefined ? null : (
+      {screen.applyStatus === "apply-error" ? (
         <text style={{ fg: "red" }}>{screen.applyErrorMessage}</text>
-      )}
+      ) : null}
       {item === null ? (
         <text style={{ fg: "red" }}>Context item no longer exists.</text>
       ) : detail === null ? (

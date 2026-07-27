@@ -1,5 +1,8 @@
 import type { ComposerState } from "../../app/appTypes";
-import { assembleLlmContextInput, buildLlmContext } from "../../lib/llm/context";
+import {
+  assembleLlmContextInput,
+  buildLlmContext,
+} from "../../lib/llm/context";
 import { getAmbientLlmContextItems } from "../../lib/context/automaticContextItems";
 import { buildPatchAwareSystemPrompt } from "../../lib/llm/prompts";
 import { getLlmWorkflowTools } from "../llmTools/toolRegistry";
@@ -55,7 +58,7 @@ export function startShowContextRequest(
 function formatContextDebugView(
   context: Awaited<ReturnType<typeof buildLlmContext>>["context"],
 ): string {
-  const tools = context.tools ?? [];
+  const tools = context.tools;
   const toolText =
     tools.length === 0
       ? "No tools."

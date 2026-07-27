@@ -7,6 +7,7 @@ import {
 } from "./SyntaxHighlightedContent";
 import { isEnterKey } from "../lib/keymap";
 import type { PatchProgressFile, PatchProgressState } from "../lib/patch/types";
+import { formatPatchValidationError } from "../lib/patch/patchToolOutput";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
 import { applyPatchProposalWithRuntimeEvents } from "../workflows/patch/patchApplyRuntime";
 
@@ -159,10 +160,10 @@ function PatchReview({ request }: { request: LlmRequestState }) {
               <text style={{ fg: "red" }}>{getPatchErrorHeading(patch)}</text>
               {patch.errors.map((error) => (
                 <text
-                  key={`${error.editIndex}:${error.path}`}
+                  key={`${error.editIndex}${error.path !== undefined ? `:${error.path}` : ""}`}
                   style={{ fg: "red" }}
                 >
-                  {error.path || "<unknown>"}: {error.message}
+                  {formatPatchValidationError(error)}
                 </text>
               ))}
             </box>
@@ -422,9 +423,10 @@ export function getInvalidPatchDebugText(
       ? []
       : ["Tool call id:", patch.proposal.toolCallId, ""]),
     "Validation errors:",
-    ...patch.errors.map(
-      (error) =>
-        `- ${error.path || "<unknown>"} [edit ${error.editIndex}]: ${error.message}`,
+    ...patch.errors.map((error) =>
+      error.path !== undefined
+        ? `- ${error.path} [edit ${error.editIndex}]: ${error.message}`
+        : `- [edit ${error.editIndex}]: ${error.message}`,
     ),
     "",
     ...(request.responseText.trim().length === 0
@@ -502,9 +504,7 @@ async function applyPatch(
 
     if (result.status === "invalid") {
       responseActions.failPatchApply({
-        errorMessage: result.errors
-          .map((error) => `${error.path || "<unknown>"}: ${error.message}`)
-          .join("\n"),
+        errorMessage: result.errors.map(formatPatchValidationError).join("\n"),
         requestId: request.id,
       });
       return;

@@ -85,7 +85,7 @@ export async function buildLlmContext({
   question,
   root = process.cwd(),
   systemPrompt = defaultSystemPrompt,
-  tools,
+  tools = [],
 }: BuildLlmContextOptions): Promise<BuiltLlmContext> {
   const selectedContext = await formatSelectedContextItems({
     contextItems,

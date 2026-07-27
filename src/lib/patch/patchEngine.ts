@@ -353,7 +353,7 @@ async function validatePatch({
         {
           editIndex: 0,
           message: parsed.error,
-          path: parsed.path ?? "",
+          ...(parsed.path !== undefined ? { path: parsed.path } : {}),
         },
       ],
       proposal,
@@ -365,8 +365,8 @@ async function validatePatch({
       errors: [
         {
           editIndex: 0,
-          message: "apply_patch environment selection is unavailable for this turn",
-          path: "",
+          message:
+            "apply_patch environment selection is unavailable for this turn",
         },
       ],
       proposal,
@@ -378,7 +378,6 @@ async function validatePatch({
     errors.push({
       editIndex: 0,
       message: "patch rejected: empty patch",
-      path: "",
     });
   }
 
@@ -557,13 +556,15 @@ export function parseCodexPatch(patchText: string): ParseResult {
 
   if (lines[0]?.trim() !== "*** Begin Patch") {
     return {
-      error: "invalid patch: The first line of the patch must be '*** Begin Patch'",
+      error:
+        "invalid patch: The first line of the patch must be '*** Begin Patch'",
       status: "invalid",
     };
   }
   if (lines[lines.length - 1]?.trim() !== "*** End Patch") {
     return {
-      error: "invalid patch: The last line of the patch must be '*** End Patch'",
+      error:
+        "invalid patch: The last line of the patch must be '*** End Patch'",
       status: "invalid",
     };
   }
@@ -616,7 +617,9 @@ export function parseCodexPatch(patchText: string): ParseResult {
       }
       operations.push({
         content:
-          addLines.length === 0 ? "" : ensureTrailingNewline(addLines.join("\n")),
+          addLines.length === 0
+            ? ""
+            : ensureTrailingNewline(addLines.join("\n")),
         path,
         type: "add",
       });
@@ -941,6 +944,7 @@ async function getExistingFileState({
     const directoryCheck = await rejectDirectoryReadForDelete({
       absolutePath,
       editIndex,
+      path,
     });
     if (directoryCheck.status === "invalid") {
       return directoryCheck;
@@ -961,7 +965,7 @@ async function getExistingFileState({
       error: {
         editIndex,
         message: missingFileMessage({ absolutePath, kind: missingKind }),
-        path: "",
+        path,
       },
       status: "invalid",
     };
@@ -973,12 +977,13 @@ async function getExistingFileState({
 async function rejectDirectoryReadForDelete({
   absolutePath,
   editIndex,
+  path,
 }: {
   absolutePath: string;
   editIndex: number;
+  path: string;
 }): Promise<
-  | { status: "valid" }
-  | { status: "invalid"; error: PatchValidationError }
+  { status: "valid" } | { status: "invalid"; error: PatchValidationError }
 > {
   try {
     const stats = await stat(absolutePath);
@@ -996,7 +1001,7 @@ async function rejectDirectoryReadForDelete({
         absolutePath,
         reason: "Is a directory (os error 21)",
       }),
-      path: "",
+      path,
     },
     status: "invalid",
   };
@@ -1329,6 +1334,7 @@ function createUnifiedDiff(files: readonly ValidatedPatchFile[]): string {
         file.oldDiffPath,
         file.nextContent === null ? "/dev/null" : file.newDiffPath,
         file.previousContent,
+        // nextContent === null signals a delete operation; pass "" as the diff's "new" side.
         file.nextContent ?? "",
         "",
         "",
@@ -1413,9 +1419,10 @@ function expectedUpdateContextMarkerMessage(line: string): string {
   return `Expected update hunk to start with a @@ context marker, got: '${line}'`;
 }
 
-function parseUpdateHunkContextMarker(
-  line: string,
-): { context?: string; isMarker: boolean } {
+function parseUpdateHunkContextMarker(line: string): {
+  context?: string;
+  isMarker: boolean;
+} {
   if (line === "@@") {
     return { isMarker: true };
   }

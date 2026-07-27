@@ -31,6 +31,12 @@ export class ContextDeck {
     );
   }
 
+  /**
+   * Intentionally lenient: returns same deck if id not found.
+   * Race: user removes the item (keyboard / action) while a response
+   * finishes and tries to replace the live item. No-op is safe;
+   * throwing would crash the state transition.
+   */
   replace(item: PersistentContextItem): ContextDeck {
     if (!hasContextItem(this.contextItems, item.id)) {
       return this;
@@ -44,6 +50,12 @@ export class ContextDeck {
     );
   }
 
+  /**
+   * Intentionally lenient: returns same deck if id not found.
+   * Race: double-remove via keyboard shortcut + context action
+   * dispatched before state settles. No-op is safe; throwing would
+   * break the optimistic UI path.
+   */
   remove(itemId: string): ContextDeck {
     const removedIndex = this.contextItems.findIndex(
       (item) => item.id === itemId,
@@ -105,7 +117,14 @@ export function getNextContextItemFocusId({
         : displayOrder.length - 1
       : (currentIndex + offset + displayOrder.length) % displayOrder.length;
 
-  return displayOrder[nextIndex]?.id ?? null;
+  if (nextIndex < 0 || nextIndex >= displayOrder.length) {
+    throw new Error(
+      `getNextContextItemFocusId: computed index ${nextIndex} out of bounds for length ${displayOrder.length} (currentIndex=${currentIndex}, direction=${direction})`,
+    );
+  }
+
+  // displayOrder is non-empty (checked above) and nextIndex is proven in-bounds.
+  return displayOrder[nextIndex]!.id;
 }
 
 function getFocusAfterRemoval({
@@ -127,7 +146,13 @@ function getFocusAfterRemoval({
     return previousFocusedContextItemId;
   }
 
-  return (
-    contextItems[Math.min(removedIndex, contextItems.length - 1)]?.id ?? null
-  );
+  const index = Math.min(removedIndex, contextItems.length - 1);
+  if (index < 0 || index >= contextItems.length) {
+    throw new Error(
+      `getFocusAfterRemoval: computed index ${index} out of bounds for length ${contextItems.length} (removedIndex=${removedIndex})`,
+    );
+  }
+
+  // contextItems non-empty already checked; index clamped and proven in-bounds.
+  return contextItems[index]!.id;
 }

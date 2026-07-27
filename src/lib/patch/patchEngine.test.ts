@@ -10,6 +10,7 @@ import {
   parseCodexPatch,
   validatePatchProposal,
 } from "./patchEngine";
+import { formatPatchValidationError } from "./patchToolOutput";
 
 test("validates a Codex update patch and generates a diff", async () => {
   const root = await createTempRoot();
@@ -526,7 +527,7 @@ test("rejects mismatched heredoc quotes like Codex", async () => {
     root,
     proposal: {
       patch: [
-        '<<"EOF\'',
+        "<<\"EOF'",
         "*** Begin Patch",
         "*** Update File: file.txt",
         "@@",
@@ -950,7 +951,9 @@ test("move operations overwrite existing destinations like Codex", async () => {
   expect(await readFile(join(root, "renamed", "dir", "name.txt"), "utf8")).toBe(
     "new\n",
   );
-  await expect(readFile(join(root, "old", "name.txt"), "utf8")).rejects.toThrow();
+  await expect(
+    readFile(join(root, "old", "name.txt"), "utf8"),
+  ).rejects.toThrow();
 });
 
 test("updates a newly added file later in the same patch", async () => {
@@ -1151,11 +1154,9 @@ test("rejects directory delete targets with Codex's verification read failure", 
   const result = await validatePatchProposal({
     root,
     proposal: {
-      patch: [
-        "*** Begin Patch",
-        "*** Delete File: dir",
-        "*** End Patch",
-      ].join("\n"),
+      patch: ["*** Begin Patch", "*** Delete File: dir", "*** End Patch"].join(
+        "\n",
+      ),
       summary: "Delete directory",
     },
   });
@@ -1298,9 +1299,7 @@ test("rejects malformed hunk context markers without a space after @@", async ()
   });
 
   expect(result.status).toBe("invalid");
-  expect(
-    result.status === "invalid" ? result.errors[0]?.message : "",
-  ).toBe(
+  expect(result.status === "invalid" ? result.errors[0]?.message : "").toBe(
     "Unexpected line found in update hunk: '@@const value'. Every line should start with ' ' (context line), '+' (added line), or '-' (removed line)",
   );
 });
@@ -1381,6 +1380,30 @@ test("rejects stray update lines after hunk content with Codex's context-marker 
   );
 });
 
+test("formats structurally broken patch validation errors without a leading colon", async () => {
+  const root = await createTempRoot();
+
+  const result = await validatePatchProposal({
+    root,
+    proposal: {
+      patch: ["*** Update File: file.ts", "*** End Patch"].join("\n"),
+      summary: "Missing begin marker",
+    },
+  });
+
+  expect(result.status).toBe("invalid");
+  if (result.status !== "invalid") {
+    return;
+  }
+
+  expect(result.errors[0]?.path).toBeUndefined();
+  const formatted = formatPatchValidationError(result.errors[0]!);
+  expect(formatted).not.toMatch(/^:/);
+  expect(formatted).toBe(
+    "invalid patch: The first line of the patch must be '*** Begin Patch'",
+  );
+});
+
 test("rejects missing patch boundary markers with Codex's invalid-patch messages", async () => {
   const root = await createTempRoot();
 
@@ -1395,7 +1418,9 @@ test("rejects missing patch boundary markers with Codex's invalid-patch messages
   expect(missingStart.status).toBe("invalid");
   expect(
     missingStart.status === "invalid" ? missingStart.errors[0]?.message : "",
-  ).toBe("invalid patch: The first line of the patch must be '*** Begin Patch'");
+  ).toBe(
+    "invalid patch: The first line of the patch must be '*** Begin Patch'",
+  );
 
   const missingEnd = await validatePatchProposal({
     root,

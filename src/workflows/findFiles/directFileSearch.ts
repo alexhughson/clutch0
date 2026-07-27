@@ -5,7 +5,11 @@ import { buildAgentContextSnapshot } from "../../lib/llm/agentContext";
 import { completeDirectLlmResponse } from "../../lib/llm/llmClient";
 import { renderPrompt } from "../../lib/llm/prompts";
 import { configuredLlmRequestOptions } from "../../lib/llm/requestOptions";
-import type { LlmContext } from "../../lib/llm/types";
+import type {
+  LlmAssistantMessage,
+  LlmContext,
+  LlmTextContent,
+} from "../../lib/llm/types";
 import type { ContextItem } from "../../types";
 
 export type RunDirectFileSearchOptions = {
@@ -50,6 +54,7 @@ export async function runDirectFileSearch({
         timestamp: Date.now(),
       },
     ],
+    tools: [],
   };
 
   try {
@@ -201,12 +206,12 @@ function normalizePath(path: string): string {
   return path.trim().replace(/^\.\//, "").split("\\").join("/");
 }
 
-function getAssistantText(message: {
-  content: readonly { text?: string; type: string }[];
-}): string {
+function getAssistantText(
+  message: Pick<LlmAssistantMessage, "content">,
+): string {
   return message.content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text ?? "")
+    .filter((block): block is LlmTextContent => block.type === "text")
+    .map((block) => block.text)
     .join("\n");
 }
 

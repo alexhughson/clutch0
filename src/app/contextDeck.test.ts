@@ -69,3 +69,43 @@ test("context deck cycles focus and keeps focus valid after removal", () => {
   expect(afterRemoval.contextItems).toEqual([first]);
   expect(afterRemoval.focusedContextItemId).toBe(first.id);
 });
+
+test("context deck focus cycles and wraps around", () => {
+  const a = createFileContextItem("src/lib/a.ts");
+  const b = createFileContextItem("src/lib/b.ts");
+  const screen = {
+    ...createInitialComposeScreen(),
+    contextItems: [a, b],
+    focusedContextItemId: a.id,
+  };
+
+  // display order sorts by path: a then b
+  const deck = ContextDeck.fromComposeScreen(screen);
+  const next1 = deck.focus("next");
+  expect(next1.focusedContextItemId).toBe(b.id);
+
+  const next2 = next1.focus("next");
+  expect(next2.focusedContextItemId).toBe(a.id);
+
+  const prevFromFirst = deck.focus("previous");
+  expect(prevFromFirst.focusedContextItemId).toBe(b.id);
+});
+
+test("context deck remove non-existent id returns same deck (lenient for double-remove race)", () => {
+  const item = createFileContextItem("src/App.tsx");
+  const deck = new ContextDeck([item], item.id);
+
+  const result = deck.remove("non-existent");
+  expect(result).toBe(deck);
+  expect(result.contextItems).toEqual([item]);
+});
+
+test("context deck replace non-existent id returns same deck (lenient for remove-while-replace race)", () => {
+  const item = createFileContextItem("src/App.tsx");
+  const other = createFileContextItem("src/other.ts");
+  const deck = new ContextDeck([item], item.id);
+
+  const result = deck.replace(other);
+  expect(result).toBe(deck);
+  expect(result.contextItems).toEqual([item]);
+});

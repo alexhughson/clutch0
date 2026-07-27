@@ -97,7 +97,6 @@ export async function applyPatchProposalWithRuntimeEvents({
         {
           editIndex: 0,
           message: errorMessage,
-          path: "",
         },
       ],
       proposal,

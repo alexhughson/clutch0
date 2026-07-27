@@ -96,7 +96,7 @@ export function FindFilesScreen({ screen }: FindFilesScreenProps) {
       )}
       {screen.status === "searching" ? <SearchingView screen={screen} /> : null}
       {screen.status === "error" ? (
-        <ErrorView errorMessage={screen.errorMessage ?? "Unknown error"} />
+        <ErrorView errorMessage={screen.errorMessage} />
       ) : null}
       {screen.status === "results" ? <ResultsView screen={screen} /> : null}
     </box>
@@ -126,7 +126,11 @@ function ErrorView({ errorMessage }: { errorMessage: string }) {
   );
 }
 
-function ResultsView({ screen }: { screen: FindFilesScreenState }) {
+function ResultsView({
+  screen,
+}: {
+  screen: Extract<FindFilesScreenState, { status: "results" }>;
+}) {
   const contextItems = useAppStore((state) => state.workspace.contextItems);
   const scrollBoxRef = useRef<ScrollBoxRenderable | null>(null);
 

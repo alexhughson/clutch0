@@ -165,7 +165,8 @@ function isPowerShell(command: string): boolean {
 }
 
 function shellBasename(command: string): string {
-  const basename = command.split(/[\\/]/).pop()?.toLowerCase() ?? command.toLowerCase();
+  // split(/[\\/]/) always returns an array of length >= 1, so pop() is never undefined.
+  const basename = command.split(/[\\/]/).pop()!.toLowerCase();
   const extensionIndex = basename.lastIndexOf(".");
   return extensionIndex > 0 ? basename.slice(0, extensionIndex) : basename;
 }

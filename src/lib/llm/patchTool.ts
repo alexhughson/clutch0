@@ -6,12 +6,10 @@ export const APPLY_PATCH_TOOL_NAME = "apply_patch";
 
 export const applyPatchTool: Tool = {
   name: APPLY_PATCH_TOOL_NAME,
-  description:
-    "Edit files with one complete Codex apply_patch patch.",
+  description: "Edit files with one complete Codex apply_patch patch.",
   parameters: Type.Object({
     input: Type.String({
-      description:
-        "Raw patch body from *** Begin Patch through *** End Patch.",
+      description: "Raw patch body from *** Begin Patch through *** End Patch.",
     }),
   }),
 };
@@ -30,7 +28,8 @@ export function patchProposalFromToolCall(toolCall: ToolCall): PatchProposal {
   return {
     patch,
     summary,
-    toolCallId: toolCall.id.split("|")[0] ?? toolCall.id,
+    // split("|") always returns an array of length >= 1, so [0] is never undefined.
+    toolCallId: toolCall.id.split("|")[0]!,
   };
 }
 

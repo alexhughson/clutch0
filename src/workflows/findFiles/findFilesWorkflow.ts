@@ -30,7 +30,13 @@ export function createFindFilesActions({
         state.activeTask?.kind === "find-files"
           ? {
               activeTask: {
-                ...state.activeTask,
+                agentOutput: state.activeTask.agentOutput,
+                goal: state.activeTask.goal,
+                hints: state.activeTask.hints,
+                kind: "find-files",
+                ...(state.activeTask.rejectComposer === undefined
+                  ? {}
+                  : { rejectComposer: state.activeTask.rejectComposer }),
                 errorMessage,
                 status: "error",
               },
@@ -42,7 +48,13 @@ export function createFindFilesActions({
         state.activeTask?.kind === "find-files"
           ? {
               activeTask: {
-                ...state.activeTask,
+                agentOutput: state.activeTask.agentOutput,
+                goal: state.activeTask.goal,
+                hints: state.activeTask.hints,
+                kind: "find-files",
+                ...(state.activeTask.rejectComposer === undefined
+                  ? {}
+                  : { rejectComposer: state.activeTask.rejectComposer }),
                 candidates,
                 selectedIndex: 0,
                 status: "results",
@@ -71,11 +83,9 @@ export function createFindFilesActions({
       set({
         activeTask: {
           agentOutput: [],
-          candidates: [],
           goal,
           hints,
           kind: "find-files",
-          selectedIndex: 0,
           status: "searching",
         },
       }),
