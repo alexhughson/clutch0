@@ -394,6 +394,95 @@ export function saveClutchAgentBackendConfiguration({
   } satisfies ClutchSettings);
 }
 
+export function findModelRolesUsingProvider(
+  models: Partial<Record<ClutchModelRole, ClutchModelSelection>>,
+  providerId: string,
+): ClutchModelRole[] {
+  const roles: ClutchModelRole[] = [];
+  if (models.primary?.provider === providerId) {
+    roles.push("primary");
+  }
+  if (models.agent?.provider === providerId) {
+    roles.push("agent");
+  }
+  if (models.summarization?.provider === providerId) {
+    roles.push("summarization");
+  }
+  return roles;
+}
+
+export function saveClutchEndpointConfiguration({
+  apiKey,
+  endpoint,
+  paths = getClutchConfigPaths(),
+}: {
+  apiKey?: string;
+  endpoint: ClutchEndpoint;
+  paths?: ClutchConfigPaths;
+}) {
+  assertEndpointSlug(endpoint.id);
+  const normalizedEndpoint = normalizeEndpointForSave(endpoint);
+  const settings = loadClutchSettings(paths);
+  const endpoints = [...(settings.endpoints ?? [])];
+  const existingIndex = endpoints.findIndex(
+    (candidate) => candidate.id === normalizedEndpoint.id,
+  );
+  if (existingIndex === -1) {
+    endpoints.push(normalizedEndpoint);
+  } else {
+    endpoints[existingIndex] = normalizedEndpoint;
+  }
+
+  mkdirSync(paths.configDir, { recursive: true });
+  writeJsonFile(paths.settingsPath, {
+    ...settings,
+    endpoints,
+  } satisfies ClutchSettings);
+
+  if (apiKey !== undefined) {
+    saveClutchApiKey({ apiKey, paths, provider: normalizedEndpoint.id });
+  }
+}
+
+export function deleteClutchEndpointConfiguration({
+  endpointId,
+  paths = getClutchConfigPaths(),
+}: {
+  endpointId: string;
+  paths?: ClutchConfigPaths;
+}) {
+  if (endpointId === OPENROUTER_PROVIDER_ID) {
+    throw new Error("Cannot delete the built-in OpenRouter provider.");
+  }
+
+  const settings = loadClutchSettings(paths);
+  const roles = findModelRolesUsingProvider(settings.models ?? {}, endpointId);
+  if (roles.length > 0) {
+    throw new Error(
+      `Cannot delete endpoint "${endpointId}" while ${roles.join(", ")} model(s) still use it. Change those models first.`,
+    );
+  }
+
+  const endpoints = settings.endpoints ?? [];
+  if (!endpoints.some((candidate) => candidate.id === endpointId)) {
+    throw new Error(`Endpoint "${endpointId}" was not found.`);
+  }
+
+  mkdirSync(paths.configDir, { recursive: true });
+  const { endpoints: _endpoints, ...restSettings } = settings;
+  const nextEndpoints = endpoints.filter((candidate) => candidate.id !== endpointId);
+  writeJsonFile(paths.settingsPath, {
+    ...restSettings,
+    ...(nextEndpoints.length === 0 ? {} : { endpoints: nextEndpoints }),
+  } satisfies ClutchSettings);
+
+  const auth = loadClutchAuth(paths);
+  if (auth[endpointId] !== undefined) {
+    const { [endpointId]: _removed, ...restAuth } = auth;
+    writeClutchAuth(paths, restAuth);
+  }
+}
+
 export function createDefaultClutchConfigDraft(
   paths = getClutchConfigPaths(),
 ): {
@@ -1099,6 +1188,37 @@ function resolveEndpointConfig(
   }
 
   return endpoint;
+}
+
+function assertEndpointSlug(id: string) {
+  if (id === OPENROUTER_PROVIDER_ID) {
+    throw new Error(`Endpoint id "${OPENROUTER_PROVIDER_ID}" is reserved.`);
+  }
+  if (!/^[a-z][a-z0-9-]*$/.test(id)) {
+    throw new Error('Endpoint id must be a lowercase slug like "my-proxy".');
+  }
+}
+
+function normalizeEndpointForSave(endpoint: ClutchEndpoint): ClutchEndpoint {
+  const id = endpoint.id.trim();
+  const label = endpoint.label.trim();
+  const baseUrl = endpoint.baseUrl.trim();
+  if (label.length === 0) {
+    throw new Error("Endpoint label must be a non-empty string.");
+  }
+  if (baseUrl.length === 0) {
+    throw new Error("Endpoint baseUrl must be a non-empty string.");
+  }
+
+  return {
+    baseUrl,
+    id,
+    label,
+    ...(endpoint.headers === undefined ? {} : { headers: endpoint.headers }),
+    ...(endpoint.requestDefaults === undefined
+      ? {}
+      : { requestDefaults: endpoint.requestDefaults }),
+  };
 }
 
 function resolveApiKeyCredential(

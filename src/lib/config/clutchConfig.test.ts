@@ -15,6 +15,8 @@ import {
   saveClutchAgentBackendConfiguration,
   saveClutchApiKey,
   saveClutchConfiguration,
+  saveClutchEndpointConfiguration,
+  deleteClutchEndpointConfiguration,
   saveClutchModelConfiguration,
 } from "./clutchConfig";
 
@@ -467,5 +469,74 @@ test("malformed model service tier fails loudly", async () => {
 
   expect(() => isClutchConfigured(paths)).toThrow(
     "model serviceTier must be one of",
+  );
+});
+
+test("saves and deletes custom endpoints", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchEndpointConfiguration({
+    apiKey: "proxy-token",
+    endpoint: {
+      baseUrl: "https://proxy.example/v1",
+      id: "work-proxy",
+      label: "Work Proxy",
+      headers: { "x-proxy": "1" },
+      requestDefaults: { temperature: 0.2 },
+    },
+    paths,
+  });
+
+  const settings = loadClutchSettings(paths);
+  expect(settings.endpoints).toEqual([
+    {
+      baseUrl: "https://proxy.example/v1",
+      headers: { "x-proxy": "1" },
+      id: "work-proxy",
+      label: "Work Proxy",
+      requestDefaults: { temperature: 0.2 },
+    },
+  ]);
+  expect(loadClutchAuth(paths)["work-proxy"]).toEqual({
+    key: "proxy-token",
+    type: "api_key",
+  });
+
+  deleteClutchEndpointConfiguration({ endpointId: "work-proxy", paths });
+  expect(loadClutchSettings(paths).endpoints).toBeUndefined();
+  expect(loadClutchAuth(paths)["work-proxy"]).toBeUndefined();
+});
+
+test("deleteClutchEndpointConfiguration blocks when models still use endpoint", async () => {
+  const paths = await createTempConfigPaths();
+  saveClutchEndpointConfiguration({
+    apiKey: "proxy-token",
+    endpoint: {
+      baseUrl: "https://proxy.example/v1",
+      id: "work-proxy",
+      label: "Work Proxy",
+    },
+    paths,
+  });
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      endpoints: [
+        {
+          baseUrl: "https://proxy.example/v1",
+          id: "work-proxy",
+          label: "Work Proxy",
+        },
+      ],
+      models: {
+        primary: { model: "vendor/model", provider: "work-proxy" },
+      },
+    }),
+    "utf-8",
+  );
+
+  expect(() =>
+    deleteClutchEndpointConfiguration({ endpointId: "work-proxy", paths }),
+  ).toThrow(
+    'Cannot delete endpoint "work-proxy" while primary model(s) still use it. Change those models first.',
   );
 });

@@ -12,9 +12,13 @@ import {
   getClutchModelEffortLevel,
   getClutchOpenRouterServiceTier,
   getClutchProviderLabel,
+  loadClutchAuth,
+  loadClutchSettings,
   OPENROUTER_PROVIDER_ID,
   saveClutchAgentBackendConfiguration,
   saveClutchApiKey,
+  saveClutchEndpointConfiguration,
+  deleteClutchEndpointConfiguration,
   saveClutchModelConfiguration,
   type ClutchAgentBackendConfig,
   type ClutchEndpoint,
@@ -27,6 +31,27 @@ import {
   type ClutchProviderModel,
 } from "../../lib/config/providerModels";
 import { useAppStore } from "../../store/appStore";
+import {
+  buildModelSettingsRows,
+  commitOpenRouterModelSelection,
+  entryLabel,
+  getModelEntrySelection,
+  modelSettingsRowKey,
+  modelSettingsRowLabel,
+  OPENROUTER_SORT_OPTIONS,
+  openRouterSortIndex,
+  openRouterVendorIndex,
+  openRouterVendorOptions,
+  providerExtrasJson,
+  selectionWithOpenRouterSort,
+  selectionWithOpenRouterVendor,
+  selectionWithProviderExtrasJson,
+  parseJsonObject,
+  parseJsonStringArray,
+  parseJsonStringRecord,
+  type ModelEntry,
+  type ModelSettingsRow,
+} from "./configScreenHelpers";
 
 type ConfigScreenProps = {
   task: ConfigTaskState;
@@ -34,23 +59,42 @@ type ConfigScreenProps = {
 
 type ConfigStage =
   | "agent-backend"
-  | "model-effort"
+  | "endpoint-form"
   | "model-model"
+  | "model-option"
   | "model-provider"
-  | "model-service-tier"
   | "model-settings"
   | "providers"
   | "token";
-type ModelEntry = "agent" | "primary" | "summarization";
-type ModelSettingsRow =
-  | { entry: ModelEntry; kind: "effort" | "model" | "service-tier" }
-  | { kind: "done" };
+type ModelOptionKey =
+  | "effort"
+  | "providerExtras"
+  | "serviceTier"
+  | "sort"
+  | "vendor";
 type AgentBackendField = "args" | "command" | "env";
 type AgentBackendRow = AgentBackendField | "save";
 type AgentBackendForm = {
   argsJson: string;
   command: string;
   envJson: string;
+};
+type EndpointFormField =
+  | "apiKey"
+  | "baseUrl"
+  | "headersJson"
+  | "id"
+  | "label"
+  | "requestDefaultsJson";
+type EndpointFormRow = EndpointFormField | "delete" | "save";
+type EndpointFormMode = "add" | "edit";
+type EndpointForm = {
+  apiKey: string;
+  baseUrl: string;
+  headersJson: string;
+  id: string;
+  label: string;
+  requestDefaultsJson: string;
 };
 type ModelLoadState =
   | {
@@ -69,18 +113,6 @@ type ModelLoadState =
 
 type AppActions = ReturnType<typeof useAppStore.getState>["actions"];
 
-const MODEL_SETTINGS_ROWS: ModelSettingsRow[] = [
-  { entry: "primary", kind: "model" },
-  { entry: "primary", kind: "effort" },
-  { entry: "primary", kind: "service-tier" },
-  { entry: "agent", kind: "model" },
-  { entry: "agent", kind: "effort" },
-  { entry: "agent", kind: "service-tier" },
-  { entry: "summarization", kind: "model" },
-  { entry: "summarization", kind: "effort" },
-  { entry: "summarization", kind: "service-tier" },
-  { kind: "done" },
-];
 const AGENT_BACKEND_ROWS: AgentBackendRow[] = [
   "command",
   "args",
@@ -99,8 +131,8 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const [activeModelEntry, setActiveModelEntry] =
     useState<ModelEntry>("primary");
   const [modelProviderIndex, setModelProviderIndex] = useState(0);
-  const [modelEffortIndex, setModelEffortIndex] = useState(0);
-  const [modelServiceTierIndex, setModelServiceTierIndex] = useState(0);
+  const [modelOptionKey, setModelOptionKey] = useState<ModelOptionKey>("sort");
+  const [modelOptionIndex, setModelOptionIndex] = useState(0);
   const [modelIndex, setModelIndex] = useState(0);
   const [modelFilter, setModelFilter] = useState("");
   const [agentBackendForm, setAgentBackendForm] = useState(
@@ -114,7 +146,13 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const [configuredProviders, setConfiguredProviders] = useState(
     task.configuredProviders,
   );
-  const [endpoints] = useState(task.endpoints);
+  const [endpoints, setEndpoints] = useState(task.endpoints);
+  const [endpointForm, setEndpointForm] = useState<EndpointForm | null>(null);
+  const [endpointFormMode, setEndpointFormMode] =
+    useState<EndpointFormMode>("add");
+  const [endpointFormRowIndex, setEndpointFormRowIndex] = useState(0);
+  const [providerExtrasDraft, setProviderExtrasDraft] = useState("{}");
+  const [modelCommitPending, setModelCommitPending] = useState(false);
   const [modelLoad, setModelLoad] = useState<ModelLoadState>({
     models: [],
     provider: null,
@@ -124,6 +162,11 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const activeSelection = getModelEntrySelection({
     agent,
     entry: activeModelEntry,
+    primary,
+    summarization,
+  });
+  const modelSettingsRows = buildModelSettingsRows({
+    agent,
     primary,
     summarization,
   });
@@ -160,7 +203,12 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   }, [activeSelection.model, activeSelection.provider, stage]);
 
   usePaste((event) => {
-    if (stage !== "token" && stage !== "agent-backend") {
+    if (
+      stage !== "token" &&
+      stage !== "agent-backend" &&
+      stage !== "endpoint-form" &&
+      !(stage === "model-option" && modelOptionKey === "providerExtras")
+    ) {
       return;
     }
 
@@ -171,6 +219,19 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
 
     if (stage === "token") {
       setToken((currentToken) => `${currentToken}${pastedToken}`);
+    } else if (stage === "model-option") {
+      setProviderExtrasDraft((current) => `${current}${pastedToken}`);
+    } else if (stage === "endpoint-form") {
+      const row = endpointFormRows(endpointFormMode)[endpointFormRowIndex];
+      if (row !== undefined && isEndpointFormField(row)) {
+        setEndpointForm((form) =>
+          updateEndpointFormField(
+            form ?? emptyEndpointForm(),
+            row,
+            (value) => `${value}${pastedToken}`,
+          ),
+        );
+      }
     } else {
       const row = AGENT_BACKEND_ROWS[agentBackendRowIndex];
       if (row !== undefined && row !== "save") {
@@ -197,12 +258,31 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         event,
         providerIndex,
         agentBackendConfigured: agentBackendForm.command.trim().length > 0,
+        setEndpointForm,
+        setEndpointFormMode,
+        setEndpointFormRowIndex,
         setMessage,
         setProviderIndex,
         setStage,
         setToken,
         setTokenProvider,
         task,
+      });
+      return;
+    }
+
+    if (stage === "endpoint-form") {
+      handleEndpointFormKey({
+        endpointForm,
+        endpointFormMode,
+        endpointFormRowIndex,
+        event,
+        setConfiguredProviders,
+        setEndpointForm,
+        setEndpointFormRowIndex,
+        setEndpoints,
+        setMessage,
+        setStage,
       });
       return;
     }
@@ -239,18 +319,41 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       handleModelSettingsKey({
         actions,
         agent,
+        endpoints,
         event,
         modelSettingsIndex,
+        modelSettingsRows,
         primary,
         setActiveModelEntry,
         setMessage,
-        setModelEffortIndex,
+        setModelOptionIndex,
+        setModelOptionKey,
         setModelProviderIndex,
-        setModelServiceTierIndex,
         setModelSettingsIndex,
+        setProviderExtrasDraft,
         setStage,
         summarization,
-        endpoints,
+      });
+      return;
+    }
+
+    if (stage === "model-option") {
+      handleModelOptionKey({
+        activeModelEntry,
+        agent,
+        event,
+        modelOptionIndex,
+        modelOptionKey,
+        primary,
+        providerExtrasDraft,
+        setAgent,
+        setMessage,
+        setModelOptionIndex,
+        setPrimary,
+        setProviderExtrasDraft,
+        setStage,
+        setSummarization,
+        summarization,
       });
       return;
     }
@@ -276,52 +379,18 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       return;
     }
 
-    if (stage === "model-effort") {
-      handleModelEffortKey({
-        activeModelEntry,
-        agent,
-        event,
-        modelEffortIndex,
-        primary,
-        setAgent,
-        setMessage,
-        setModelEffortIndex,
-        setStage,
-        setSummarization,
-        setPrimary,
-        summarization,
-      });
-      return;
-    }
-
-    if (stage === "model-service-tier") {
-      handleModelServiceTierKey({
-        activeModelEntry,
-        agent,
-        event,
-        modelServiceTierIndex,
-        primary,
-        setAgent,
-        setMessage,
-        setModelServiceTierIndex,
-        setStage,
-        setSummarization,
-        setPrimary,
-        summarization,
-      });
-      return;
-    }
-
     handleModelChoiceKey({
       activeModelEntry,
       agent,
       event,
+      modelCommitPending,
       modelFilter,
       modelIndex,
       modelLoad,
       primary,
       setAgent,
       setMessage,
+      setModelCommitPending,
       setModelFilter,
       setModelIndex,
       setPrimary,
@@ -342,8 +411,8 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       }}
     >
       <box
-        title={stageTitle({ activeModelEntry, stage, task })}
-        bottomTitle={hotkeysForStage(stage, task)}
+        title={stageTitle({ activeModelEntry, modelOptionKey, stage, task })}
+        bottomTitle={hotkeysForStage(stage, task, modelOptionKey)}
         bottomTitleAlignment="right"
         borderStyle="rounded"
         style={{
@@ -362,6 +431,14 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
             message={message}
             providerIndex={providerIndex}
             task={task}
+          />
+        ) : null}
+        {stage === "endpoint-form" ? (
+          <EndpointFormStep
+            form={endpointForm ?? emptyEndpointForm()}
+            message={message}
+            mode={endpointFormMode}
+            rowIndex={endpointFormRowIndex}
           />
         ) : null}
         {stage === "token" ? (
@@ -386,6 +463,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
             message={message}
             primary={primary}
             rowIndex={modelSettingsIndex}
+            rows={modelSettingsRows}
             summarization={summarization}
           />
         ) : null}
@@ -410,18 +488,16 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
             summarization={summarization}
           />
         ) : null}
-        {stage === "model-effort" ? (
-          <ModelEffortStep
+        {stage === "model-option" ? (
+          <ModelOptionStep
             activeModelEntry={activeModelEntry}
-            effortIndex={modelEffortIndex}
+            agent={agent}
             message={message}
-          />
-        ) : null}
-        {stage === "model-service-tier" ? (
-          <ModelServiceTierStep
-            activeModelEntry={activeModelEntry}
-            message={message}
-            serviceTierIndex={modelServiceTierIndex}
+            optionIndex={modelOptionIndex}
+            optionKey={modelOptionKey}
+            primary={primary}
+            providerExtrasDraft={providerExtrasDraft}
+            summarization={summarization}
           />
         ) : null}
       </box>
@@ -519,6 +595,7 @@ function ModelSettingsStep({
   message,
   primary,
   rowIndex,
+  rows,
   summarization,
 }: {
   agent: ClutchModelSelection;
@@ -526,12 +603,13 @@ function ModelSettingsStep({
   message: string | null;
   primary: ClutchModelSelection;
   rowIndex: number;
+  rows: ModelSettingsRow[];
   summarization: ClutchModelSelection;
 }) {
   return (
     <>
       <text>Model settings</text>
-      {MODEL_SETTINGS_ROWS.map((row, index) => (
+      {rows.map((row, index) => (
         <text
           key={modelSettingsRowKey(row)}
           style={index === rowIndex ? selectedStyle : undefined}
@@ -546,24 +624,53 @@ function ModelSettingsStep({
   );
 }
 
-function ModelEffortStep({
+function ModelOptionStep({
   activeModelEntry,
-  effortIndex,
+  agent,
   message,
+  optionIndex,
+  optionKey,
+  primary,
+  providerExtrasDraft,
+  summarization,
 }: {
   activeModelEntry: ModelEntry;
-  effortIndex: number;
+  agent: ClutchModelSelection;
   message: string | null;
+  optionIndex: number;
+  optionKey: ModelOptionKey;
+  primary: ClutchModelSelection;
+  providerExtrasDraft: string;
+  summarization: ClutchModelSelection;
 }) {
+  if (optionKey === "providerExtras") {
+    return (
+      <>
+        <text>{`Provider extras JSON for ${entryLabel(activeModelEntry)}.`}</text>
+        <text>{providerExtrasDraft}</text>
+        {message === null ? null : <text style={{ fg: "red" }}>{message}</text>}
+      </>
+    );
+  }
+
+  const selection = getModelEntrySelection({
+    agent,
+    entry: activeModelEntry,
+    primary,
+    summarization,
+  });
+  const prompt = modelOptionPrompt(optionKey, activeModelEntry);
+  const options = modelOptionLabels(optionKey, selection);
+
   return (
     <>
-      <text>{`Choose effort for ${entryLabel(activeModelEntry)}.`}</text>
-      {CLUTCH_MODEL_EFFORT_LEVELS.map((effortLevel, index) => (
+      <text>{prompt}</text>
+      {options.map((label, index) => (
         <text
-          key={effortLevel}
-          style={index === effortIndex ? selectedStyle : undefined}
+          key={label}
+          style={index === optionIndex ? selectedStyle : undefined}
         >
-          {`${index === effortIndex ? ">" : " "} ${effortLevel}`}
+          {`${index === optionIndex ? ">" : " "} ${label}`}
         </text>
       ))}
       {message === null ? null : (
@@ -573,29 +680,26 @@ function ModelEffortStep({
   );
 }
 
-function ModelServiceTierStep({
-  activeModelEntry,
+function EndpointFormStep({
+  form,
   message,
-  serviceTierIndex,
+  mode,
+  rowIndex,
 }: {
-  activeModelEntry: ModelEntry;
+  form: EndpointForm;
   message: string | null;
-  serviceTierIndex: number;
+  mode: EndpointFormMode;
+  rowIndex: number;
 }) {
   return (
     <>
-      <text>{`Choose service tier for ${entryLabel(activeModelEntry)}.`}</text>
-      {CLUTCH_MODEL_SERVICE_TIERS.map((serviceTier, index) => (
-        <text
-          key={serviceTier}
-          style={index === serviceTierIndex ? selectedStyle : undefined}
-        >
-          {`${index === serviceTierIndex ? ">" : " "} ${serviceTier}`}
+      <text>{mode === "add" ? "Add endpoint" : "Edit endpoint"}</text>
+      {endpointFormRows(mode).map((row, index) => (
+        <text key={row} style={index === rowIndex ? selectedStyle : undefined}>
+          {`${index === rowIndex ? ">" : " "} ${endpointFormRowLabel({ form, mode, row })}`}
         </text>
       ))}
-      {message === null ? null : (
-        <text style={{ fg: "yellow" }}>{message}</text>
-      )}
+      {message === null ? null : <text style={{ fg: "red" }}>{message}</text>}
     </>
   );
 }
@@ -697,6 +801,9 @@ function handleProvidersKey({
   endpoints,
   event,
   providerIndex,
+  setEndpointForm,
+  setEndpointFormMode,
+  setEndpointFormRowIndex,
   setMessage,
   setProviderIndex,
   setStage,
@@ -710,6 +817,9 @@ function handleProvidersKey({
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   providerIndex: number;
+  setEndpointForm: (form: EndpointForm | null) => void;
+  setEndpointFormMode: (mode: EndpointFormMode) => void;
+  setEndpointFormRowIndex: (index: number) => void;
   setMessage: (message: string | null) => void;
   setProviderIndex: (index: number) => void;
   setStage: (stage: ConfigStage) => void;
@@ -755,6 +865,30 @@ function handleProvidersKey({
 
   if (row.kind === "agent-backend") {
     setStage("agent-backend");
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  if (row.kind === "add-endpoint") {
+    setEndpointFormMode("add");
+    setEndpointForm(emptyEndpointForm());
+    setEndpointFormRowIndex(0);
+    setStage("endpoint-form");
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  if (row.kind === "endpoint") {
+    const endpoint = endpoints.find((candidate) => candidate.id === row.endpointId);
+    if (endpoint === undefined) {
+      throw new Error(`Unknown endpoint id: ${row.endpointId}`);
+    }
+    setEndpointFormMode("edit");
+    setEndpointForm(endpointFormFromEndpoint(endpoint));
+    setEndpointFormRowIndex(0);
+    setStage("endpoint-form");
     setMessage(null);
     prevent(event);
     return;
@@ -933,13 +1067,15 @@ function handleModelSettingsKey({
   endpoints,
   event,
   modelSettingsIndex,
+  modelSettingsRows,
   primary,
   setActiveModelEntry,
   setMessage,
-  setModelEffortIndex,
+  setModelOptionIndex,
+  setModelOptionKey,
   setModelProviderIndex,
-  setModelServiceTierIndex,
   setModelSettingsIndex,
+  setProviderExtrasDraft,
   setStage,
   summarization,
 }: {
@@ -948,13 +1084,15 @@ function handleModelSettingsKey({
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelSettingsIndex: number;
+  modelSettingsRows: ModelSettingsRow[];
   primary: ClutchModelSelection;
   setActiveModelEntry: (entry: ModelEntry) => void;
   setMessage: (message: string | null) => void;
-  setModelEffortIndex: (index: number) => void;
+  setModelOptionIndex: (index: number) => void;
+  setModelOptionKey: (key: ModelOptionKey) => void;
   setModelProviderIndex: (index: number) => void;
-  setModelServiceTierIndex: (index: number) => void;
   setModelSettingsIndex: (index: number) => void;
+  setProviderExtrasDraft: (draft: string) => void;
   setStage: (stage: ConfigStage) => void;
   summarization: ClutchModelSelection;
 }) {
@@ -969,7 +1107,7 @@ function handleModelSettingsKey({
     setModelSettingsIndex(
       cycleIndex(
         modelSettingsIndex,
-        MODEL_SETTINGS_ROWS.length,
+        modelSettingsRows.length,
         event.name === "down" ? 1 : -1,
       ),
     );
@@ -982,7 +1120,7 @@ function handleModelSettingsKey({
     return;
   }
 
-  const row = MODEL_SETTINGS_ROWS[modelSettingsIndex];
+  const row = modelSettingsRows[modelSettingsIndex];
   if (row === undefined) {
     throw new Error(`Invalid model settings row index: ${modelSettingsIndex}`);
   }
@@ -1005,19 +1143,18 @@ function handleModelSettingsKey({
     summarization,
   });
   setActiveModelEntry(row.entry);
-  if (row.kind === "effort") {
-    setModelEffortIndex(effortIndexFor(getClutchModelEffortLevel(selection)));
-    setStage("model-effort");
-  } else if (row.kind === "service-tier") {
-    setModelServiceTierIndex(
-      serviceTierIndexFor(getClutchOpenRouterServiceTier(selection)),
-    );
-    setStage("model-service-tier");
-  } else {
-    setModelProviderIndex(
-      providerIndexFor(selection.provider, endpoints),
-    );
+  if (row.kind === "model") {
+    setModelProviderIndex(providerIndexFor(selection.provider, endpoints));
     setStage("model-provider");
+  } else {
+    const optionKey = modelSettingsKindToOptionKey(row.kind);
+    setModelOptionKey(optionKey);
+    if (optionKey === "providerExtras") {
+      setProviderExtrasDraft(providerExtrasJson(selection));
+    } else {
+      setModelOptionIndex(modelOptionIndexFor(optionKey, selection));
+    }
+    setStage("model-option");
   }
   setMessage(null);
   prevent(event);
@@ -1122,16 +1259,19 @@ function handleModelProviderKey({
   prevent(event);
 }
 
-function handleModelEffortKey({
+function handleModelOptionKey({
   activeModelEntry,
   agent,
   event,
-  modelEffortIndex,
+  modelOptionIndex,
+  modelOptionKey,
   primary,
+  providerExtrasDraft,
   setAgent,
   setMessage,
-  setModelEffortIndex,
+  setModelOptionIndex,
   setPrimary,
+  setProviderExtrasDraft,
   setStage,
   setSummarization,
   summarization,
@@ -1139,16 +1279,26 @@ function handleModelEffortKey({
   activeModelEntry: ModelEntry;
   agent: ClutchModelSelection;
   event: KeyEvent;
-  modelEffortIndex: number;
+  modelOptionIndex: number;
+  modelOptionKey: ModelOptionKey;
   primary: ClutchModelSelection;
+  providerExtrasDraft: string;
   setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
-  setModelEffortIndex: (index: number) => void;
+  setModelOptionIndex: (index: number) => void;
   setPrimary: (selection: ClutchModelSelection) => void;
+  setProviderExtrasDraft: (draft: string) => void;
   setStage: (stage: ConfigStage) => void;
   setSummarization: (selection: ClutchModelSelection) => void;
   summarization: ClutchModelSelection;
 }) {
+  const selection = getModelEntrySelection({
+    agent,
+    entry: activeModelEntry,
+    primary,
+    summarization,
+  });
+
   if (event.name === "escape") {
     setStage("model-settings");
     setMessage(null);
@@ -1156,11 +1306,60 @@ function handleModelEffortKey({
     return;
   }
 
+  if (modelOptionKey === "providerExtras") {
+    if (event.name === "return" || (event.ctrl && event.name === "s")) {
+      try {
+        setActiveSelection({
+          activeModelEntry,
+          selection: selectionWithProviderExtrasJson(
+            selection,
+            providerExtrasDraft,
+          ),
+          setAgent,
+          setPrimary,
+          setSummarization,
+        });
+        setStage("model-settings");
+        setMessage(
+          `${entryLabel(activeModelEntry)} provider extras updated. Choose Done to save.`,
+        );
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : String(error));
+      }
+      prevent(event);
+      return;
+    }
+
+    if (event.ctrl && event.name === "u") {
+      setProviderExtrasDraft("{}");
+      setMessage(null);
+      prevent(event);
+      return;
+    }
+
+    if (event.name === "backspace") {
+      setProviderExtrasDraft(providerExtrasDraft.slice(0, -1));
+      setMessage(null);
+      prevent(event);
+      return;
+    }
+
+    const input = getPrintableInput(event);
+    if (input !== null) {
+      setProviderExtrasDraft(`${providerExtrasDraft}${input}`);
+      setMessage(null);
+      prevent(event);
+    }
+    return;
+  }
+
+  const optionCount = modelOptionLabels(modelOptionKey, selection).length;
+
   if (event.name === "up" || event.name === "down") {
-    setModelEffortIndex(
+    setModelOptionIndex(
       cycleIndex(
-        modelEffortIndex,
-        CLUTCH_MODEL_EFFORT_LEVELS.length,
+        modelOptionIndex,
+        optionCount,
         event.name === "down" ? 1 : -1,
       ),
     );
@@ -1173,111 +1372,21 @@ function handleModelEffortKey({
     return;
   }
 
-  const effortLevel = CLUTCH_MODEL_EFFORT_LEVELS[modelEffortIndex];
-  if (effortLevel === undefined) {
-    throw new Error(`Invalid model effort row index: ${modelEffortIndex}`);
-  }
-
-  const selection = getModelEntrySelection({
-    agent,
-    entry: activeModelEntry,
-    primary,
-    summarization,
-  });
-  setActiveSelection({
-    activeModelEntry,
-    selection: { ...selection, effortLevel },
-    setAgent,
-    setPrimary,
-    setSummarization,
-  });
-  setStage("model-settings");
-  setMessage(
-    `${entryLabel(activeModelEntry)} effort updated. Choose Done to save.`,
+  const nextSelection = selectionWithModelOption(
+    modelOptionKey,
+    selection,
+    modelOptionIndex,
   );
-  prevent(event);
-}
-
-function handleModelServiceTierKey({
-  activeModelEntry,
-  agent,
-  event,
-  modelServiceTierIndex,
-  primary,
-  setAgent,
-  setMessage,
-  setModelServiceTierIndex,
-  setPrimary,
-  setStage,
-  setSummarization,
-  summarization,
-}: {
-  activeModelEntry: ModelEntry;
-  agent: ClutchModelSelection;
-  event: KeyEvent;
-  modelServiceTierIndex: number;
-  primary: ClutchModelSelection;
-  setAgent: (selection: ClutchModelSelection) => void;
-  setMessage: (message: string | null) => void;
-  setModelServiceTierIndex: (index: number) => void;
-  setPrimary: (selection: ClutchModelSelection) => void;
-  setStage: (stage: ConfigStage) => void;
-  setSummarization: (selection: ClutchModelSelection) => void;
-  summarization: ClutchModelSelection;
-}) {
-  if (event.name === "escape") {
-    setStage("model-settings");
-    setMessage(null);
-    prevent(event);
-    return;
-  }
-
-  if (event.name === "up" || event.name === "down") {
-    setModelServiceTierIndex(
-      cycleIndex(
-        modelServiceTierIndex,
-        CLUTCH_MODEL_SERVICE_TIERS.length,
-        event.name === "down" ? 1 : -1,
-      ),
-    );
-    setMessage(null);
-    prevent(event);
-    return;
-  }
-
-  if (event.name !== "return") {
-    return;
-  }
-
-  const serviceTier = CLUTCH_MODEL_SERVICE_TIERS[modelServiceTierIndex];
-  if (serviceTier === undefined) {
-    throw new Error(
-      `Invalid model service tier row index: ${modelServiceTierIndex}`,
-    );
-  }
-
-  const selection = getModelEntrySelection({
-    agent,
-    entry: activeModelEntry,
-    primary,
-    summarization,
-  });
   setActiveSelection({
     activeModelEntry,
-    selection: {
-      ...selection,
-      openRouter: {
-        ...(selection.openRouter ?? {}),
-        serviceTier,
-      },
-    },
+    selection: nextSelection,
     setAgent,
     setPrimary,
     setSummarization,
   });
   setStage("model-settings");
   setMessage(
-    `${entryLabel(activeModelEntry)} service tier updated. Choose Done to save.`,
+    `${entryLabel(activeModelEntry)} ${modelOptionTitle(modelOptionKey)} updated. Choose Done to save.`,
   );
   prevent(event);
 }
@@ -1286,12 +1395,14 @@ function handleModelChoiceKey({
   activeModelEntry,
   agent,
   event,
+  modelCommitPending,
   modelFilter,
   modelIndex,
   modelLoad,
   primary,
   setAgent,
   setMessage,
+  setModelCommitPending,
   setModelFilter,
   setModelIndex,
   setPrimary,
@@ -1302,12 +1413,14 @@ function handleModelChoiceKey({
   activeModelEntry: ModelEntry;
   agent: ClutchModelSelection;
   event: KeyEvent;
+  modelCommitPending: boolean;
   modelFilter: string;
   modelIndex: number;
   modelLoad: ModelLoadState;
   primary: ClutchModelSelection;
   setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
+  setModelCommitPending: (pending: boolean) => void;
   setModelFilter: (filter: string) => void;
   setModelIndex: (index: number) => void;
   setPrimary: (selection: ClutchModelSelection) => void;
@@ -1345,22 +1458,70 @@ function handleModelChoiceKey({
   }
 
   if (event.name === "return") {
-    if (modelLoad.status !== "loaded") {
-      setMessage("Models are not loaded yet.");
+    if (modelCommitPending) {
       prevent(event);
       return;
     }
 
-    const model = matches[modelIndex];
-    if (model === undefined) {
+    const modelId = resolveCommittedModelId({
+      filter: modelFilter,
+      matches,
+      modelIndex,
+    });
+    if (modelId === undefined) {
       setMessage("Choose a model before continuing.");
+      prevent(event);
+      return;
+    }
+
+    if (selection.provider === OPENROUTER_PROVIDER_ID) {
+      const apiKey = loadClutchAuth()[OPENROUTER_PROVIDER_ID]?.key;
+      if (apiKey === undefined || apiKey.trim().length === 0) {
+        setMessage("Configure OpenRouter API key before choosing a model.");
+        prevent(event);
+        return;
+      }
+
+      setModelCommitPending(true);
+      setMessage("Loading model capabilities…");
+      prevent(event);
+      void commitOpenRouterModelSelection({
+        apiKey,
+        modelId,
+        selection,
+      })
+        .then((nextSelection) => {
+          setActiveSelection({
+            activeModelEntry,
+            selection: nextSelection,
+            setAgent,
+            setPrimary,
+            setSummarization,
+          });
+          setModelFilter("");
+          setStage("model-settings");
+          setMessage(
+            `${entryLabel(activeModelEntry)} model updated. Choose Done to save.`,
+          );
+        })
+        .catch((error) => {
+          setMessage(error instanceof Error ? error.message : String(error));
+        })
+        .finally(() => {
+          setModelCommitPending(false);
+        });
+      return;
+    }
+
+    if (modelLoad.status !== "loaded" && modelFilter.trim().length === 0) {
+      setMessage("Models are not loaded yet.");
       prevent(event);
       return;
     }
 
     setActiveSelection({
       activeModelEntry,
-      selection: { ...selection, model: model.id },
+      selection: { ...selection, model: modelId },
       setAgent,
       setPrimary,
       setSummarization,
@@ -1400,41 +1561,130 @@ function handleModelChoiceKey({
   }
 }
 
-function modelSettingsRowLabel({
-  agent,
-  endpoints,
-  primary,
-  row,
-  summarization,
+function handleEndpointFormKey({
+  endpointForm,
+  endpointFormMode,
+  endpointFormRowIndex,
+  event,
+  setConfiguredProviders,
+  setEndpointForm,
+  setEndpointFormRowIndex,
+  setEndpoints,
+  setMessage,
+  setStage,
 }: {
-  agent: ClutchModelSelection;
-  endpoints: readonly ClutchEndpoint[];
-  primary: ClutchModelSelection;
-  row: ModelSettingsRow;
-  summarization: ClutchModelSelection;
-}): string {
-  if (row.kind === "done") {
-    return "Done";
+  endpointForm: EndpointForm | null;
+  endpointFormMode: EndpointFormMode;
+  event: KeyEvent;
+  endpointFormRowIndex: number;
+  setConfiguredProviders: (
+    providers: string[] | ((current: string[]) => string[]),
+  ) => void;
+  setEndpointForm: (form: EndpointForm | null) => void;
+  setEndpointFormRowIndex: (index: number) => void;
+  setEndpoints: (endpoints: ClutchEndpoint[]) => void;
+  setMessage: (message: string | null) => void;
+  setStage: (stage: ConfigStage) => void;
+}) {
+  const rows = endpointFormRows(endpointFormMode);
+  const form = endpointForm ?? emptyEndpointForm();
+
+  if (event.name === "escape") {
+    setStage("providers");
+    setMessage(null);
+    prevent(event);
+    return;
   }
 
-  const selection = getModelEntrySelection({
-    agent,
-    entry: row.entry,
-    primary,
-    summarization,
-  });
-  if (row.kind === "effort") {
-    return `${entryLabel(row.entry)} effort: ${getClutchModelEffortLevel(selection)}`;
-  }
-  if (row.kind === "service-tier") {
-    return `${entryLabel(row.entry)} service tier: ${getClutchOpenRouterServiceTier(selection)}`;
+  if (event.name === "up" || event.name === "down") {
+    setEndpointFormRowIndex(
+      cycleIndex(
+        endpointFormRowIndex,
+        rows.length,
+        event.name === "down" ? 1 : -1,
+      ),
+    );
+    setMessage(null);
+    prevent(event);
+    return;
   }
 
-  return `${entryLabel(row.entry)} model: ${getClutchProviderLabel(selection.provider, { endpoints: [...endpoints] })} / ${selection.model.length === 0 ? "(choose model)" : selection.model}`;
-}
+  const row = rows[endpointFormRowIndex];
+  if (row === undefined) {
+    throw new Error(`Invalid endpoint form row index: ${endpointFormRowIndex}`);
+  }
 
-function modelSettingsRowKey(row: ModelSettingsRow): string {
-  return row.kind === "done" ? "done" : `${row.entry}-${row.kind}`;
+  if (row === "delete" && event.name === "return") {
+    try {
+      deleteClutchEndpointConfiguration({ endpointId: form.id });
+      setEndpoints(loadClutchSettings().endpoints ?? []);
+      setEndpointForm(null);
+      setStage("providers");
+      setMessage(`Deleted endpoint ${form.label}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+    prevent(event);
+    return;
+  }
+
+  if (event.name === "return" || (event.ctrl && event.name === "s")) {
+    if (row === "save" || event.ctrl) {
+      try {
+        const endpoint = endpointFromForm(form, endpointFormMode);
+        saveClutchEndpointConfiguration({
+          apiKey: form.apiKey.trim().length === 0 ? undefined : form.apiKey,
+          endpoint,
+        });
+        setEndpoints(loadClutchSettings().endpoints ?? []);
+        if (form.apiKey.trim().length > 0) {
+          setConfiguredProviders((current) =>
+            Array.from(new Set([...current, endpoint.id])),
+          );
+        }
+        setEndpointForm(null);
+        setStage("providers");
+        setMessage(`Saved endpoint ${endpoint.label}.`);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : String(error));
+      }
+    }
+    prevent(event);
+    return;
+  }
+
+  if (row === "save" || row === "delete") {
+    return;
+  }
+
+  if (endpointFormMode === "edit" && row === "id") {
+    return;
+  }
+
+  if (event.ctrl && event.name === "u") {
+    setEndpointForm(updateEndpointFormField(form, row, () => ""));
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  if (event.name === "backspace") {
+    setEndpointForm(
+      updateEndpointFormField(form, row, (value) => value.slice(0, -1)),
+    );
+    setMessage(null);
+    prevent(event);
+    return;
+  }
+
+  const input = getPrintableInput(event);
+  if (input !== null) {
+    setEndpointForm(
+      updateEndpointFormField(form, row, (value) => value + input),
+    );
+    setMessage(null);
+    prevent(event);
+  }
 }
 
 function providerRows({
@@ -1455,10 +1705,15 @@ function providerRows({
     },
     ...endpoints.map((endpoint) => ({
       key: endpoint.id,
-      kind: "provider" as const,
+      kind: "endpoint" as const,
+      endpointId: endpoint.id,
       label: `${endpoint.label}${configuredProviders.includes(endpoint.id) ? " ✓" : ""}`,
-      provider: endpoint.id,
     })),
+    {
+      key: "add-endpoint",
+      kind: "add-endpoint" as const,
+      label: "Add endpoint",
+    },
     {
       key: "models",
       kind: "models" as const,
@@ -1499,41 +1754,6 @@ function agentBackendFromForm(
     command: form.command.trim(),
     ...(Object.keys(env).length === 0 ? {} : { env }),
   };
-}
-
-function parseJsonStringArray(value: string, message: string): string[] {
-  const parsed = parseJsonValue(value.length === 0 ? "[]" : value, message);
-  if (
-    !Array.isArray(parsed) ||
-    !parsed.every((item) => typeof item === "string")
-  ) {
-    throw new Error(message);
-  }
-  return parsed;
-}
-
-function parseJsonStringRecord(
-  value: string,
-  message: string,
-): Record<string, string> {
-  const parsed = parseJsonValue(value.length === 0 ? "{}" : value, message);
-  if (
-    parsed === null ||
-    typeof parsed !== "object" ||
-    Array.isArray(parsed) ||
-    !Object.values(parsed).every((item) => typeof item === "string")
-  ) {
-    throw new Error(message);
-  }
-  return parsed as Record<string, string>;
-}
-
-function parseJsonValue(value: string, message: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    throw new Error(message);
-  }
 }
 
 function agentBackendRowLabel({
@@ -1623,25 +1843,136 @@ function setActiveSelection({
   setSummarization(selection);
 }
 
-function getModelEntrySelection({
-  agent,
-  entry,
-  primary,
-  summarization,
+function resolveCommittedModelId({
+  filter,
+  matches,
+  modelIndex,
 }: {
-  agent: ClutchModelSelection;
-  entry: ModelEntry;
-  primary: ClutchModelSelection;
-  summarization: ClutchModelSelection;
-}): ClutchModelSelection {
-  switch (entry) {
-    case "agent":
-      return agent;
-    case "primary":
-      return primary;
-    case "summarization":
-      return summarization;
+  filter: string;
+  matches: readonly ClutchProviderModel[];
+  modelIndex: number;
+}): string | undefined {
+  const typed = filter.trim();
+  if (typed.length > 0) {
+    return typed;
   }
+
+  return matches[modelIndex]?.id;
+}
+
+function endpointFormRows(mode: EndpointFormMode): EndpointFormRow[] {
+  const fields: EndpointFormField[] = [
+    "id",
+    "label",
+    "baseUrl",
+    "apiKey",
+    "headersJson",
+    "requestDefaultsJson",
+  ];
+  return mode === "add"
+    ? [...fields, "save"]
+    : [...fields, "save", "delete"];
+}
+
+function emptyEndpointForm(): EndpointForm {
+  return {
+    apiKey: "",
+    baseUrl: "",
+    headersJson: "{}",
+    id: "",
+    label: "",
+    requestDefaultsJson: "{}",
+  };
+}
+
+function endpointFormFromEndpoint(endpoint: ClutchEndpoint): EndpointForm {
+  const apiKey = loadClutchAuth()[endpoint.id]?.key ?? "";
+  return {
+    apiKey,
+    baseUrl: endpoint.baseUrl,
+    headersJson: JSON.stringify(endpoint.headers ?? {}),
+    id: endpoint.id,
+    label: endpoint.label,
+    requestDefaultsJson: JSON.stringify(endpoint.requestDefaults ?? {}),
+  };
+}
+
+function endpointFromForm(
+  form: EndpointForm,
+  mode: EndpointFormMode,
+): ClutchEndpoint {
+  const headers = parseJsonStringRecord(
+    form.headersJson,
+    "Endpoint headers must be a JSON object of strings.",
+  );
+  const requestDefaults = parseJsonObject(
+    form.requestDefaultsJson,
+    "Endpoint requestDefaults must be a JSON object.",
+  );
+
+  return {
+    baseUrl: form.baseUrl.trim(),
+    id: mode === "add" ? form.id.trim() : form.id,
+    label: form.label.trim(),
+    ...(Object.keys(headers).length === 0 ? {} : { headers }),
+    ...(Object.keys(requestDefaults).length === 0
+      ? {}
+      : { requestDefaults }),
+  };
+}
+
+function endpointFormRowLabel({
+  form,
+  mode,
+  row,
+}: {
+  form: EndpointForm;
+  mode: EndpointFormMode;
+  row: EndpointFormRow;
+}): string {
+  switch (row) {
+    case "id":
+      return `Id: ${form.id}`;
+    case "label":
+      return `Label: ${form.label}`;
+    case "baseUrl":
+      return `Base URL: ${form.baseUrl}`;
+    case "apiKey":
+      return `API key: ${form.apiKey.length === 0 ? "" : "*".repeat(form.apiKey.length)}`;
+    case "headersJson":
+      return `Headers JSON: ${form.headersJson}`;
+    case "requestDefaultsJson":
+      return `Request defaults JSON: ${form.requestDefaultsJson}`;
+    case "save":
+      return "Save endpoint";
+    case "delete":
+      return "Delete endpoint";
+  }
+}
+
+function updateEndpointFormField(
+  form: EndpointForm,
+  field: EndpointFormField,
+  update: (value: string) => string,
+): EndpointForm {
+  switch (field) {
+    case "id":
+      return { ...form, id: update(form.id) };
+    case "label":
+      return { ...form, label: update(form.label) };
+    case "baseUrl":
+      return { ...form, baseUrl: update(form.baseUrl) };
+    case "apiKey":
+      return { ...form, apiKey: update(form.apiKey) };
+    case "headersJson":
+      return { ...form, headersJson: update(form.headersJson) };
+    case "requestDefaultsJson":
+      return { ...form, requestDefaultsJson: update(form.requestDefaultsJson) };
+  }
+}
+
+function isEndpointFormField(row: EndpointFormRow): row is EndpointFormField {
+  return row !== "save" && row !== "delete";
 }
 
 function matchingModels({
@@ -1702,6 +2033,132 @@ function providerIndexFor(
   return index;
 }
 
+function modelSettingsKindToOptionKey(
+  kind: Exclude<ModelSettingsRow["kind"], "done" | "model">,
+): ModelOptionKey {
+  switch (kind) {
+    case "effort":
+      return "effort";
+    case "service-tier":
+      return "serviceTier";
+    case "vendor":
+      return "vendor";
+    case "sort":
+      return "sort";
+    case "provider-extras":
+      return "providerExtras";
+  }
+}
+
+function modelOptionIndexFor(
+  optionKey: ModelOptionKey,
+  selection: ClutchModelSelection,
+): number {
+  switch (optionKey) {
+    case "effort":
+      return effortIndexFor(getClutchModelEffortLevel(selection));
+    case "serviceTier":
+      return serviceTierIndexFor(getClutchOpenRouterServiceTier(selection));
+    case "vendor":
+      return openRouterVendorIndex(
+        selection,
+        selection.openRouter?.capabilities,
+      );
+    case "sort":
+      return openRouterSortIndex(selection);
+    case "providerExtras":
+      return 0;
+  }
+}
+
+function modelOptionLabels(
+  optionKey: ModelOptionKey,
+  selection: ClutchModelSelection,
+): string[] {
+  switch (optionKey) {
+    case "effort":
+      return [...CLUTCH_MODEL_EFFORT_LEVELS];
+    case "serviceTier":
+      return [...CLUTCH_MODEL_SERVICE_TIERS];
+    case "vendor":
+      return openRouterVendorOptions(selection.openRouter?.capabilities);
+    case "sort":
+      return OPENROUTER_SORT_OPTIONS.map((option) => option.label);
+    case "providerExtras":
+      return [];
+  }
+}
+
+function modelOptionPrompt(
+  optionKey: ModelOptionKey,
+  activeModelEntry: ModelEntry,
+): string {
+  return `Choose ${modelOptionTitle(optionKey)} for ${entryLabel(activeModelEntry)}.`;
+}
+
+function modelOptionTitle(optionKey: ModelOptionKey): string {
+  switch (optionKey) {
+    case "effort":
+      return "effort";
+    case "serviceTier":
+      return "service tier";
+    case "vendor":
+      return "vendor";
+    case "sort":
+      return "sort";
+    case "providerExtras":
+      return "provider extras";
+  }
+}
+
+function selectionWithModelOption(
+  optionKey: ModelOptionKey,
+  selection: ClutchModelSelection,
+  optionIndex: number,
+): ClutchModelSelection {
+  switch (optionKey) {
+    case "effort": {
+      const effortLevel = CLUTCH_MODEL_EFFORT_LEVELS[optionIndex];
+      if (effortLevel === undefined) {
+        throw new Error(`Invalid model effort row index: ${optionIndex}`);
+      }
+      return { ...selection, effortLevel };
+    }
+    case "serviceTier": {
+      const serviceTier = CLUTCH_MODEL_SERVICE_TIERS[optionIndex];
+      if (serviceTier === undefined) {
+        throw new Error(`Invalid model service tier row index: ${optionIndex}`);
+      }
+      return {
+        ...selection,
+        openRouter: {
+          ...(selection.openRouter ?? {}),
+          serviceTier,
+        },
+      };
+    }
+    case "vendor": {
+      const vendors = openRouterVendorOptions(
+        selection.openRouter?.capabilities,
+      );
+      const vendor = vendors[optionIndex];
+      if (vendor === undefined) {
+        throw new Error(`Invalid vendor row index: ${optionIndex}`);
+      }
+      return selectionWithOpenRouterVendor(selection, vendor);
+    }
+    case "sort": {
+      const option = OPENROUTER_SORT_OPTIONS[optionIndex];
+      if (option === undefined) {
+        throw new Error(`Invalid sort row index: ${optionIndex}`);
+      }
+      return selectionWithOpenRouterSort(selection, option.sort);
+    }
+    case "providerExtras":
+      throw new Error("providerExtras is edited as text, not by index.");
+  }
+}
+
 function effortIndexFor(effortLevel: ClutchModelEffortLevel): number {
   const index = CLUTCH_MODEL_EFFORT_LEVELS.findIndex(
     (candidate) => candidate === effortLevel,
@@ -1728,26 +2185,28 @@ function cycleIndex(index: number, length: number, direction: 1 | -1): number {
 
 function stageTitle({
   activeModelEntry,
+  modelOptionKey,
   stage,
   task,
 }: {
   activeModelEntry: ModelEntry;
+  modelOptionKey: ModelOptionKey;
   stage: ConfigStage;
   task: ConfigTaskState;
 }): string {
   switch (stage) {
     case "agent-backend":
       return "ACP backend";
+    case "endpoint-form":
+      return "Endpoint";
     case "providers":
       return task.mode === "first-run" ? "Setup providers" : "Providers";
     case "token":
       return "Provider token";
     case "model-settings":
       return "Model settings";
-    case "model-effort":
-      return `${entryLabel(activeModelEntry)} effort`;
-    case "model-service-tier":
-      return `${entryLabel(activeModelEntry)} service tier`;
+    case "model-option":
+      return `${entryLabel(activeModelEntry)} ${modelOptionTitle(modelOptionKey)}`;
     case "model-provider":
       return `${entryLabel(activeModelEntry)} provider`;
     case "model-model":
@@ -1755,9 +2214,15 @@ function stageTitle({
   }
 }
 
-function hotkeysForStage(stage: ConfigStage, task: ConfigTaskState): string {
+function hotkeysForStage(
+  stage: ConfigStage,
+  task: ConfigTaskState,
+  modelOptionKey: ModelOptionKey,
+): string {
   switch (stage) {
     case "agent-backend":
+      return "Esc providers · ↑/↓ field · type edit · Ctrl+u clear · Ctrl+s save";
+    case "endpoint-form":
       return "Esc providers · ↑/↓ field · type edit · Ctrl+u clear · Ctrl+s save";
     case "providers":
       return `${task.mode === "settings" ? "Esc return · " : ""}↑/↓ select · Enter open`;
@@ -1765,25 +2230,14 @@ function hotkeysForStage(stage: ConfigStage, task: ConfigTaskState): string {
       return "Esc back · paste/type token · Ctrl+u clear · Enter save";
     case "model-settings":
       return "Esc providers · ↑/↓ select · Enter edit/done";
-    case "model-effort":
-      return "Esc back · ↑/↓ choose effort · Enter choose";
-    case "model-service-tier":
-      return "Esc back · ↑/↓ choose tier · Enter choose";
+    case "model-option":
+      return modelOptionKey === "providerExtras"
+        ? "Esc back · type JSON · Ctrl+u clear · Enter save"
+        : "Esc back · ↑/↓ choose · Enter choose";
     case "model-provider":
       return "Esc back · ↑/↓ choose provider · Enter next";
     case "model-model":
       return "Esc back · ↑/↓ choose model · type filter · Ctrl+u clear · Enter choose";
-  }
-}
-
-function entryLabel(entry: ModelEntry): string {
-  switch (entry) {
-    case "agent":
-      return "Agent";
-    case "primary":
-      return "Primary";
-    case "summarization":
-      return "Summarization";
   }
 }
 
