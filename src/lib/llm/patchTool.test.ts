@@ -1,4 +1,4 @@
-import type { ToolCall } from "@earendil-works/pi-ai";
+import type { LlmToolCall } from "./types";
 import { expect, test } from "bun:test";
 import { applyPatchTool, patchProposalFromToolCall } from "./patchTool";
 
@@ -26,7 +26,7 @@ test("parses Codex input apply_patch tool calls", () => {
       id: "tool-1",
       name: "apply_patch",
       type: "toolCall",
-    } satisfies ToolCall),
+    } satisfies LlmToolCall),
   ).toEqual({
     patch,
     summary: "Apply patch",
@@ -41,7 +41,7 @@ test("keeps legacy patch and summary apply_patch tool calls parseable", () => {
       id: "tool-1",
       name: "apply_patch",
       type: "toolCall",
-    } satisfies ToolCall),
+    } satisfies LlmToolCall),
   ).toEqual({
     patch,
     summary: "Update README",

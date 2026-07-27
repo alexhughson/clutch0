@@ -1,5 +1,5 @@
 import type { AppActions } from "../../app/appTypes";
-import type { Tool, ToolCall } from "@earendil-works/pi-ai";
+import type { LlmTool, LlmToolCall } from "../../lib/llm/types";
 import { addFilesWorkflowTool } from "../addFiles/addFilesWorkflowTool";
 import { createFileWorkflowTool } from "../createFile/createFileWorkflowTool";
 import { findFilesWorkflowTool } from "../findFiles/findFilesTool";
@@ -99,7 +99,7 @@ export function getLlmWorkflowTools({
   allowedToolNames,
 }: {
   allowedToolNames?: readonly string[];
-} = {}): Tool[] {
+} = {}): LlmTool[] {
   return getLlmWorkflowToolControllers({ allowedToolNames }).map(
     (controller) => controller.tool,
   );
@@ -153,7 +153,7 @@ export async function routeLlmWorkflowToolCalls({
   allowedToolNames?: readonly string[];
   root?: string;
   signal?: AbortSignal;
-  toolCalls: readonly ToolCall[];
+  toolCalls: readonly LlmToolCall[];
 }): Promise<LlmWorkflowToolResult | null> {
   if (toolCalls.length === 0) {
     return null;

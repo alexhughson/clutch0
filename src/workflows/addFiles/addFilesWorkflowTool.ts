@@ -1,21 +1,27 @@
-import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
 import { validateExistingContextFilePaths } from "../../lib/context/contextFilePaths";
 import { invariant } from "../../lib/invariant";
 import { addCommandPromptDirective } from "../../lib/llm/prompts";
+import type { LlmTool, LlmToolCall } from "../../lib/llm/types";
 import type { FilePath } from "../../types";
 import type { LlmWorkflowToolController } from "../llmTools/types";
 
 export const ADD_CONTEXT_FILES_TOOL_NAME = "add_context_files";
 
-export const addContextFilesTool: Tool = {
+export const addContextFilesTool: LlmTool = {
   name: ADD_CONTEXT_FILES_TOOL_NAME,
   description:
     "Add exact existing project files to selected context. Use only when paths are known.",
-  parameters: Type.Object({
-    paths: Type.Array(Type.String(), {
-      description: "Existing project-relative file paths.",
-    }),
-  }),
+  parameters: {
+    type: "object",
+    properties: {
+      paths: {
+        type: "array",
+        items: { type: "string" },
+        description: "Existing project-relative file paths.",
+      },
+    },
+    required: ["paths"],
+  },
 };
 
 export const addFilesWorkflowTool: LlmWorkflowToolController = {
@@ -59,7 +65,7 @@ export const addFilesWorkflowTool: LlmWorkflowToolController = {
   },
 };
 
-function addFilesRequestFromToolCall(toolCall: ToolCall): string[] {
+function addFilesRequestFromToolCall(toolCall: LlmToolCall): string[] {
   const arguments_ = toolCall.arguments;
   invariant(
     Array.isArray(arguments_.paths),

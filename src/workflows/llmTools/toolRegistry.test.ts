@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "bun:test";
-import type { ToolCall } from "@earendil-works/pi-ai";
+import type { LlmToolCall } from "../../lib/llm/types";
 import { APPLY_PATCH_TOOL_NAME } from "../../lib/llm/patchTool";
 import { ADD_CONTEXT_FILES_TOOL_NAME } from "../addFiles/addFilesWorkflowTool";
 import { FIND_RELEVANT_FILES_TOOL_NAME } from "../findFiles/findFilesTool";
@@ -30,7 +30,7 @@ test("routes add context files tool calls to the add files workflow", async () =
         arguments: {
           paths: ["one.ts", "two.ts", "one.ts"],
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -51,7 +51,7 @@ test("routes find relevant files tool calls to the find files workflow", async (
           goal: "Find routing code",
           hints: ["App", "screen"],
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -76,7 +76,7 @@ test("routes create file tool calls to the create file workflow", async () => {
           path: "src/newFile.ts",
           summary: "Add new file",
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -104,7 +104,7 @@ test("routes shell command tool calls and captures output", async () => {
         arguments: {
           command: "printf clutch-cmd",
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -139,7 +139,7 @@ test("routes apply_patch input tool calls to patch review", async () => {
             "*** End Patch",
           ].join("\n"),
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -173,7 +173,7 @@ test("routes shell apply_patch heredocs into patch review", async () => {
             "PATCH",
           ].join("\n"),
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -208,7 +208,7 @@ test("routes shell apply_patch argument commands into patch review", async () =>
             "*** End Patch'",
           ].join("\n"),
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -246,7 +246,7 @@ test("routes cd shell apply_patch heredocs into root-relative patch review", asy
             "PATCH",
           ].join("\n"),
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -282,7 +282,7 @@ test("rejects implicit shell patch bodies as patch validation failures", async (
             "*** End Patch'",
           ].join("\n"),
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -315,7 +315,7 @@ test("routes abort signals into shell command tool calls", async () => {
         arguments: {
           command: "sleep 10",
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -346,7 +346,7 @@ test("exposes shell commands to unrestricted LLM requests", async () => {
         arguments: {
           command: "printf clutch-cmd",
         },
-      } satisfies ToolCall,
+      } satisfies LlmToolCall,
     ],
   });
 
@@ -385,7 +385,7 @@ test("rejects multiple workflow tool calls in one response", async () => {
           arguments: {
             goal: "Find routing code",
           },
-        } satisfies ToolCall,
+        } satisfies LlmToolCall,
         {
           type: "toolCall",
           id: "tool-2",
@@ -393,7 +393,7 @@ test("rejects multiple workflow tool calls in one response", async () => {
           arguments: {
             goal: "Find config code",
           },
-        } satisfies ToolCall,
+        } satisfies LlmToolCall,
       ],
     }),
   ).rejects.toThrow("accepts exactly one tool call per response");
@@ -408,7 +408,7 @@ test("rejects malformed workflow tool calls", async () => {
           id: "tool-1",
           name: FIND_RELEVANT_FILES_TOOL_NAME,
           arguments: {},
-        } satisfies ToolCall,
+        } satisfies LlmToolCall,
       ],
     }),
   ).rejects.toThrow("find_relevant_files.goal must be a non-empty string");

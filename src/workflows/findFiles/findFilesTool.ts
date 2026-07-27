@@ -1,24 +1,29 @@
-import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
 import { invariant } from "../../lib/invariant";
 import { findCommandPromptDirective } from "../../lib/llm/prompts";
+import type { LlmTool, LlmToolCall } from "../../lib/llm/types";
 import type { LlmWorkflowToolController } from "../llmTools/types";
 
 export const FIND_RELEVANT_FILES_TOOL_NAME = "find_relevant_files";
 
-export const findRelevantFilesTool: Tool = {
+export const findRelevantFilesTool: LlmTool = {
   name: FIND_RELEVANT_FILES_TOOL_NAME,
   description:
     "Find project files for discovery, stack traces, missing source, or insufficient selected context.",
-  parameters: Type.Object({
-    goal: Type.String({
-      description: "Concrete code-navigation goal.",
-    }),
-    hints: Type.Optional(
-      Type.Array(Type.String(), {
+  parameters: {
+    type: "object",
+    properties: {
+      goal: {
+        type: "string",
+        description: "Concrete code-navigation goal.",
+      },
+      hints: {
+        type: "array",
+        items: { type: "string" },
         description: "Symbols, paths, errors, or feature names.",
-      }),
-    ),
-  }),
+      },
+    },
+    required: ["goal"],
+  },
 };
 
 export const findFilesWorkflowTool: LlmWorkflowToolController = {
@@ -51,7 +56,7 @@ export const findFilesWorkflowTool: LlmWorkflowToolController = {
   },
 };
 
-function findFilesRequestFromToolCall(toolCall: ToolCall) {
+function findFilesRequestFromToolCall(toolCall: LlmToolCall) {
   const arguments_ = toolCall.arguments;
   invariant(
     typeof arguments_.goal === "string" && arguments_.goal.trim().length > 0,

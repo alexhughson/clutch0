@@ -1,29 +1,36 @@
-import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
 import {
   validateCreateFileProposal,
   type CreateFileProposal,
 } from "../../lib/createFile/createFile";
 import { invariant } from "../../lib/invariant";
 import { createCommandPromptDirective } from "../../lib/llm/prompts";
+import type { LlmTool, LlmToolCall } from "../../lib/llm/types";
 import type { LlmWorkflowToolController } from "../llmTools/types";
 
 export const CREATE_FILE_TOOL_NAME = "create_file";
 
-export const createFileTool: Tool = {
+export const createFileTool: LlmTool = {
   name: CREATE_FILE_TOOL_NAME,
   description:
     "Propose one new file for review. Does not write files.",
-  parameters: Type.Object({
-    summary: Type.String({
-      description: "Concise file purpose.",
-    }),
-    path: Type.String({
-      description: "New project-relative path.",
-    }),
-    content: Type.String({
-      description: "Full file contents.",
-    }),
-  }),
+  parameters: {
+    type: "object",
+    properties: {
+      summary: {
+        type: "string",
+        description: "Concise file purpose.",
+      },
+      path: {
+        type: "string",
+        description: "New project-relative path.",
+      },
+      content: {
+        type: "string",
+        description: "Full file contents.",
+      },
+    },
+    required: ["summary", "path", "content"],
+  },
 };
 
 export const createFileWorkflowTool: LlmWorkflowToolController = {
@@ -60,7 +67,7 @@ export const createFileWorkflowTool: LlmWorkflowToolController = {
 };
 
 export function createFileProposalFromToolCall(
-  toolCall: ToolCall,
+  toolCall: LlmToolCall,
 ): CreateFileProposal {
   const arguments_ = toolCall.arguments;
   invariant(

@@ -1,6 +1,6 @@
-import { Type, type Tool } from "@earendil-works/pi-ai";
 import { invariant } from "../../lib/invariant";
 import { shellCommandPromptDirective } from "../../lib/llm/prompts";
+import type { LlmTool } from "../../lib/llm/types";
 import {
   isImplicitApplyPatchShellCommand,
   parseApplyPatchShellCommand,
@@ -12,15 +12,20 @@ import type { LlmWorkflowToolController } from "./types";
 
 export const RUN_SHELL_COMMAND_TOOL_NAME = "run_shell_command";
 
-export const runShellCommandTool: Tool = {
+export const runShellCommandTool: LlmTool = {
   name: RUN_SHELL_COMMAND_TOOL_NAME,
   description:
     "Run one project-root shell command and save stdout/stderr as context.",
-  parameters: Type.Object({
-    command: Type.String({
-      description: "One concise command.",
-    }),
-  }),
+  parameters: {
+    type: "object",
+    properties: {
+      command: {
+        type: "string",
+        description: "One concise command.",
+      },
+    },
+    required: ["command"],
+  },
 };
 
 export const shellCommandWorkflowTool: LlmWorkflowToolController = {

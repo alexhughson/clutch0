@@ -1,5 +1,3 @@
-import type { TSchema } from "@earendil-works/pi-ai";
-
 export type LlmApi =
   | "google-generative-ai"
   | "openai-codex-responses"
@@ -122,10 +120,10 @@ export type LlmMessage =
   | LlmAssistantMessage
   | LlmToolResultMessage;
 
-export type LlmTool<TParameters extends TSchema = TSchema> = {
+export type LlmTool = {
   description: string;
   name: string;
-  parameters: TParameters;
+  parameters: Record<string, unknown>;
 };
 
 export type LlmContext = {

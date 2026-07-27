@@ -1,4 +1,4 @@
-import type { AssistantMessage, Context } from "@earendil-works/pi-ai";
+import type { LlmAssistantMessage, LlmContext } from "./types";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,7 +14,7 @@ import {
 
 test("builds a tool-result continuation context from an assistant tool call", () => {
   const assistantMessage = assistantMessageFixture();
-  const context: Context = {
+  const context: LlmContext = {
     messages: [
       {
         content: "Edit the selected file.",
@@ -501,7 +501,7 @@ test("applies multiple apply_patch tool calls before continuing in apply mode", 
   });
 });
 
-function continuationBaseContext(): Context {
+function continuationBaseContext(): LlmContext {
   return {
     messages: [
       {
@@ -563,7 +563,7 @@ function assistantMessageFixture({
 }: {
   callId?: string;
   patch?: string;
-} = {}): AssistantMessage {
+} = {}): LlmAssistantMessage {
   return {
     api: "openai-responses",
     content: [
@@ -600,7 +600,7 @@ function assistantMessageFixture({
 
 function multiToolAssistantMessageFixture(
   calls: readonly { callId: string; patch: string }[],
-): AssistantMessage {
+): LlmAssistantMessage {
   return {
     ...assistantMessageFixture(),
     content: calls.map(({ callId, patch }) => ({
@@ -612,7 +612,7 @@ function multiToolAssistantMessageFixture(
   };
 }
 
-function textAssistantMessageFixture(text: string): AssistantMessage {
+function textAssistantMessageFixture(text: string): LlmAssistantMessage {
   return {
     api: "openai-responses",
     content: [{ text, type: "text" }],

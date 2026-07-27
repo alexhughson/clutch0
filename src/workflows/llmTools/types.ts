@@ -1,5 +1,5 @@
 import type { AppActions } from "../../app/appTypes";
-import type { Tool, ToolCall } from "@earendil-works/pi-ai";
+import type { LlmTool, LlmToolCall } from "../../lib/llm/types";
 import type { SlashCommandRunner } from "../slashCommands/slashCommandRunners";
 import type { CreateFileValidationResult } from "../../lib/createFile/createFile";
 import type {
@@ -55,7 +55,7 @@ export interface LlmWorkflowToolController {
     LlmSlashCommand,
     "allowedToolNames" | "run"
   >;
-  readonly tool: Tool;
+  readonly tool: LlmTool;
   handleResult(options: {
     actions: AppActions;
     requestId: number;
@@ -64,6 +64,6 @@ export interface LlmWorkflowToolController {
   routeToolCall(options: {
     root?: string;
     signal?: AbortSignal;
-    toolCall: ToolCall;
+    toolCall: LlmToolCall;
   }): Promise<LlmWorkflowToolResult>;
 }

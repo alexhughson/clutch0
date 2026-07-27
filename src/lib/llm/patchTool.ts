@@ -1,22 +1,27 @@
-import { Type, type Tool, type ToolCall } from "@earendil-works/pi-ai";
 import { invariant } from "../invariant";
 import type { PatchProposal } from "../patch/types";
+import type { LlmTool, LlmToolCall } from "./types";
 
 export const APPLY_PATCH_TOOL_NAME = "apply_patch";
 
-export const applyPatchTool: Tool = {
+export const applyPatchTool: LlmTool = {
   name: APPLY_PATCH_TOOL_NAME,
   description:
     "Edit files with one complete Codex apply_patch patch.",
-  parameters: Type.Object({
-    input: Type.String({
-      description:
-        "Raw patch body from *** Begin Patch through *** End Patch.",
-    }),
-  }),
+  parameters: {
+    type: "object",
+    properties: {
+      input: {
+        type: "string",
+        description:
+          "Raw patch body from *** Begin Patch through *** End Patch.",
+      },
+    },
+    required: ["input"],
+  },
 };
 
-export function patchProposalFromToolCall(toolCall: ToolCall): PatchProposal {
+export function patchProposalFromToolCall(toolCall: LlmToolCall): PatchProposal {
   invariant(
     toolCall.name === APPLY_PATCH_TOOL_NAME,
     `apply_patch received unexpected tool ${toolCall.name}`,
@@ -35,7 +40,7 @@ export function patchProposalFromToolCall(toolCall: ToolCall): PatchProposal {
 }
 
 export function patchInputFromToolArguments(
-  arguments_: ToolCall["arguments"],
+  arguments_: LlmToolCall["arguments"],
 ): string {
   if (typeof arguments_.input === "string") {
     return arguments_.input;

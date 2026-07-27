@@ -1,4 +1,3 @@
-import { Type } from "@earendil-works/pi-ai";
 import { afterEach, expect, test } from "bun:test";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -449,9 +448,13 @@ function multiTurnContextFixture(): LlmContext {
       {
         description: "Find files by query.",
         name: "find_relevant_files",
-        parameters: Type.Object({
-          query: Type.String(),
-        }),
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+          },
+          required: ["query"],
+        },
       },
     ],
   };
@@ -465,9 +468,13 @@ function contextFixture(): LlmContext {
       {
         description: "Find files by query.",
         name: "find_relevant_files",
-        parameters: Type.Object({
-          query: Type.String(),
-        }),
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+          },
+          required: ["query"],
+        },
       },
     ],
   };
