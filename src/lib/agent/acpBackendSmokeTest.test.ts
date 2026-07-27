@@ -52,7 +52,11 @@ test("ACP backend smoke test reports backend stderr when startup fails", async (
 test("ACP backend smoke test fails when a backend requests permission", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-acp-smoke-permission-"));
   const agentPath = join(root, "permission-agent.mjs");
-  await writeFile(agentPath, fakeAgentScript({ requestPermission: true }), "utf-8");
+  await writeFile(
+    agentPath,
+    fakeAgentScript({ requestPermission: true }),
+    "utf-8",
+  );
 
   const error = await captureError(() =>
     runAcpBackendSmokeTest({
@@ -65,8 +69,10 @@ test("ACP backend smoke test fails when a backend requests permission", async ()
     }),
   );
 
-  expect(error.message).toContain("ACP smoke test failed during session/prompt.");
-  expect(error.message).toContain('backend=');
+  expect(error.message).toContain(
+    "ACP smoke test failed during session/prompt.",
+  );
+  expect(error.message).toContain("backend=");
   expect(error.message).toContain(
     "ACP smoke test prompt completed without assistant text.",
   );

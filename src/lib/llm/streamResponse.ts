@@ -189,9 +189,8 @@ export async function streamLlmInteraction({
     root,
   });
   const routeWorkflowToolCalls = async (toolCalls: readonly LlmToolCall[]) => {
-    const { routeLlmWorkflowToolCalls } = await import(
-      "../../workflows/llmTools/toolRegistry"
-    );
+    const { routeLlmWorkflowToolCalls } =
+      await import("../../workflows/llmTools/toolRegistry");
     return await routeLlmWorkflowToolCalls({
       allowedToolNames,
       root,
@@ -237,7 +236,7 @@ export async function streamLlmInteraction({
           onPatchProgress,
           signal,
           toolOutputs,
-      }),
+        }),
     });
   }
   if (toolCalls.length === 0) {
@@ -721,7 +720,9 @@ function getAssistantToolCalls(message: LlmAssistantMessage): LlmToolCall[] {
   );
 }
 
-function areOnlyApplyPatchToolCalls(toolCalls: readonly LlmToolCall[]): boolean {
+function areOnlyApplyPatchToolCalls(
+  toolCalls: readonly LlmToolCall[],
+): boolean {
   return (
     toolCalls.length > 0 &&
     toolCalls.every((toolCall) => toolCall.name === APPLY_PATCH_TOOL_NAME)

@@ -206,7 +206,8 @@ function parseSerializedAppTask(
   const response = decoded as Omit<SerializedResponseTaskState, "request"> & {
     request: Omit<SerializedResponseTaskState["request"], "contextItems">;
   };
-  const requestRecord = (value as { request: { contextItems: unknown } }).request;
+  const requestRecord = (value as { request: { contextItems: unknown } })
+    .request;
   if (!Array.isArray(requestRecord.contextItems)) {
     throw new Error("activeTask.request.contextItems must be an array.");
   }

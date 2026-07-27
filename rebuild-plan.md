@@ -28,7 +28,7 @@ verified: context item state is plain data. strings, numbers, status enums. even
 
 ### the honest caveat
 
-`normalizeRestoredState` does ~150 lines of *semantic* migration that no schema can absorb: converting interrupted `running`/`applying`/`searching` statuses to error states on restore, rebuilding id counters from restored items, checking `schemaVersion`. that layer survives. the target is deleting the ~1,400 lines of mechanical parse/serialize, not the migration logic.
+`normalizeRestoredState` does ~150 lines of _semantic_ migration that no schema can absorb: converting interrupted `running`/`applying`/`searching` statuses to error states on restore, rebuilding id counters from restored items, checking `schemaVersion`. that layer survives. the target is deleting the ~1,400 lines of mechanical parse/serialize, not the migration logic.
 
 ### the rule
 
@@ -89,7 +89,7 @@ make the turn model honest: a turn has a **step budget**, default 1. the manual-
 
 ### what NOT to unify
 
-the custom patch engine (`src/lib/patch/patchEngine.ts`, 1510 lines) stays. review verdict: unifying on git diffs is not feasible on the input side — models emit the openai apply_patch V4A format because they're rl-trained on it, and V4A's context-matching-without-line-numbers is the whole point. patchEngine is the one big file that earns its size. the only realistic (and low-value) unification is routing its *apply* step through `git apply`, but patchEngine has already computed `nextContent` by then — skip it.
+the custom patch engine (`src/lib/patch/patchEngine.ts`, 1510 lines) stays. review verdict: unifying on git diffs is not feasible on the input side — models emit the openai apply_patch V4A format because they're rl-trained on it, and V4A's context-matching-without-line-numbers is the whole point. patchEngine is the one big file that earns its size. the only realistic (and low-value) unification is routing its _apply_ step through `git apply`, but patchEngine has already computed `nextContent` by then — skip it.
 
 ---
 

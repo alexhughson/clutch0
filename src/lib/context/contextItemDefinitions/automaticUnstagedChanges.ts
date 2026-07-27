@@ -92,5 +92,4 @@ export const automaticUnstagedChangesContextItemDefinition: ContextItemDefinitio
         text: (await readCurrentDiffForLlm({ root })) ?? "",
       };
     },
-
   };

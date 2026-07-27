@@ -40,7 +40,11 @@ export type ConfigKeyEffect =
   | { kind: "consume" }
   | { kind: "dismiss" }
   | { kind: "none" }
-  | { kind: "start-subscription-login"; requestId: number; task: ConfigTaskState }
+  | {
+      kind: "start-subscription-login";
+      requestId: number;
+      task: ConfigTaskState;
+    }
   | { kind: "update"; task: ConfigTaskState };
 
 type AgentBackendField = Exclude<(typeof AGENT_BACKEND_ROWS)[number], "save">;
@@ -91,7 +95,10 @@ export function reduceConfigKey(
         key,
         indexField: "modelEffortIndex",
         label: "effort",
-        updateSelection: (selection, effortLevel) => ({ ...selection, effortLevel }),
+        updateSelection: (selection, effortLevel) => ({
+          ...selection,
+          effortLevel,
+        }),
         values: CLUTCH_MODEL_EFFORT_LEVELS,
       });
     case "model-service-tier":
@@ -100,7 +107,10 @@ export function reduceConfigKey(
         key,
         indexField: "modelServiceTierIndex",
         label: "service tier",
-        updateSelection: (selection, serviceTier) => ({ ...selection, serviceTier }),
+        updateSelection: (selection, serviceTier) => ({
+          ...selection,
+          serviceTier,
+        }),
         values: CLUTCH_MODEL_SERVICE_TIERS,
       });
     case "model-model":
@@ -134,7 +144,11 @@ export function reduceConfigPaste(
       kind: "update",
       task: {
         ...task,
-        agentBackendForm: updateAgentBackendField(task.agentBackendForm, row, (value) => `${value}${sanitized}`),
+        agentBackendForm: updateAgentBackendField(
+          task.agentBackendForm,
+          row,
+          (value) => `${value}${sanitized}`,
+        ),
         message: null,
       },
     };
@@ -154,7 +168,10 @@ type MenuListKeyConfig = {
 function reduceMenuListNavigation(
   task: ConfigTaskState,
   key: ConfigKeyInput,
-  config: Pick<MenuListKeyConfig, "getIndex" | "getItemCount" | "onEscape" | "setIndex">,
+  config: Pick<
+    MenuListKeyConfig,
+    "getIndex" | "getItemCount" | "onEscape" | "setIndex"
+  >,
 ): ConfigKeyEffect | null {
   if (key.name === "escape" && config.onEscape !== undefined) {
     return config.onEscape(task);
@@ -264,7 +281,9 @@ function reduceProvidersKey(
     onEnter: (currentTask) => {
       const row = rows[currentTask.providerIndex];
       if (row === undefined) {
-        throw new Error(`Invalid provider row index: ${currentTask.providerIndex}`);
+        throw new Error(
+          `Invalid provider row index: ${currentTask.providerIndex}`,
+        );
       }
 
       if (row.kind === "models") {
@@ -339,7 +358,9 @@ function reduceAgentBackendKey(
 
   const row = AGENT_BACKEND_ROWS[task.agentBackendRowIndex];
   if (row === undefined) {
-    throw new Error(`Invalid ACP backend row index: ${task.agentBackendRowIndex}`);
+    throw new Error(
+      `Invalid ACP backend row index: ${task.agentBackendRowIndex}`,
+    );
   }
 
   if (key.name === "return" || (key.ctrl && key.name === "s")) {
@@ -372,7 +393,8 @@ function reduceAgentBackendKey(
   }
 
   return reduceStringFieldKey(task, key, {
-    getValue: (currentTask) => readAgentBackendField(currentTask.agentBackendForm, row),
+    getValue: (currentTask) =>
+      readAgentBackendField(currentTask.agentBackendForm, row),
     onEscape: (currentTask) => ({
       kind: "update",
       task: { ...currentTask, message: null, stage: "providers" },
@@ -380,7 +402,11 @@ function reduceAgentBackendKey(
     onSubmit: () => ({ kind: "consume" }),
     setValue: (currentTask, value) => ({
       ...currentTask,
-      agentBackendForm: updateAgentBackendField(currentTask.agentBackendForm, row, value),
+      agentBackendForm: updateAgentBackendField(
+        currentTask.agentBackendForm,
+        row,
+        value,
+      ),
       message: null,
     }),
   });
@@ -398,13 +424,19 @@ function reduceTokenKey(
     }),
     onSubmit: (currentTask) => {
       try {
-        saveClutchApiKey({ apiKey: currentTask.token, provider: currentTask.tokenProvider });
+        saveClutchApiKey({
+          apiKey: currentTask.token,
+          provider: currentTask.tokenProvider,
+        });
         return {
           kind: "update",
           task: {
             ...currentTask,
             configuredProviders: Array.from(
-              new Set([...currentTask.configuredProviders, currentTask.tokenProvider]),
+              new Set([
+                ...currentTask.configuredProviders,
+                currentTask.tokenProvider,
+              ]),
             ),
             message: `Saved token for ${getSupportedClutchProviderLabel(currentTask.tokenProvider)}.`,
             stage: "providers",
@@ -451,7 +483,10 @@ function reduceSubscriptionLoginKey(
   ) {
     return {
       kind: "update",
-      task: { ...task, message: "OpenAI subscription login is already running." },
+      task: {
+        ...task,
+        message: "OpenAI subscription login is already running.",
+      },
     };
   }
 
@@ -481,7 +516,9 @@ function reduceModelSettingsKey(
     onEnter: (currentTask) => {
       const row = MODEL_SETTINGS_ROWS[currentTask.modelSettingsIndex];
       if (row === undefined) {
-        throw new Error(`Invalid model settings row index: ${currentTask.modelSettingsIndex}`);
+        throw new Error(
+          `Invalid model settings row index: ${currentTask.modelSettingsIndex}`,
+        );
       }
 
       if (row.kind === "done") {
@@ -514,7 +551,9 @@ function reduceModelSettingsKey(
             ...currentTask,
             activeModelEntry: row.entry,
             message: null,
-            modelEffortIndex: effortIndexFor(getClutchModelEffortLevel(selection)),
+            modelEffortIndex: effortIndexFor(
+              getClutchModelEffortLevel(selection),
+            ),
             stage: "model-effort",
           },
         };
@@ -624,7 +663,9 @@ function reduceModelProviderKey(
   });
 }
 
-function reduceModelEnumChoiceKey<T extends ClutchModelEffortLevel | ClutchModelServiceTier>({
+function reduceModelEnumChoiceKey<
+  T extends ClutchModelEffortLevel | ClutchModelServiceTier,
+>({
   task,
   key,
   indexField,
@@ -636,7 +677,10 @@ function reduceModelEnumChoiceKey<T extends ClutchModelEffortLevel | ClutchModel
   key: ConfigKeyInput;
   indexField: "modelEffortIndex" | "modelServiceTierIndex";
   label: string;
-  updateSelection: (selection: ClutchModelSelection, value: T) => ClutchModelSelection;
+  updateSelection: (
+    selection: ClutchModelSelection,
+    value: T,
+  ) => ClutchModelSelection;
   values: readonly T[];
 }): ConfigKeyEffect {
   return reduceMenuListKey(task, key, {
@@ -645,7 +689,9 @@ function reduceModelEnumChoiceKey<T extends ClutchModelEffortLevel | ClutchModel
     onEnter: (currentTask) => {
       const value = values[currentTask[indexField]];
       if (value === undefined) {
-        throw new Error(`Invalid model ${label} row index: ${currentTask[indexField]}`);
+        throw new Error(
+          `Invalid model ${label} row index: ${currentTask[indexField]}`,
+        );
       }
 
       const selection = getModelEntrySelection({
@@ -837,7 +883,9 @@ function updateAgentBackendField(
   update: string | ((value: string) => string),
 ): ConfigTaskState["agentBackendForm"] {
   const nextValue =
-    typeof update === "string" ? update : update(readAgentBackendField(form, field));
+    typeof update === "string"
+      ? update
+      : update(readAgentBackendField(form, field));
 
   switch (field) {
     case "command":

@@ -139,7 +139,8 @@ function renderStage(task: ConfigTaskState) {
               : "Provider credentials"
           }
           items={providerRows({
-            agentBackendConfigured: task.agentBackendForm.command.trim().length > 0,
+            agentBackendConfigured:
+              task.agentBackendForm.command.trim().length > 0,
             configuredProviders: task.configuredProviders,
           }).map((row) => ({ key: row.key, label: row.label }))}
           message={task.message}
@@ -257,7 +258,9 @@ function ModelChoiceView({ task }: { task: ConfigTaskState }) {
       description={`Choose model for ${entryLabel(task.activeModelEntry)}.`}
       extraContent={
         <>
-          {task.modelLoad.status === "loading" ? <text>Loading models…</text> : null}
+          {task.modelLoad.status === "loading" ? (
+            <text>Loading models…</text>
+          ) : null}
           {task.modelLoad.status === "error" ? (
             <text style={{ fg: "red" }}>{task.modelLoad.errorMessage}</text>
           ) : null}
@@ -292,7 +295,9 @@ function SubscriptionLoginView({
       <text>{`Provider: ${getSupportedClutchProviderLabel("openai-codex")}`}</text>
       <text>Use your ChatGPT Plus or Pro subscription.</text>
       {login.status === "idle" ? (
-        <text style={{ fg: "gray" }}>Press Enter to start device-code login.</text>
+        <text style={{ fg: "gray" }}>
+          Press Enter to start device-code login.
+        </text>
       ) : null}
       {login.status === "working" ? <text>{login.message}</text> : null}
       {login.status === "waiting-for-device" ? (

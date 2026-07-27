@@ -20,7 +20,9 @@ async function main() {
   console.log(`backend: ${result.backendCommand}`);
   console.log(`config: ${result.configPath}`);
   console.log(`cwd: ${result.cwd}`);
-  console.log(`env keys: ${result.envKeys.length === 0 ? "<none>" : result.envKeys.join(", ")}`);
+  console.log(
+    `env keys: ${result.envKeys.length === 0 ? "<none>" : result.envKeys.join(", ")}`,
+  );
   console.log(`session: ${result.sessionId}`);
   console.log(`initialize: ${result.stages.initializeMs}ms`);
   console.log(`session/new: ${result.stages.sessionMs}ms`);
@@ -104,7 +106,11 @@ function parseArgs(args: string[]): CliOptions {
   return options;
 }
 
-function readValue(args: readonly string[], index: number, flag: string): string {
+function readValue(
+  args: readonly string[],
+  index: number,
+  flag: string,
+): string {
   const value = args[index];
   if (value === undefined) {
     throw new Error(`${flag} requires a value.`);

@@ -27,10 +27,7 @@ TypeRegistry.Set(SAFE_INTEGER_KIND, (schema: TSchema, value) => {
   return true;
 });
 
-export function SafeInteger(options?: {
-  maximum?: number;
-  minimum?: number;
-}) {
+export function SafeInteger(options?: { maximum?: number; minimum?: number }) {
   return Type.Unsafe<number>({
     [Kind]: SAFE_INTEGER_KIND,
     type: "integer",
@@ -41,7 +38,11 @@ export function SafeInteger(options?: {
 export const PositiveSafeInteger = SafeInteger({ minimum: 1 });
 export const NonNegativeSafeInteger = SafeInteger({ minimum: 0 });
 
-export function decodeSchema<T>(schema: TSchema, snapshot: unknown, label: string): T {
+export function decodeSchema<T>(
+  schema: TSchema,
+  snapshot: unknown,
+  label: string,
+): T {
   if (!Value.Check(schema, snapshot)) {
     throw formatSchemaValidationError(label, schema, snapshot);
   }
@@ -126,9 +127,9 @@ export function formatSchemaErrorMessage(
     return `${fieldLabel} must be an array.`;
   }
   if (message.startsWith("Expected union")) {
-    const values = message.match(/Expected '([^']+)'/g)?.map((part) =>
-      part.slice("Expected '".length, -1),
-    );
+    const values = message
+      .match(/Expected '([^']+)'/g)
+      ?.map((part) => part.slice("Expected '".length, -1));
     if (values !== undefined && values.length > 0) {
       return `${fieldLabel} must be one of: ${values.join(", ")}.`;
     }
@@ -137,7 +138,10 @@ export function formatSchemaErrorMessage(
   return `${fieldLabel}: ${message}`;
 }
 
-function integerConstraintMessage(fieldLabel: string, schema?: TSchema): string {
+function integerConstraintMessage(
+  fieldLabel: string,
+  schema?: TSchema,
+): string {
   const minimum = readNumericConstraint(schema, "minimum");
   if (minimum === 1) {
     return `${fieldLabel} must be a positive safe integer.`;

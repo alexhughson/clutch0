@@ -173,12 +173,18 @@ describe("llm client parity", () => {
       const newEvents = await collectStreamEvents(stream);
       const newMessage = await stream.result();
 
-      assertKnownDifferences(fixture.name, legacy.message, stripMessageEnvelope(newMessage));
-      expect(alignMessage(fixture.name, stripMessageEnvelope(newMessage))).toEqual(
+      assertKnownDifferences(
+        fixture.name,
         legacy.message,
+        stripMessageEnvelope(newMessage),
       );
       expect(
-        normalizeEvents(newEvents).map((event) => alignEventMessage(fixture.name, event)),
+        alignMessage(fixture.name, stripMessageEnvelope(newMessage)),
+      ).toEqual(legacy.message);
+      expect(
+        normalizeEvents(newEvents).map((event) =>
+          alignEventMessage(fixture.name, event),
+        ),
       ).toEqual(legacy.events);
     });
   }
@@ -222,21 +228,36 @@ describe("llm client parity", () => {
         total_tokens: 1100,
       },
     };
-    globalThis.fetch = (async () => jsonResponse(body)) as unknown as typeof fetch;
-    const legacyMessage = await runLegacyComplete(model, context, legacyOptions, body);
-    const newMessage = await completeDirectLlmResponse(model, context, newOptions);
+    globalThis.fetch = (async () =>
+      jsonResponse(body)) as unknown as typeof fetch;
+    const legacyMessage = await runLegacyComplete(
+      model,
+      context,
+      legacyOptions,
+      body,
+    );
+    const newMessage = await completeDirectLlmResponse(
+      model,
+      context,
+      newOptions,
+    );
     assertKnownDifferences(
       "complete openai chat cached usage",
       legacyMessage,
       stripMessageEnvelope(newMessage),
     );
     expect(
-      alignMessage("complete openai chat cached usage", stripMessageEnvelope(newMessage)),
+      alignMessage(
+        "complete openai chat cached usage",
+        stripMessageEnvelope(newMessage),
+      ),
     ).toEqual(legacyMessage);
   });
 
   test("usage parity: openai chat stream without prompt_tokens_details", async () => {
-    const fixture = parityFixtures.find((entry) => entry.name === "cerebras plain chat");
+    const fixture = parityFixtures.find(
+      (entry) => entry.name === "cerebras plain chat",
+    );
     expect(fixture).toBeDefined();
     const legacy = await runLegacyResponse(fixture!);
     globalThis.fetch = (async () =>
@@ -246,7 +267,11 @@ describe("llm client parity", () => {
       fixture!.context(),
       configuredLlmRequestOptions(fixture!.request()),
     ).result();
-    assertKnownDifferences(fixture!.name, legacy.message, stripMessageEnvelope(message));
+    assertKnownDifferences(
+      fixture!.name,
+      legacy.message,
+      stripMessageEnvelope(message),
+    );
     expect(stripMessageEnvelope(message).usage).toEqual(legacy.message.usage);
   });
 
@@ -297,8 +322,13 @@ describe("llm client parity", () => {
       context: () => context,
       sseEvents,
     });
-    globalThis.fetch = (async () => sseResponse(sseEvents)) as unknown as typeof fetch;
-    const message = await streamDirectLlmResponse(model, context, options).result();
+    globalThis.fetch = (async () =>
+      sseResponse(sseEvents)) as unknown as typeof fetch;
+    const message = await streamDirectLlmResponse(
+      model,
+      context,
+      options,
+    ).result();
     expect(stripMessageEnvelope(message).usage).toEqual(legacy.message.usage);
   });
 });
@@ -313,7 +343,9 @@ describe("llm client behavior", () => {
       return new Response(
         new ReadableStream({
           start(streamController) {
-            streamController.enqueue(new TextEncoder().encode('data: {"choices":[]}\n\n'));
+            streamController.enqueue(
+              new TextEncoder().encode('data: {"choices":[]}\n\n'),
+            );
             signal?.addEventListener("abort", () => {
               streamController.error(new Error("aborted"));
             });
@@ -394,7 +426,9 @@ describe("llm client behavior", () => {
   });
 });
 
-async function legacyRequestBody(fixture: ParityFixture): Promise<Record<string, unknown>> {
+async function legacyRequestBody(
+  fixture: ParityFixture,
+): Promise<Record<string, unknown>> {
   const request = await buildDirectRequest({
     context: fixture.context(),
     model: fixture.model,
@@ -523,14 +557,22 @@ function alignEventMessage(fixtureName: string, event: unknown): unknown {
   ) {
     return event;
   }
-  const done = event as { type: "done"; reason: string; message: ReturnType<typeof stripMessageEnvelope> };
+  const done = event as {
+    type: "done";
+    reason: string;
+    message: ReturnType<typeof stripMessageEnvelope>;
+  };
   return {
     ...done,
     message: alignMessage(fixtureName, done.message),
   };
 }
 
-function setField(target: Record<string, unknown>, path: string, value: unknown): void {
+function setField(
+  target: Record<string, unknown>,
+  path: string,
+  value: unknown,
+): void {
   const keys = path.split(".");
   let current: Record<string, unknown> = target;
   for (let index = 0; index < keys.length - 1; index += 1) {
@@ -561,7 +603,10 @@ function assertKnownDifferences(
   }
 }
 
-function fieldValue(message: ReturnType<typeof stripMessageEnvelope>, path: string): unknown {
+function fieldValue(
+  message: ReturnType<typeof stripMessageEnvelope>,
+  path: string,
+): unknown {
   return path.split(".").reduce<unknown>((value, key) => {
     if (value === null || value === undefined || typeof value !== "object") {
       return undefined;
@@ -579,10 +624,18 @@ function normalizeEvents(events: AssistantMessageEvent[]): unknown[] {
       return { type: event.type, contentIndex: event.contentIndex };
     }
     if (event.type === "text_delta" || event.type === "toolcall_delta") {
-      return { type: event.type, contentIndex: event.contentIndex, delta: event.delta };
+      return {
+        type: event.type,
+        contentIndex: event.contentIndex,
+        delta: event.delta,
+      };
     }
     if (event.type === "text_end") {
-      return { type: event.type, contentIndex: event.contentIndex, content: event.content };
+      return {
+        type: event.type,
+        contentIndex: event.contentIndex,
+        content: event.content,
+      };
     }
     if (event.type === "toolcall_end") {
       return {
@@ -599,7 +652,11 @@ function normalizeEvents(events: AssistantMessageEvent[]): unknown[] {
       };
     }
     if (event.type === "error") {
-      return { type: event.type, reason: event.reason, errorMessage: event.error.errorMessage };
+      return {
+        type: event.type,
+        reason: event.reason,
+        errorMessage: event.error.errorMessage,
+      };
     }
     return event;
   });
@@ -847,7 +904,13 @@ function cerebrasModel(): LlmModel<"openai-completions"> {
 function openAiChatTextSse(text: string) {
   return [
     {
-      choices: [{ delta: { content: text, role: "assistant" }, finish_reason: null, index: 0 }],
+      choices: [
+        {
+          delta: { content: text, role: "assistant" },
+          finish_reason: null,
+          index: 0,
+        },
+      ],
       id: "chatcmpl_1",
       model: "model",
     },
@@ -885,7 +948,10 @@ function openAiChatToolSse() {
                 id: "call_1",
                 index: 0,
                 type: "function",
-                function: { name: "find_relevant_files", arguments: '{"query"' },
+                function: {
+                  name: "find_relevant_files",
+                  arguments: '{"query"',
+                },
               },
             ],
           },
@@ -898,7 +964,9 @@ function openAiChatToolSse() {
       choices: [
         {
           delta: {
-            tool_calls: [{ index: 0, function: { arguments: ':"llm client"}' } }],
+            tool_calls: [
+              { index: 0, function: { arguments: ':"llm client"}' } },
+            ],
           },
           finish_reason: "tool_calls",
           index: 0,
@@ -946,7 +1014,9 @@ function openAiResponsesSse() {
 function geminiSse(text: string) {
   return [
     {
-      candidates: [{ content: { parts: [{ text }], role: "model" }, finishReason: "STOP" }],
+      candidates: [
+        { content: { parts: [{ text }], role: "model" }, finishReason: "STOP" },
+      ],
       usageMetadata: {
         candidatesTokenCount: 5,
         promptTokenCount: 20,

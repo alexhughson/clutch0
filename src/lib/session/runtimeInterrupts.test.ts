@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import { abortRuntimeWork, createRuntimeAbortHandle } from "./runtimeInterrupts";
+import {
+  abortRuntimeWork,
+  createRuntimeAbortHandle,
+} from "./runtimeInterrupts";
 
 test("runtime abort handles are aborted together and removed after abort", () => {
   const first = createRuntimeAbortHandle();

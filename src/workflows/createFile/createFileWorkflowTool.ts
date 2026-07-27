@@ -11,8 +11,7 @@ export const CREATE_FILE_TOOL_NAME = "create_file";
 
 export const createFileTool: Tool = {
   name: CREATE_FILE_TOOL_NAME,
-  description:
-    "Propose one new file for review. Does not write files.",
+  description: "Propose one new file for review. Does not write files.",
   parameters: Type.Object({
     summary: Type.String({
       description: "Concise file purpose.",

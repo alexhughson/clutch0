@@ -8,7 +8,10 @@ import {
   reduceConfigPaste,
   type ConfigKeyEffect,
 } from "./configKeyHandling";
-import { runConfigSubscriptionLogin, abortActiveConfigSubscriptionLogin } from "./configSubscriptionLoginController";
+import {
+  runConfigSubscriptionLogin,
+  abortActiveConfigSubscriptionLogin,
+} from "./configSubscriptionLoginController";
 
 type SetAppState = (
   partial:

@@ -52,9 +52,10 @@ export async function runAcpBackendSmokeTest({
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: AcpBackendSmokeTestOptions = {}): Promise<AcpBackendSmokeTestResult> {
   const configPaths =
-    configDir === undefined ? getClutchConfigPaths() : getClutchConfigPaths(configDir);
-  const resolvedBackend =
-    backend ?? resolveConfiguredAgentBackend(configPaths);
+    configDir === undefined
+      ? getClutchConfigPaths()
+      : getClutchConfigPaths(configDir);
+  const resolvedBackend = backend ?? resolveConfiguredAgentBackend(configPaths);
   const child = spawnBackend(resolvedBackend, cwd);
   const stderr = createStreamBuffer(child.stderr);
   const stdout = createStreamBuffer(child.stdout);

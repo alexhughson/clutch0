@@ -114,7 +114,10 @@ function reconcileStreamText(
       throw new Error("Expected stream block for matched stream id.");
     }
 
-    if (block.text === nextBlock.text && block.truncated === nextBlock.truncated) {
+    if (
+      block.text === nextBlock.text &&
+      block.truncated === nextBlock.truncated
+    ) {
       return [...blocks];
     }
 
@@ -138,7 +141,10 @@ function reconcileStreamText(
       continue;
     }
 
-    if (block.text === nextBlock.text && block.truncated === nextBlock.truncated) {
+    if (
+      block.text === nextBlock.text &&
+      block.truncated === nextBlock.truncated
+    ) {
       return [...blocks];
     }
 

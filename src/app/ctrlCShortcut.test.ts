@@ -12,9 +12,9 @@ import {
 test("recognizes ctrl+c key events", () => {
   expect(isCtrlCKey(keyEvent({ ctrl: true, name: "c" }))).toBe(true);
   expect(isCtrlCKey(keyEvent({ ctrl: true, name: "C" }))).toBe(true);
-  expect(isCtrlCKey(keyEvent({ name: "", raw: "\u0003", sequence: "\u0003" }))).toBe(
-    true,
-  );
+  expect(
+    isCtrlCKey(keyEvent({ name: "", raw: "\u0003", sequence: "\u0003" })),
+  ).toBe(true);
   expect(isCtrlCKey(keyEvent({ name: "c" }))).toBe(false);
   expect(isCtrlCKey(keyEvent({ ctrl: true, name: "x" }))).toBe(false);
 });

@@ -4,23 +4,23 @@
 
 clutch carries a 943-line private llm client (`src/lib/llm/directLlmClient.ts`) plus a 258-line legalization shim (`src/lib/llm/requestOptions.ts`). fiat already owns the request/response schema and the translators; this document specifies what fiat must add so clutch's client collapses to a thin adapter. scope is fiat `v0.2`. evidence for every requirement is a line in clutch that exists only because fiat lacks it.
 
-the escape hatch that motivates most of this: `onPayload` in `requestOptions.ts` exists solely to splice openrouter `reasoning` and `service_tier` into the body *after* `toBody()`, because fiat has no ops for them. `maxRetries` in `DirectLlmRequestOptions` is declared but never read — there is no retry logic in the current client.
+the escape hatch that motivates most of this: `onPayload` in `requestOptions.ts` exists solely to splice openrouter `reasoning` and `service_tier` into the body _after_ `toBody()`, because fiat has no ops for them. `maxRetries` in `DirectLlmRequestOptions` is declared but never read — there is no retry logic in the current client.
 
 ## current division of labor
 
-| concern | lives in | should live in |
-|---|---|---|
-| program schema, ops | fiat | fiat |
-| body translation (openai chat/responses, gemini) | fiat | fiat |
-| stream event → ops (`fromStreamResponse`) | fiat | fiat |
-| url construction per api | clutch `requestBodyForModel`, `geminiUrl` | fiat |
-| auth headers per provider | clutch `authHeaders` | fiat |
-| sse parsing | clutch `parseSseData` (~50 lines) | fiat |
-| ops → assistant message fold | clutch `createAssistantAccumulator` (~180 lines) | fiat |
-| stop-reason mapping | clutch `stopReasonFromFiat` | fiat |
-| usage merge incl. cache tokens | clutch `usageFromFiat`, `applyProviderUsage` | fiat |
-| service tier, openrouter reasoning | clutch `requestOptions.ts` via `onPayload` splice | fiat (as ops) |
-| model catalog, api keys, oauth, cost tables | clutch (`providerModels`, `clutchConfig`, pi-ai oauth) | clutch (non-goal) |
+| concern                                          | lives in                                               | should live in    |
+| ------------------------------------------------ | ------------------------------------------------------ | ----------------- |
+| program schema, ops                              | fiat                                                   | fiat              |
+| body translation (openai chat/responses, gemini) | fiat                                                   | fiat              |
+| stream event → ops (`fromStreamResponse`)        | fiat                                                   | fiat              |
+| url construction per api                         | clutch `requestBodyForModel`, `geminiUrl`              | fiat              |
+| auth headers per provider                        | clutch `authHeaders`                                   | fiat              |
+| sse parsing                                      | clutch `parseSseData` (~50 lines)                      | fiat              |
+| ops → assistant message fold                     | clutch `createAssistantAccumulator` (~180 lines)       | fiat              |
+| stop-reason mapping                              | clutch `stopReasonFromFiat`                            | fiat              |
+| usage merge incl. cache tokens                   | clutch `usageFromFiat`, `applyProviderUsage`           | fiat              |
+| service tier, openrouter reasoning               | clutch `requestOptions.ts` via `onPayload` splice      | fiat (as ops)     |
+| model catalog, api keys, oauth, cost tables      | clutch (`providerModels`, `clutchConfig`, pi-ai oauth) | clutch (non-goal) |
 
 ## R1 — new ops (close the `onPayload` escape hatch)
 

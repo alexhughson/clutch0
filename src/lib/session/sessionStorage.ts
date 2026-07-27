@@ -171,7 +171,9 @@ export async function listSessions({
   }
 
   const entries: SessionListEntry[] = [];
-  for (const metadata of index.sessions.slice().sort((a, b) => b.updatedAt - a.updatedAt)) {
+  for (const metadata of index.sessions
+    .slice()
+    .sort((a, b) => b.updatedAt - a.updatedAt)) {
     entries.push(await readSessionListEntry({ metadata, workspaceRoot }));
   }
 

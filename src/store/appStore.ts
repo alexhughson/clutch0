@@ -34,7 +34,7 @@ const storeInstrumentations = new WeakMap<AppStore, ActionInstrumentation>();
 export function createAppStore(
   initialState: Omit<AppState, "actions"> = createInitialAppState(),
   runtime: AppStoreRuntime = {},
-) : AppStore {
+): AppStore {
   return createAppStoreWithRuntime(initialState, runtime);
 }
 

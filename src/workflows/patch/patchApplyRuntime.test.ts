@@ -185,7 +185,7 @@ test("returns failed tool output for patch apply exceptions", async () => {
     stdout: "",
     success: false,
   });
-  expect(result.status === "invalid" ? result.errors[0]?.message : "").toContain(
-    "not a directory",
-  );
+  expect(
+    result.status === "invalid" ? result.errors[0]?.message : "",
+  ).toContain("not a directory");
 });

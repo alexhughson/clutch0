@@ -17,12 +17,17 @@ export function decodeContextItemV1(snapshot: unknown): PersistentContextItem {
     throw new Error(`Unknown context item type: ${type}`);
   }
 
-  const schema = persistentContextItemSchemas[type as PersistentContextItemType];
+  const schema =
+    persistentContextItemSchemas[type as PersistentContextItemType];
   return decodeSchema(schema, snapshot, type) as PersistentContextItem;
 }
 
 function readContextItemType(snapshot: unknown): string {
-  if (snapshot === null || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+  if (
+    snapshot === null ||
+    typeof snapshot !== "object" ||
+    Array.isArray(snapshot)
+  ) {
     throw new Error("context item snapshot must be an object.");
   }
 

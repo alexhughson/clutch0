@@ -1,7 +1,10 @@
 import { getPatchProposalPaths } from "../patch/patchEngine";
 import type { SessionEvent } from "../../types";
 import type { PersistentContextItem } from "./contextItemTypes";
-import { fieldChanged, stateUpdatedEvent } from "./contextItemDefinitions/shared";
+import {
+  fieldChanged,
+  stateUpdatedEvent,
+} from "./contextItemDefinitions/shared";
 
 type PersistentContextItemPair = {
   item: PersistentContextItem;
@@ -10,7 +13,9 @@ type PersistentContextItemPair = {
 
 type HistoryRule = {
   changed: (pair: PersistentContextItemPair) => boolean;
-  details?: (pair: PersistentContextItemPair) => Record<string, unknown> | undefined;
+  details?: (
+    pair: PersistentContextItemPair,
+  ) => Record<string, unknown> | undefined;
   kind: string;
 };
 
@@ -90,7 +95,8 @@ const persistentContextItemHistoryRules = {
         item.type === "llm-response-live" &&
         previous.output !== item.output,
       details: ({ item, previous }) =>
-        previous.type === "llm-response-live" && item.type === "llm-response-live"
+        previous.type === "llm-response-live" &&
+        item.type === "llm-response-live"
           ? {
               outputLength: item.output.length,
               previousOutputLength: previous.output.length,
@@ -105,7 +111,8 @@ const persistentContextItemHistoryRules = {
         (previous.status !== item.status ||
           previous.errorMessage !== item.errorMessage),
       details: ({ item, previous }) =>
-        previous.type === "llm-response-live" && item.type === "llm-response-live"
+        previous.type === "llm-response-live" &&
+        item.type === "llm-response-live"
           ? {
               errorMessage: item.errorMessage,
               previousStatus: previous.status,
@@ -117,8 +124,7 @@ const persistentContextItemHistoryRules = {
   ],
   "pi-agent": [
     {
-      changed: ({ item, previous }) =>
-        fieldChanged(previous, item, "blocks"),
+      changed: ({ item, previous }) => fieldChanged(previous, item, "blocks"),
       details: ({ item, previous }) =>
         previous.type === "pi-agent" && item.type === "pi-agent"
           ? {
@@ -148,8 +154,7 @@ const persistentContextItemHistoryRules = {
       kind: "pi-agent.status-changed",
     },
     {
-      changed: ({ item, previous }) =>
-        fieldChanged(previous, item, "sandbox"),
+      changed: ({ item, previous }) => fieldChanged(previous, item, "sandbox"),
       details: ({ item }) =>
         item.type === "pi-agent"
           ? {
@@ -180,7 +185,8 @@ const persistentContextItemHistoryRules = {
       changed: ({ item, previous }) =>
         previous.type === "agent-sandbox-diff" &&
         item.type === "agent-sandbox-diff" &&
-        (previous.diffText !== item.diffText || previous.summary !== item.summary),
+        (previous.diffText !== item.diffText ||
+          previous.summary !== item.summary),
       details: ({ item }) =>
         item.type === "agent-sandbox-diff"
           ? {

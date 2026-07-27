@@ -238,7 +238,7 @@ test("extracts powershell.exe apply_patch heredocs", () => {
   expect(
     parseApplyPatchShellCommand(
       [
-        'powershell.exe -Command "apply_patch <<\'PATCH\'',
+        "powershell.exe -Command \"apply_patch <<'PATCH'",
         "*** Begin Patch",
         "*** Add File: hello.txt",
         "+hello",
@@ -260,7 +260,7 @@ test("extracts powershell.exe NoProfile apply_patch heredocs", () => {
   expect(
     parseApplyPatchShellCommand(
       [
-        'powershell.exe -NoProfile -Command "apply_patch <<\'PATCH\'',
+        "powershell.exe -NoProfile -Command \"apply_patch <<'PATCH'",
         "*** Begin Patch",
         "*** Add File: hello.txt",
         "+hello",

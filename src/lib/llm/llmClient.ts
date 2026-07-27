@@ -102,7 +102,11 @@ export function streamDirectLlmResponse(
           applyAccumulatorEvent(event, output, model, stream);
         },
       });
-      for await (const raised of streamResponse(translator, program, clientOptions)) {
+      for await (const raised of streamResponse(
+        translator,
+        program,
+        clientOptions,
+      )) {
         if (!started) {
           started = true;
           stream.push({ partial: output, type: "start" });
@@ -115,8 +119,10 @@ export function streamDirectLlmResponse(
       }
       stream.end();
     } catch (error) {
-      output.stopReason = options.signal?.aborted === true ? "aborted" : "error";
-      output.errorMessage = error instanceof Error ? error.message : String(error);
+      output.stopReason =
+        options.signal?.aborted === true ? "aborted" : "error";
+      output.errorMessage =
+        error instanceof Error ? error.message : String(error);
       stream.push({ error: output, reason: output.stopReason, type: "error" });
       stream.end();
     }
@@ -141,9 +147,7 @@ export async function completeDirectLlmResponse(
   const clientOptions = buildClientOptions(model, connection, options);
   const output = createInitialAssistantMessage(model);
   const accumulator = createAssistantAccumulator({ model: model.id });
-  accumulator.push(
-    await completeResponse(translator, program, clientOptions),
-  );
+  accumulator.push(await completeResponse(translator, program, clientOptions));
   accumulator.finish();
   applyFiatMessage(accumulator.message, output, model);
   const text = output.content
@@ -204,7 +208,11 @@ function applyAccumulatorEvent(
   }
   switch (event.type) {
     case "text_start":
-      stream.push({ contentIndex: event.contentIndex, partial: output, type: "text_start" });
+      stream.push({
+        contentIndex: event.contentIndex,
+        partial: output,
+        type: "text_start",
+      });
       break;
     case "text_delta":
       stream.push({
@@ -223,7 +231,11 @@ function applyAccumulatorEvent(
       });
       break;
     case "toolcall_start":
-      stream.push({ contentIndex: event.contentIndex, partial: output, type: "toolcall_start" });
+      stream.push({
+        contentIndex: event.contentIndex,
+        partial: output,
+        type: "toolcall_start",
+      });
       break;
     case "toolcall_delta":
       stream.push({
@@ -257,7 +269,8 @@ function applyFiatMessage(
   output.stopReason = mapStopReason(fiat.stopReason);
   output.usage = mapUsage(fiat.usage, model);
   if (fiat.responseId !== undefined) output.responseId = fiat.responseId;
-  if (fiat.responseModel !== undefined) output.responseModel = fiat.responseModel;
+  if (fiat.responseModel !== undefined)
+    output.responseModel = fiat.responseModel;
 }
 
 function mapToolCall(block: {
@@ -280,10 +293,7 @@ function mapStopReason(reason: AssistantMessage["stopReason"]): LlmStopReason {
   return "stop";
 }
 
-function mapUsage(
-  fiat: AssistantMessage["usage"],
-  model: LlmModel,
-): LlmUsage {
+function mapUsage(fiat: AssistantMessage["usage"], model: LlmModel): LlmUsage {
   const cacheRead = fiat.cacheReadTokens ?? 0;
   const cacheWrite = fiat.cacheWriteTokens ?? 0;
   const input =

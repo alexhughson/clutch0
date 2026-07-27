@@ -73,5 +73,4 @@ export const automaticFileListContextItemDefinition: ContextItemDefinition<"auto
         text: (await readFileListForLlm({ root })) ?? "",
       };
     },
-
   };

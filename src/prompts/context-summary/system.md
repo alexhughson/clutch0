@@ -20,7 +20,7 @@ the user a sense of what is contained.
 - Do not write filler like "this file...", "this command output...", or "the context item...".
 - Do not include markdown fences.
 - Do not invent details not present in the input.
-- Try to lay out the meaning of the content, rather than what the content is.  
+- Try to lay out the meaning of the content, rather than what the content is.
   - For code describe what it addresses and roughly how, how it operates on domains
   - For text, highlight the key messages of the text
 - If the content is short, just output it, no need to summarize.

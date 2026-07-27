@@ -74,7 +74,9 @@ function modelFixture({
   };
 }
 
-async function withTempConfigDir(run: (configDir: string) => void | Promise<void>) {
+async function withTempConfigDir(
+  run: (configDir: string) => void | Promise<void>,
+) {
   const configDir = await mkdtemp(join(tmpdir(), "clutch-config-workflow-"));
   process.env[CLUTCH_CONFIG_DIR_ENV] = configDir;
   try {
@@ -101,10 +103,10 @@ test("provider list navigation moves the cursor", () => {
     task: { providerIndex: 1 },
   });
 
-  const up = reduceConfigKey(
-    down.kind === "update" ? down.task : task,
-    { name: "up", sequence: "up" },
-  );
+  const up = reduceConfigKey(down.kind === "update" ? down.task : task, {
+    name: "up",
+    sequence: "up",
+  });
   expect(up).toMatchObject({
     kind: "update",
     task: { providerIndex: 0 },
@@ -194,7 +196,11 @@ test("agent-backend typing, paste, clear, save success, and validation error", a
     });
     task = pasted.kind === "update" ? pasted.task : task;
 
-    const cleared = reduceConfigKey(task, { ctrl: true, name: "u", sequence: "u" });
+    const cleared = reduceConfigKey(task, {
+      ctrl: true,
+      name: "u",
+      sequence: "u",
+    });
     expect(cleared).toMatchObject({
       kind: "update",
       task: { agentBackendForm: { command: "" } },
@@ -210,12 +216,16 @@ test("agent-backend typing, paste, clear, save success, and validation error", a
       },
       agentBackendRowIndex: 3,
     };
-    const invalidSave = reduceConfigKey(task, { name: "return", sequence: "\r" });
+    const invalidSave = reduceConfigKey(task, {
+      name: "return",
+      sequence: "\r",
+    });
     expect(invalidSave).toMatchObject({
       kind: "update",
       task: {
         stage: "agent-backend",
-        message: 'ACP backend args must be a JSON string array, for example ["acp"].',
+        message:
+          'ACP backend args must be a JSON string array, for example ["acp"].',
       },
     });
 
@@ -266,7 +276,9 @@ test("token stage save, ctrl+s save, clear, and validation error", async () => {
     });
 
     for (const character of "secret-token") {
-      harness.config.handleKey({ key: { name: character, sequence: character } });
+      harness.config.handleKey({
+        key: { name: character, sequence: character },
+      });
     }
     harness.config.handleKey(key("u", "u", { ctrl: true }));
     expect(harness.state.activeTask).toMatchObject({
@@ -275,7 +287,9 @@ test("token stage save, ctrl+s save, clear, and validation error", async () => {
     });
 
     for (const character of "secret-token") {
-      harness.config.handleKey({ key: { name: character, sequence: character } });
+      harness.config.handleKey({
+        key: { name: character, sequence: character },
+      });
     }
     harness.config.handleKey({ key: { name: "s", sequence: "s", ctrl: true } });
     expect(harness.state.activeTask).toMatchObject({
@@ -338,7 +352,8 @@ test("model-settings transitions into effort and service-tier pickers", () => {
     },
   });
 
-  const serviceTierTask = serviceTier.kind === "update" ? serviceTier.task : base;
+  const serviceTierTask =
+    serviceTier.kind === "update" ? serviceTier.task : base;
   const priorityIndex = CLUTCH_MODEL_SERVICE_TIERS.indexOf("priority");
   const tierChosen = reduceConfigKey(
     { ...serviceTierTask, modelServiceTierIndex: priorityIndex },
@@ -347,7 +362,11 @@ test("model-settings transitions into effort and service-tier pickers", () => {
   expect(tierChosen).toMatchObject({
     kind: "update",
     task: {
-      primary: { provider: "openai", model: "gpt-test", serviceTier: "priority" },
+      primary: {
+        provider: "openai",
+        model: "gpt-test",
+        serviceTier: "priority",
+      },
       stage: "model-settings",
       message: "Primary service tier updated. Choose Done to save.",
     },
@@ -394,10 +413,11 @@ test("subscription login enter, duplicate enter, and escape abort", () => {
   });
 
   const runningTask =
-    start.kind === "start-subscription-login"
-      ? start.task
-      : startTask;
-  const duplicate = reduceConfigKey(runningTask, { name: "return", sequence: "\r" });
+    start.kind === "start-subscription-login" ? start.task : startTask;
+  const duplicate = reduceConfigKey(runningTask, {
+    name: "return",
+    sequence: "\r",
+  });
   expect(duplicate).toMatchObject({
     kind: "update",
     task: {

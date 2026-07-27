@@ -89,13 +89,13 @@ async function runCleanupTask(task: () => Promise<void> | void): Promise<void> {
 }
 
 function cleanupFailureFromResults(
-  results:
-    | PromiseSettledResult<unknown>[]
-    | undefined,
+  results: PromiseSettledResult<unknown>[] | undefined,
   timeoutMs: number,
 ): Error | null {
   if (results === undefined) {
-    return new Error(`Session shutdown cleanup timed out after ${timeoutMs}ms.`);
+    return new Error(
+      `Session shutdown cleanup timed out after ${timeoutMs}ms.`,
+    );
   }
 
   const failures = results.filter(

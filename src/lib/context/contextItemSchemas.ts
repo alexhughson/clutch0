@@ -55,10 +55,7 @@ export const AgentOutputStatusBlockSchema = Type.Object({
 export const AgentOutputStreamBlockSchema = Type.Object({
   id: Type.String(),
   kind: Type.Literal("stream"),
-  streamKind: Type.Union([
-    Type.Literal("assistant"),
-    Type.Literal("thinking"),
-  ]),
+  streamKind: Type.Union([Type.Literal("assistant"), Type.Literal("thinking")]),
   text: Type.String(),
   timestamp: Type.Number(),
   truncated: Type.Optional(Type.Boolean()),
@@ -250,7 +247,8 @@ export const persistentContextItemSchemas = {
   "user-text": UserTextContextItemSchema,
 } as const;
 
-export type PersistentContextItemType = keyof typeof persistentContextItemSchemas;
+export type PersistentContextItemType =
+  keyof typeof persistentContextItemSchemas;
 
 export type FileContextItemState = Static<typeof FileContextItemSchema>;
 export type SavedLlmResponseContextItemState = Static<

@@ -51,10 +51,7 @@ export interface LlmWorkflowToolController {
   readonly enabledByDefault?: boolean;
   readonly resultKind: LlmWorkflowToolResult["kind"];
   readonly runSlashCommand?: SlashCommandRunner;
-  readonly slashCommand?: Omit<
-    LlmSlashCommand,
-    "allowedToolNames" | "run"
-  >;
+  readonly slashCommand?: Omit<LlmSlashCommand, "allowedToolNames" | "run">;
   readonly tool: Tool;
   handleResult(options: {
     actions: AppActions;

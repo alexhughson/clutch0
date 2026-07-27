@@ -42,9 +42,10 @@ export async function readGitDiff({
 }
 
 export function isNotGitRepositoryError(error: unknown): boolean {
-  return [getErrorMessage(error), getErrorStderr(error)].some((text) =>
-    text.toLowerCase().includes("not a git repository") ||
-    text.includes("Could not access 'HEAD'"),
+  return [getErrorMessage(error), getErrorStderr(error)].some(
+    (text) =>
+      text.toLowerCase().includes("not a git repository") ||
+      text.includes("Could not access 'HEAD'"),
   );
 }
 
@@ -122,7 +123,10 @@ async function readUntrackedFileDiffs({
       diffs.push(await readUntrackedFileDiff({ maxBuffer, path, root }));
     } catch (error) {
       if (isMaxBufferError(error)) {
-        throw withErrorStdout(error, joinDiffs([...diffs, getErrorStdout(error)]));
+        throw withErrorStdout(
+          error,
+          joinDiffs([...diffs, getErrorStdout(error)]),
+        );
       }
 
       throw error;

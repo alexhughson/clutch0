@@ -57,7 +57,7 @@ test("collects OpenAI chat stream text and tool-call deltas into an assistant me
                   type: "function",
                   function: {
                     name: "find_relevant_files",
-                    arguments: "{\"query\"",
+                    arguments: '{"query"',
                   },
                 },
               ],
@@ -75,7 +75,7 @@ test("collects OpenAI chat stream text and tool-call deltas into an assistant me
                 {
                   index: 0,
                   function: {
-                    arguments: ":\"llm client\"}",
+                    arguments: ':"llm client"}',
                   },
                 },
               ],
