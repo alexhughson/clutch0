@@ -197,10 +197,7 @@ function parseCliOptions(args: string[]): CliOptions {
     repeat,
     targets:
       targets.length === 0
-        ? [
-            parseEvalModelSpec("cerebras:gpt-oss-120b"),
-            parseEvalModelSpec("openai:gpt-5.4"),
-          ]
+        ? [parseEvalModelSpec("openrouter:openai/gpt-5")]
         : targets,
   };
 }

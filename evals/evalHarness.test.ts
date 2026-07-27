@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { LlmAssistantMessage } from "../src/lib/llm/types";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -227,7 +227,7 @@ test("normalizes assistant messages into classifier results", () => {
       output: 0,
       totalTokens: 0,
     },
-  } satisfies AssistantMessage;
+  } satisfies LlmAssistantMessage;
 
   expect(normalizeAssistantMessage(message)).toMatchObject({
     classification: "find_relevant_files",
@@ -288,7 +288,7 @@ test("writes Clutch validator-generated diffs as eval artifacts", async () => {
   );
 });
 
-function assistantMessageFixture(): AssistantMessage {
+function assistantMessageFixture(): LlmAssistantMessage {
   return {
     api: "openai-responses",
     content: [],

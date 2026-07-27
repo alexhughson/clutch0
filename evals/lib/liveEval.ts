@@ -1,10 +1,4 @@
 import {
-  type Api,
-  type AssistantMessage,
-  type TextContent,
-  type ToolCall,
-} from "@earendil-works/pi-ai";
-import {
   DEFAULT_CLUTCH_MODEL_EFFORT_LEVEL,
   hasUsableApiKey,
   isClutchProviderId,
@@ -22,7 +16,13 @@ import {
   configuredLlmRequestOptions,
 } from "../../src/lib/llm/requestOptions";
 import { completeDirectLlmResponse } from "../../src/lib/llm/directLlmClient";
-import type { LlmContext, LlmModel } from "../../src/lib/llm/types";
+import type {
+  LlmAssistantMessage,
+  LlmContext,
+  LlmModel,
+  LlmTextContent,
+  LlmToolCall,
+} from "../../src/lib/llm/types";
 import {
   getPatchProposalPaths,
   parseCodexPatch,
@@ -52,9 +52,9 @@ export type EvalModelRequest = ResolvedConfiguredLlmRequest & {
 export type NormalizedAssistantResult = {
   assistantText: string;
   classification: EvalClassification;
-  rawAssistantMessage: AssistantMessage;
-  toolCall?: ToolCall;
-  toolCalls: ToolCall[];
+  rawAssistantMessage: LlmAssistantMessage;
+  toolCall?: LlmToolCall;
+  toolCalls: LlmToolCall[];
 };
 
 export type EvalAttemptResult = NormalizedAssistantResult & {
@@ -151,13 +151,9 @@ export async function completeEvalRequest({
 }: {
   context: LlmContext;
   request: EvalModelRequest;
-}): Promise<AssistantMessage> {
+}): Promise<LlmAssistantMessage> {
   const options = configuredLlmRequestOptions(request);
-  return (await completeDirectLlmResponse(
-    request.model as never,
-    context,
-    options,
-  )) as unknown as AssistantMessage;
+  return completeDirectLlmResponse(request.model as never, context, options);
 }
 
 export async function runPreparedEvalCase({
@@ -256,7 +252,7 @@ export async function runPreparedEvalCaseAttempt({
   };
 }
 
-function assistantRequestFailure(message: AssistantMessage): string | null {
+function assistantRequestFailure(message: LlmAssistantMessage): string | null {
   if (message.stopReason !== "error") {
     return null;
   }
@@ -268,13 +264,13 @@ function assistantRequestFailure(message: AssistantMessage): string | null {
 }
 
 export function normalizeAssistantMessage(
-  message: AssistantMessage,
+  message: LlmAssistantMessage,
 ): NormalizedAssistantResult {
   const toolCalls = message.content.filter(
-    (block): block is ToolCall => block.type === "toolCall",
+    (block): block is LlmToolCall => block.type === "toolCall",
   );
   const assistantText = message.content
-    .filter((block): block is TextContent => block.type === "text")
+    .filter((block): block is LlmTextContent => block.type === "text")
     .map((block) => block.text)
     .join("\n");
 
@@ -549,9 +545,9 @@ function extractJsonObject(text: string): string {
   return text.slice(start, end + 1);
 }
 
-function getAssistantText(message: AssistantMessage): string {
+function getAssistantText(message: LlmAssistantMessage): string {
   return message.content
-    .filter((block): block is TextContent => block.type === "text")
+    .filter((block): block is LlmTextContent => block.type === "text")
     .map((block) => block.text)
     .join("\n");
 }
