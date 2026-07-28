@@ -319,19 +319,25 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       handleModelSettingsKey({
         actions,
         agent,
+        configuredProviders,
         endpoints,
         event,
         modelSettingsIndex,
         modelSettingsRows,
         primary,
         setActiveModelEntry,
+        setAgent,
         setMessage,
+        setModelFilter,
+        setModelIndex,
         setModelOptionIndex,
         setModelOptionKey,
         setModelProviderIndex,
         setModelSettingsIndex,
+        setPrimary,
         setProviderExtrasDraft,
         setStage,
+        setSummarization,
         summarization,
       });
       return;
@@ -362,6 +368,8 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       handleModelProviderKey({
         activeModelEntry,
         agent,
+        configuredProviders,
+        endpoints,
         event,
         modelProviderIndex,
         primary,
@@ -374,7 +382,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         setStage,
         setSummarization,
         summarization,
-        endpoints,
       });
       return;
     }
@@ -382,6 +389,8 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
     handleModelChoiceKey({
       activeModelEntry,
       agent,
+      configuredProviders,
+      endpoints,
       event,
       modelCommitPending,
       modelFilter,
@@ -470,6 +479,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         {stage === "model-provider" ? (
           <ModelProviderStep
             activeModelEntry={activeModelEntry}
+            configuredProviders={configuredProviders}
             endpoints={endpoints}
             message={message}
             providerIndex={modelProviderIndex}
@@ -706,11 +716,13 @@ function EndpointFormStep({
 
 function ModelProviderStep({
   activeModelEntry,
+  configuredProviders,
   endpoints,
   message,
   providerIndex,
 }: {
   activeModelEntry: ModelEntry;
+  configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   message: string | null;
   providerIndex: number;
@@ -718,14 +730,16 @@ function ModelProviderStep({
   return (
     <>
       <text>{`Choose provider for ${entryLabel(activeModelEntry)}.`}</text>
-      {modelProvidersForEntry(endpoints).map((provider, index) => (
-        <text
-          key={provider.id}
-          style={index === providerIndex ? selectedStyle : undefined}
-        >
-          {`${index === providerIndex ? ">" : " "} ${provider.label}`}
-        </text>
-      ))}
+      {modelProvidersForEntry({ configuredProviders, endpoints }).map(
+        (provider, index) => (
+          <text
+            key={provider.id}
+            style={index === providerIndex ? selectedStyle : undefined}
+          >
+            {`${index === providerIndex ? ">" : " "} ${provider.label}`}
+          </text>
+        ),
+      )}
       {message === null ? null : (
         <text style={{ fg: "yellow" }}>{message}</text>
       )}
@@ -1064,36 +1078,48 @@ function handleTokenKey({
 function handleModelSettingsKey({
   actions,
   agent,
+  configuredProviders,
   endpoints,
   event,
   modelSettingsIndex,
   modelSettingsRows,
   primary,
   setActiveModelEntry,
+  setAgent,
   setMessage,
+  setModelFilter,
+  setModelIndex,
   setModelOptionIndex,
   setModelOptionKey,
   setModelProviderIndex,
   setModelSettingsIndex,
+  setPrimary,
   setProviderExtrasDraft,
   setStage,
+  setSummarization,
   summarization,
 }: {
   actions: AppActions;
   agent: ClutchModelSelection;
+  configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelSettingsIndex: number;
   modelSettingsRows: ModelSettingsRow[];
   primary: ClutchModelSelection;
   setActiveModelEntry: (entry: ModelEntry) => void;
+  setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
+  setModelFilter: (filter: string) => void;
+  setModelIndex: (index: number) => void;
   setModelOptionIndex: (index: number) => void;
   setModelOptionKey: (key: ModelOptionKey) => void;
   setModelProviderIndex: (index: number) => void;
   setModelSettingsIndex: (index: number) => void;
+  setPrimary: (selection: ClutchModelSelection) => void;
   setProviderExtrasDraft: (draft: string) => void;
   setStage: (stage: ConfigStage) => void;
+  setSummarization: (selection: ClutchModelSelection) => void;
   summarization: ClutchModelSelection;
 }) {
   if (event.name === "escape") {
@@ -1144,7 +1170,31 @@ function handleModelSettingsKey({
   });
   setActiveModelEntry(row.entry);
   if (row.kind === "model") {
-    setModelProviderIndex(providerIndexFor(selection.provider, endpoints));
+    const providers = modelProvidersForEntry({ configuredProviders, endpoints });
+    if (providers.length === 0) {
+      setMessage("Configure a provider API key before choosing a model.");
+      prevent(event);
+      return;
+    }
+    if (providers.length === 1) {
+      openModelChoiceForProvider({
+        activeModelEntry: row.entry,
+        currentSelection: selection,
+        provider: providers[0]!.id,
+        setAgent,
+        setMessage,
+        setModelFilter,
+        setModelIndex,
+        setPrimary,
+        setStage,
+        setSummarization,
+      });
+      prevent(event);
+      return;
+    }
+    setModelProviderIndex(
+      providerIndexFor(selection.provider, { configuredProviders, endpoints }),
+    );
     setStage("model-provider");
   } else {
     const optionKey = modelSettingsKindToOptionKey(row.kind);
@@ -1163,6 +1213,7 @@ function handleModelSettingsKey({
 function handleModelProviderKey({
   activeModelEntry,
   agent,
+  configuredProviders,
   endpoints,
   event,
   modelProviderIndex,
@@ -1179,6 +1230,7 @@ function handleModelProviderKey({
 }: {
   activeModelEntry: ModelEntry;
   agent: ClutchModelSelection;
+  configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelProviderIndex: number;
@@ -1200,8 +1252,9 @@ function handleModelProviderKey({
     return;
   }
 
+  const providers = modelProvidersForEntry({ configuredProviders, endpoints });
+
   if (event.name === "up" || event.name === "down") {
-    const providers = modelProvidersForEntry(endpoints);
     setModelProviderIndex(
       cycleIndex(
         modelProviderIndex,
@@ -1218,18 +1271,54 @@ function handleModelProviderKey({
     return;
   }
 
-  const provider =
-    modelProvidersForEntry(endpoints)[modelProviderIndex]?.id;
+  const provider = providers[modelProviderIndex]?.id;
   if (provider === undefined) {
     throw new Error(`Invalid model provider row index: ${modelProviderIndex}`);
   }
 
-  const currentSelection = getModelEntrySelection({
-    agent,
-    entry: activeModelEntry,
-    primary,
-    summarization,
+  openModelChoiceForProvider({
+    activeModelEntry,
+    currentSelection: getModelEntrySelection({
+      agent,
+      entry: activeModelEntry,
+      primary,
+      summarization,
+    }),
+    provider,
+    setAgent,
+    setMessage,
+    setModelFilter,
+    setModelIndex,
+    setPrimary,
+    setStage,
+    setSummarization,
   });
+  prevent(event);
+}
+
+function openModelChoiceForProvider({
+  activeModelEntry,
+  currentSelection,
+  provider,
+  setAgent,
+  setMessage,
+  setModelFilter,
+  setModelIndex,
+  setPrimary,
+  setStage,
+  setSummarization,
+}: {
+  activeModelEntry: ModelEntry;
+  currentSelection: ClutchModelSelection;
+  provider: string;
+  setAgent: (selection: ClutchModelSelection) => void;
+  setMessage: (message: string | null) => void;
+  setModelFilter: (filter: string) => void;
+  setModelIndex: (index: number) => void;
+  setPrimary: (selection: ClutchModelSelection) => void;
+  setStage: (stage: ConfigStage) => void;
+  setSummarization: (selection: ClutchModelSelection) => void;
+}) {
   const selection =
     currentSelection.provider === provider
       ? currentSelection
@@ -1256,7 +1345,6 @@ function handleModelProviderKey({
   setModelFilter("");
   setStage("model-model");
   setMessage(null);
-  prevent(event);
 }
 
 function handleModelOptionKey({
@@ -1394,6 +1482,8 @@ function handleModelOptionKey({
 function handleModelChoiceKey({
   activeModelEntry,
   agent,
+  configuredProviders,
+  endpoints,
   event,
   modelCommitPending,
   modelFilter,
@@ -1412,6 +1502,8 @@ function handleModelChoiceKey({
 }: {
   activeModelEntry: ModelEntry;
   agent: ClutchModelSelection;
+  configuredProviders: readonly string[];
+  endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelCommitPending: boolean;
   modelFilter: string;
@@ -1440,7 +1532,8 @@ function handleModelChoiceKey({
   });
 
   if (event.name === "escape") {
-    setStage("model-provider");
+    const providers = modelProvidersForEntry({ configuredProviders, endpoints });
+    setStage(providers.length <= 1 ? "model-settings" : "model-provider");
     setMessage(null);
     prevent(event);
     return;
@@ -1790,14 +1883,17 @@ function updateAgentBackendField(
   }
 }
 
-function modelProvidersForEntry(endpoints: readonly ClutchEndpoint[]) {
-  return [
-    { id: OPENROUTER_PROVIDER_ID, label: "OpenRouter" },
-    ...endpoints.map((endpoint) => ({
-      id: endpoint.id,
-      label: endpoint.label,
-    })),
-  ];
+function modelProvidersForEntry({
+  configuredProviders,
+  endpoints,
+}: {
+  configuredProviders: readonly string[];
+  endpoints: readonly ClutchEndpoint[];
+}) {
+  return configuredProviders.map((id) => ({
+    id,
+    label: getClutchProviderLabel(id, { endpoints: [...endpoints] }),
+  }));
 }
 
 function modelChoiceStatusLabel({
@@ -1852,12 +1948,13 @@ function resolveCommittedModelId({
   matches: readonly ClutchProviderModel[];
   modelIndex: number;
 }): string | undefined {
-  const typed = filter.trim();
-  if (typed.length > 0) {
-    return typed;
+  if (matches.length > 0) {
+    const index = Math.min(Math.max(modelIndex, 0), matches.length - 1);
+    return matches[index]?.id;
   }
 
-  return matches[modelIndex]?.id;
+  const typed = filter.trim();
+  return typed.length > 0 ? typed : undefined;
 }
 
 function endpointFormRows(mode: EndpointFormMode): EndpointFormRow[] {
@@ -2022,15 +2119,19 @@ function indexOfModel(
 
 function providerIndexFor(
   provider: string,
-  endpoints: readonly ClutchEndpoint[],
+  {
+    configuredProviders,
+    endpoints,
+  }: {
+    configuredProviders: readonly string[];
+    endpoints: readonly ClutchEndpoint[];
+  },
 ): number {
-  const index = modelProvidersForEntry(endpoints).findIndex(
-    (candidate) => candidate.id === provider,
-  );
-  if (index === -1) {
-    throw new Error(`Provider ${provider} is not configured.`);
-  }
-  return index;
+  const index = modelProvidersForEntry({
+    configuredProviders,
+    endpoints,
+  }).findIndex((candidate) => candidate.id === provider);
+  return index === -1 ? 0 : index;
 }
 
 function modelSettingsKindToOptionKey(
