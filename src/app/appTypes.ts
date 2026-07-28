@@ -108,7 +108,6 @@ export type ContextItemViewerTaskState = {
 };
 
 export type ConfigTaskState = {
-  agent: ClutchModelSelection;
   agentBackend?: ClutchAgentBackendConfig;
   configuredProviders: string[];
   endpoints: ClutchEndpoint[];

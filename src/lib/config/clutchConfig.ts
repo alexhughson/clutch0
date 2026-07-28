@@ -28,7 +28,7 @@ const LEGACY_PROVIDER_IDS = new Set([
   "sambanova",
 ]);
 
-export type ClutchModelRole = "agent" | "primary" | "summarization";
+export type ClutchModelRole = "primary" | "summarization";
 
 export const CLUTCH_MODEL_EFFORT_LEVELS = [
   "off",
@@ -65,8 +65,8 @@ export type ClutchEndpoint = {
 };
 
 export type OpenRouterCapabilities = {
+  serviceTiers: Array<"flex" | "priority">;
   supportsReasoning: boolean;
-  supportsServiceTier: boolean;
   vendors: string[];
 };
 
@@ -254,7 +254,7 @@ function salvageClutchSettings(raw: Record<string, unknown>): ClutchSettings {
     !Array.isArray(modelsRaw)
   ) {
     const models: Partial<Record<ClutchModelRole, ClutchModelSelection>> = {};
-    for (const role of ["primary", "summarization", "agent"] as const) {
+    for (const role of ["primary", "summarization"] as const) {
       const selection = (modelsRaw as Record<string, unknown>)[role];
       if (selection === undefined) {
         continue;
@@ -309,7 +309,6 @@ export function isClutchConfigured(paths = getClutchConfigPaths()): boolean {
   return (
     hasUsableModelSelection(settings, settings.models?.primary) &&
     hasUsableModelSelection(settings, settings.models?.summarization) &&
-    isConfiguredAgentModel(settings, auth) &&
     hasUsableApiKey(auth[settings.models!.primary!.provider]) &&
     hasUsableApiKey(auth[settings.models!.summarization!.provider])
   );
@@ -393,13 +392,11 @@ export function resolveConfiguredLlmRequest(
 }
 
 export function saveClutchConfiguration({
-  agent,
   apiKey,
   paths = getClutchConfigPaths(),
   primary,
   summarization,
 }: {
-  agent?: ClutchModelSelection;
   apiKey?: string;
   paths?: ClutchConfigPaths;
   primary: ClutchModelSelection;
@@ -409,7 +406,6 @@ export function saveClutchConfiguration({
     saveClutchApiKey({ apiKey, paths, provider: primary.provider });
   }
   saveClutchModelConfiguration({
-    agent,
     paths,
     primary,
     summarization,
@@ -443,26 +439,21 @@ export function saveClutchApiKey({
 }
 
 export function saveClutchModelConfiguration({
-  agent,
   paths = getClutchConfigPaths(),
   primary,
   summarization,
 }: {
-  agent?: ClutchModelSelection;
   paths?: ClutchConfigPaths;
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 }) {
   const settings = loadClutchSettings(paths);
-  const agentSelection = normalizeModelSelectionForSave(agent ?? primary);
   const primarySelection = normalizeModelSelectionForSave(primary);
   const summarizationSelection = normalizeModelSelectionForSave(summarization);
-  assertUsableModelSelection(settings, agentSelection, "agent");
   assertUsableModelSelection(settings, primarySelection, "primary");
   assertUsableModelSelection(settings, summarizationSelection, "summarization");
 
   const auth = loadClutchAuth(paths);
-  assertConfiguredProviderCredential(settings, auth, agentSelection.provider);
   assertConfiguredProviderCredential(settings, auth, primarySelection.provider);
   assertConfiguredProviderCredential(
     settings,
@@ -480,7 +471,6 @@ export function saveClutchModelConfiguration({
       ? {}
       : { agentBackend: existingSettings.agentBackend }),
     models: {
-      agent: agentSelection,
       primary: primarySelection,
       summarization: summarizationSelection,
     },
@@ -510,9 +500,6 @@ export function findModelRolesUsingProvider(
   const roles: ClutchModelRole[] = [];
   if (models.primary?.provider === providerId) {
     roles.push("primary");
-  }
-  if (models.agent?.provider === providerId) {
-    roles.push("agent");
   }
   if (models.summarization?.provider === providerId) {
     roles.push("summarization");
@@ -595,7 +582,6 @@ export function deleteClutchEndpointConfiguration({
 export function createDefaultClutchConfigDraft(
   paths = getClutchConfigPaths(),
 ): {
-  agent: ClutchModelSelection;
   agentBackend?: ClutchAgentBackendConfig;
   configuredProviders: string[];
   endpoints: ClutchEndpoint[];
@@ -608,14 +594,9 @@ export function createDefaultClutchConfigDraft(
     settings.models?.primary?.provider ?? DEFAULT_PROVIDER;
   const summarizationProvider =
     settings.models?.summarization?.provider ?? primaryProvider;
-  const agentProvider = settings.models?.agent?.provider ?? primaryProvider;
 
   return {
     agentBackend: settings.agentBackend ?? DEFAULT_AGENT_BACKEND,
-    agent: getExistingOrEmptyModelSelection({
-      model: settings.models?.agent ?? settings.models?.primary,
-      provider: agentProvider,
-    }),
     configuredProviders: listConfiguredProviders(settings, auth),
     endpoints: settings.endpoints ?? [],
     primary: getExistingOrEmptyModelSelection({
@@ -663,25 +644,10 @@ export function listConfiguredProviders(
   return providers;
 }
 
-function isConfiguredAgentModel(
-  settings: ClutchSettings,
-  auth: ClutchAuth,
-): boolean {
-  const agent = getModelSelectionForRole(settings, "agent");
-  return (
-    hasUsableModelSelection(settings, agent) &&
-    hasUsableApiKey(auth[agent!.provider])
-  );
-}
-
 function getModelSelectionForRole(
   settings: ClutchSettings,
   role: ClutchModelRole,
 ): ClutchModelSelection | undefined {
-  if (role === "agent") {
-    return settings.models?.agent ?? settings.models?.primary;
-  }
-
   return settings.models?.[role];
 }
 
@@ -844,7 +810,6 @@ function parseModelSelections(
   endpoints: readonly ClutchEndpoint[],
 ): Partial<Record<ClutchModelRole, ClutchModelSelection>> {
   return {
-    agent: parseModelSelection(rawModels.agent, "agent", endpoints),
     primary: parseModelSelection(rawModels.primary, "primary", endpoints),
     summarization: parseModelSelection(
       rawModels.summarization,
@@ -923,31 +888,18 @@ function parseOpenRouterOptions({
     return openRouter;
   }
 
-  if (legacyServiceTier === undefined) {
-    return openRouter;
+  if (legacyServiceTier === undefined && openRouter === undefined) {
+    return undefined;
   }
 
-  const serviceTier = openRouter?.serviceTier ?? legacyServiceTier;
-  const capabilities =
-    openRouter?.capabilities === undefined
-      ? {
-          vendors: [] as string[],
-          supportsReasoning: false,
-          supportsServiceTier: true,
-        }
-      : {
-          ...openRouter.capabilities,
-          ...(serviceTier !== DEFAULT_CLUTCH_MODEL_SERVICE_TIER &&
-          !openRouter.capabilities.supportsServiceTier
-            ? { supportsServiceTier: true }
-            : {}),
-        };
-
-  return {
+  const merged: OpenRouterOptions = {
     ...(openRouter ?? {}),
-    serviceTier,
-    capabilities,
+    ...(legacyServiceTier === undefined
+      ? {}
+      : { serviceTier: openRouter?.serviceTier ?? legacyServiceTier }),
   };
+
+  return coerceOpenRouterServiceTier(merged);
 }
 
 function parseOpenRouterOptionsObject(
@@ -996,7 +948,7 @@ function parseOpenRouterOptionsObject(
 
   const capabilities = parseOpenRouterCapabilities(raw.capabilities, role);
 
-  return {
+  return coerceOpenRouterServiceTier({
     ...(vendor === undefined ? {} : { vendor }),
     ...(allowFallbacks === undefined ? {} : { allowFallbacks }),
     ...(sort === undefined ? {} : { sort }),
@@ -1008,7 +960,26 @@ function parseOpenRouterOptionsObject(
       ? {}
       : { providerExtras: providerExtras as Record<string, unknown> }),
     ...(capabilities === undefined ? {} : { capabilities }),
-  };
+  });
+}
+
+function coerceOpenRouterServiceTier(
+  openRouter: OpenRouterOptions,
+): OpenRouterOptions {
+  const serviceTier = openRouter.serviceTier ?? DEFAULT_CLUTCH_MODEL_SERVICE_TIER;
+  if (serviceTier === "default") {
+    return openRouter;
+  }
+
+  const allowed = openRouter.capabilities?.serviceTiers ?? [];
+  if (serviceTier === "flex" || serviceTier === "priority") {
+    if (allowed.includes(serviceTier)) {
+      return openRouter;
+    }
+  }
+
+  const { serviceTier: _serviceTier, ...rest } = openRouter;
+  return rest;
 }
 
 function parseOpenRouterCapabilities(
@@ -1039,18 +1010,48 @@ function parseOpenRouterCapabilities(
     );
   }
 
-  const supportsServiceTier = record.supportsServiceTier;
-  if (typeof supportsServiceTier !== "boolean") {
-    throw new Error(
-      `Clutch ${role} model openRouter.capabilities.supportsServiceTier must be a boolean.`,
-    );
-  }
+  const serviceTiers = parseCapabilitiesServiceTiers(record, role);
 
   return {
+    serviceTiers,
     supportsReasoning,
-    supportsServiceTier,
-    vendors,
+    vendors: [...vendors],
   };
+}
+
+function parseCapabilitiesServiceTiers(
+  record: Record<string, unknown>,
+  role: ClutchModelRole,
+): OpenRouterCapabilities["serviceTiers"] {
+  if (record.serviceTiers !== undefined) {
+    if (
+      !Array.isArray(record.serviceTiers) ||
+      !record.serviceTiers.every(
+        (item) => item === "flex" || item === "priority",
+      )
+    ) {
+      throw new Error(
+        `Clutch ${role} model openRouter.capabilities.serviceTiers must be an array of flex/priority.`,
+      );
+    }
+    const tiers: OpenRouterCapabilities["serviceTiers"] = [];
+    if (record.serviceTiers.includes("flex")) {
+      tiers.push("flex");
+    }
+    if (record.serviceTiers.includes("priority")) {
+      tiers.push("priority");
+    }
+    return tiers;
+  }
+
+  // Legacy boolean snapshot from before endpoint-tag detection.
+  if (typeof record.supportsServiceTier === "boolean") {
+    return record.supportsServiceTier ? ["flex", "priority"] : [];
+  }
+
+  throw new Error(
+    `Clutch ${role} model openRouter.capabilities must include serviceTiers or supportsServiceTier.`,
+  );
 }
 
 function parseLegacyServiceTier({

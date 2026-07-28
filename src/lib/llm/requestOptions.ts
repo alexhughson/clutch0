@@ -196,9 +196,9 @@ function openRouterServiceTierForRequest(
     return undefined;
   }
 
-  if (openRouter.capabilities?.supportsServiceTier !== true) {
+  if (!openRouter.capabilities?.serviceTiers.includes(serviceTier)) {
     throw new Error(
-      `OpenRouter service tier "${serviceTier}" requires capabilities.supportsServiceTier.`,
+      `OpenRouter service tier "${serviceTier}" is not in capabilities.serviceTiers.`,
     );
   }
 

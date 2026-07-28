@@ -6,6 +6,7 @@ import {
   OPENROUTER_PROVIDER_ID,
   type ClutchEndpoint,
   type ClutchModelSelection,
+  type ClutchModelServiceTier,
   type OpenRouterCapabilities,
   type OpenRouterOptions,
 } from "../../lib/config/clutchConfig";
@@ -14,7 +15,7 @@ import {
   validateOpenRouterOptions,
 } from "../../lib/config/openRouterCapabilities";
 
-export type ModelEntry = "agent" | "primary" | "summarization";
+export type ModelEntry = "primary" | "summarization";
 
 export type ModelSettingsRow =
   | {
@@ -37,18 +38,15 @@ export const OPENROUTER_SORT_OPTIONS = [
 ];
 
 export function buildModelSettingsRows({
-  agent,
   primary,
   summarization,
 }: {
-  agent: ClutchModelSelection;
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 }): ModelSettingsRow[] {
   const rows: ModelSettingsRow[] = [];
-  for (const entry of ["primary", "agent", "summarization"] as const) {
+  for (const entry of ["primary", "summarization"] as const) {
     const selection = getModelEntrySelection({
-      agent,
       entry,
       primary,
       summarization,
@@ -64,7 +62,7 @@ export function buildModelSettingsRows({
       if (capabilities.vendors.length >= 1) {
         rows.push({ entry, kind: "vendor" });
       }
-      if (capabilities.supportsServiceTier) {
+      if (capabilities.serviceTiers.length > 0) {
         rows.push({ entry, kind: "service-tier" });
       }
       if (capabilities.supportsReasoning) {
@@ -81,19 +79,15 @@ export function buildModelSettingsRows({
 }
 
 export function getModelEntrySelection({
-  agent,
   entry,
   primary,
   summarization,
 }: {
-  agent: ClutchModelSelection;
   entry: ModelEntry;
   primary: ClutchModelSelection;
   summarization: ClutchModelSelection;
 }): ClutchModelSelection {
   switch (entry) {
-    case "agent":
-      return agent;
     case "primary":
       return primary;
     case "summarization":
@@ -106,13 +100,11 @@ export function modelSettingsRowKey(row: ModelSettingsRow): string {
 }
 
 export function modelSettingsRowLabel({
-  agent,
   endpoints,
   primary,
   row,
   summarization,
 }: {
-  agent: ClutchModelSelection;
   endpoints: readonly ClutchEndpoint[];
   primary: ClutchModelSelection;
   row: ModelSettingsRow;
@@ -123,7 +115,6 @@ export function modelSettingsRowLabel({
   }
 
   const selection = getModelEntrySelection({
-    agent,
     entry: row.entry,
     primary,
     summarization,
@@ -164,6 +155,15 @@ export function openRouterVendorOptions(
   return ["Auto", ...capabilities.vendors];
 }
 
+export function openRouterServiceTierOptions(
+  capabilities: OpenRouterCapabilities | undefined,
+): ClutchModelServiceTier[] {
+  if (capabilities === undefined || capabilities.serviceTiers.length === 0) {
+    return ["default"];
+  }
+  return ["default", ...capabilities.serviceTiers];
+}
+
 export function openRouterVendorIndex(
   selection: ClutchModelSelection,
   capabilities: OpenRouterCapabilities | undefined,
@@ -185,6 +185,16 @@ export function openRouterSortIndex(selection: ClutchModelSelection): number {
   const index = OPENROUTER_SORT_OPTIONS.findIndex(
     (option) => option.sort === sort,
   );
+  return index === -1 ? 0 : index;
+}
+
+export function openRouterServiceTierIndex(
+  selection: ClutchModelSelection,
+  capabilities: OpenRouterCapabilities | undefined,
+): number {
+  const options = openRouterServiceTierOptions(capabilities);
+  const tier = getClutchOpenRouterServiceTier(selection);
+  const index = options.indexOf(tier);
   return index === -1 ? 0 : index;
 }
 
@@ -228,18 +238,7 @@ export function sanitizeOpenRouterOptionsAfterCapabilities({
   capabilities: OpenRouterCapabilities;
   options: OpenRouterOptions;
 }): OpenRouterOptions {
-  let validated = validateOpenRouterOptions(options, capabilities);
-  if (
-    !capabilities.supportsServiceTier &&
-    validated.serviceTier !== undefined &&
-    validated.serviceTier !== "default"
-  ) {
-    validated = validateOpenRouterOptions(
-      { ...validated, serviceTier: "default" },
-      capabilities,
-    );
-  }
-  return validated;
+  return validateOpenRouterOptions(options, capabilities);
 }
 
 export function providerExtrasJson(selection: ClutchModelSelection): string {
@@ -303,8 +302,6 @@ export function selectionWithProviderExtrasJson(
 
 export function entryLabel(entry: ModelEntry): string {
   switch (entry) {
-    case "agent":
-      return "Agent";
     case "primary":
       return "Primary";
     case "summarization":

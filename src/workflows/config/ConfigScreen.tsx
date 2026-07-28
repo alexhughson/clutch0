@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import type { ConfigTaskState } from "../../app/appTypes";
 import {
   CLUTCH_MODEL_EFFORT_LEVELS,
-  CLUTCH_MODEL_SERVICE_TIERS,
   getClutchModelEffortLevel,
   getClutchOpenRouterServiceTier,
   getClutchProviderLabel,
@@ -24,7 +23,6 @@ import {
   type ClutchEndpoint,
   type ClutchModelEffortLevel,
   type ClutchModelSelection,
-  type ClutchModelServiceTier,
 } from "../../lib/config/clutchConfig";
 import {
   fetchClutchProviderModels,
@@ -39,6 +37,8 @@ import {
   modelSettingsRowKey,
   modelSettingsRowLabel,
   OPENROUTER_SORT_OPTIONS,
+  openRouterServiceTierIndex,
+  openRouterServiceTierOptions,
   openRouterSortIndex,
   openRouterVendorIndex,
   openRouterVendorOptions,
@@ -139,7 +139,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
     agentBackendFormFromConfig(task.agentBackend),
   );
   const [agentBackendRowIndex, setAgentBackendRowIndex] = useState(0);
-  const [agent, setAgent] = useState(task.agent);
   const [primary, setPrimary] = useState(task.primary);
   const [summarization, setSummarization] = useState(task.summarization);
   const [message, setMessage] = useState<string | null>(null);
@@ -160,13 +159,11 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   });
 
   const activeSelection = getModelEntrySelection({
-    agent,
     entry: activeModelEntry,
     primary,
     summarization,
   });
   const modelSettingsRows = buildModelSettingsRows({
-    agent,
     primary,
     summarization,
   });
@@ -318,7 +315,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
     if (stage === "model-settings") {
       handleModelSettingsKey({
         actions,
-        agent,
         configuredProviders,
         endpoints,
         event,
@@ -326,7 +322,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         modelSettingsRows,
         primary,
         setActiveModelEntry,
-        setAgent,
         setMessage,
         setModelFilter,
         setModelIndex,
@@ -346,13 +341,11 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
     if (stage === "model-option") {
       handleModelOptionKey({
         activeModelEntry,
-        agent,
         event,
         modelOptionIndex,
         modelOptionKey,
         primary,
         providerExtrasDraft,
-        setAgent,
         setMessage,
         setModelOptionIndex,
         setPrimary,
@@ -367,13 +360,11 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
     if (stage === "model-provider") {
       handleModelProviderKey({
         activeModelEntry,
-        agent,
         configuredProviders,
         endpoints,
         event,
         modelProviderIndex,
         primary,
-        setAgent,
         setMessage,
         setModelFilter,
         setModelIndex,
@@ -388,7 +379,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
 
     handleModelChoiceKey({
       activeModelEntry,
-      agent,
       configuredProviders,
       endpoints,
       event,
@@ -397,7 +387,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       modelIndex,
       modelLoad,
       primary,
-      setAgent,
       setMessage,
       setModelCommitPending,
       setModelFilter,
@@ -467,7 +456,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         ) : null}
         {stage === "model-settings" ? (
           <ModelSettingsStep
-            agent={agent}
             endpoints={endpoints}
             message={message}
             primary={primary}
@@ -488,7 +476,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         {stage === "model-model" ? (
           <ModelChoiceStep
             activeModelEntry={activeModelEntry}
-            agent={agent}
             endpoints={endpoints}
             filter={modelFilter}
             message={message}
@@ -501,7 +488,6 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         {stage === "model-option" ? (
           <ModelOptionStep
             activeModelEntry={activeModelEntry}
-            agent={agent}
             message={message}
             optionIndex={modelOptionIndex}
             optionKey={modelOptionKey}
@@ -600,7 +586,6 @@ function TokenStep({
 }
 
 function ModelSettingsStep({
-  agent,
   endpoints,
   message,
   primary,
@@ -608,7 +593,6 @@ function ModelSettingsStep({
   rows,
   summarization,
 }: {
-  agent: ClutchModelSelection;
   endpoints: readonly ClutchEndpoint[];
   message: string | null;
   primary: ClutchModelSelection;
@@ -624,7 +608,7 @@ function ModelSettingsStep({
           key={modelSettingsRowKey(row)}
           style={index === rowIndex ? selectedStyle : undefined}
         >
-          {`${index === rowIndex ? ">" : " "} ${modelSettingsRowLabel({ agent, endpoints, primary, row, summarization })}`}
+          {`${index === rowIndex ? ">" : " "} ${modelSettingsRowLabel({ endpoints, primary, row, summarization })}`}
         </text>
       ))}
       {message === null ? null : (
@@ -636,7 +620,6 @@ function ModelSettingsStep({
 
 function ModelOptionStep({
   activeModelEntry,
-  agent,
   message,
   optionIndex,
   optionKey,
@@ -645,7 +628,6 @@ function ModelOptionStep({
   summarization,
 }: {
   activeModelEntry: ModelEntry;
-  agent: ClutchModelSelection;
   message: string | null;
   optionIndex: number;
   optionKey: ModelOptionKey;
@@ -664,7 +646,6 @@ function ModelOptionStep({
   }
 
   const selection = getModelEntrySelection({
-    agent,
     entry: activeModelEntry,
     primary,
     summarization,
@@ -749,7 +730,6 @@ function ModelProviderStep({
 
 function ModelChoiceStep({
   activeModelEntry,
-  agent,
   endpoints,
   filter,
   message,
@@ -759,7 +739,6 @@ function ModelChoiceStep({
   summarization,
 }: {
   activeModelEntry: ModelEntry;
-  agent: ClutchModelSelection;
   endpoints: readonly ClutchEndpoint[];
   filter: string;
   message: string | null;
@@ -769,7 +748,6 @@ function ModelChoiceStep({
   summarization: ClutchModelSelection;
 }) {
   const selection = getModelEntrySelection({
-    agent,
     entry: activeModelEntry,
     primary,
     summarization,
@@ -1077,7 +1055,6 @@ function handleTokenKey({
 
 function handleModelSettingsKey({
   actions,
-  agent,
   configuredProviders,
   endpoints,
   event,
@@ -1085,7 +1062,6 @@ function handleModelSettingsKey({
   modelSettingsRows,
   primary,
   setActiveModelEntry,
-  setAgent,
   setMessage,
   setModelFilter,
   setModelIndex,
@@ -1100,7 +1076,6 @@ function handleModelSettingsKey({
   summarization,
 }: {
   actions: AppActions;
-  agent: ClutchModelSelection;
   configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
@@ -1108,7 +1083,6 @@ function handleModelSettingsKey({
   modelSettingsRows: ModelSettingsRow[];
   primary: ClutchModelSelection;
   setActiveModelEntry: (entry: ModelEntry) => void;
-  setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
   setModelFilter: (filter: string) => void;
   setModelIndex: (index: number) => void;
@@ -1153,7 +1127,7 @@ function handleModelSettingsKey({
 
   if (row.kind === "done") {
     try {
-      saveClutchModelConfiguration({ agent, primary, summarization });
+      saveClutchModelConfiguration({ primary, summarization });
       actions.config.closeAfterSave();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -1163,7 +1137,6 @@ function handleModelSettingsKey({
   }
 
   const selection = getModelEntrySelection({
-    agent,
     entry: row.entry,
     primary,
     summarization,
@@ -1181,7 +1154,6 @@ function handleModelSettingsKey({
         activeModelEntry: row.entry,
         currentSelection: selection,
         provider: providers[0]!.id,
-        setAgent,
         setMessage,
         setModelFilter,
         setModelIndex,
@@ -1212,13 +1184,11 @@ function handleModelSettingsKey({
 
 function handleModelProviderKey({
   activeModelEntry,
-  agent,
   configuredProviders,
   endpoints,
   event,
   modelProviderIndex,
   primary,
-  setAgent,
   setMessage,
   setModelFilter,
   setModelIndex,
@@ -1229,13 +1199,11 @@ function handleModelProviderKey({
   summarization,
 }: {
   activeModelEntry: ModelEntry;
-  agent: ClutchModelSelection;
   configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
   modelProviderIndex: number;
   primary: ClutchModelSelection;
-  setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
   setModelFilter: (filter: string) => void;
   setModelIndex: (index: number) => void;
@@ -1279,13 +1247,11 @@ function handleModelProviderKey({
   openModelChoiceForProvider({
     activeModelEntry,
     currentSelection: getModelEntrySelection({
-      agent,
       entry: activeModelEntry,
       primary,
       summarization,
     }),
     provider,
-    setAgent,
     setMessage,
     setModelFilter,
     setModelIndex,
@@ -1300,7 +1266,6 @@ function openModelChoiceForProvider({
   activeModelEntry,
   currentSelection,
   provider,
-  setAgent,
   setMessage,
   setModelFilter,
   setModelIndex,
@@ -1311,7 +1276,6 @@ function openModelChoiceForProvider({
   activeModelEntry: ModelEntry;
   currentSelection: ClutchModelSelection;
   provider: string;
-  setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
   setModelFilter: (filter: string) => void;
   setModelIndex: (index: number) => void;
@@ -1337,7 +1301,6 @@ function openModelChoiceForProvider({
   setActiveSelection({
     activeModelEntry,
     selection,
-    setAgent,
     setPrimary,
     setSummarization,
   });
@@ -1349,13 +1312,11 @@ function openModelChoiceForProvider({
 
 function handleModelOptionKey({
   activeModelEntry,
-  agent,
   event,
   modelOptionIndex,
   modelOptionKey,
   primary,
   providerExtrasDraft,
-  setAgent,
   setMessage,
   setModelOptionIndex,
   setPrimary,
@@ -1365,13 +1326,11 @@ function handleModelOptionKey({
   summarization,
 }: {
   activeModelEntry: ModelEntry;
-  agent: ClutchModelSelection;
   event: KeyEvent;
   modelOptionIndex: number;
   modelOptionKey: ModelOptionKey;
   primary: ClutchModelSelection;
   providerExtrasDraft: string;
-  setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
   setModelOptionIndex: (index: number) => void;
   setPrimary: (selection: ClutchModelSelection) => void;
@@ -1381,7 +1340,6 @@ function handleModelOptionKey({
   summarization: ClutchModelSelection;
 }) {
   const selection = getModelEntrySelection({
-    agent,
     entry: activeModelEntry,
     primary,
     summarization,
@@ -1403,7 +1361,6 @@ function handleModelOptionKey({
             selection,
             providerExtrasDraft,
           ),
-          setAgent,
           setPrimary,
           setSummarization,
         });
@@ -1468,7 +1425,6 @@ function handleModelOptionKey({
   setActiveSelection({
     activeModelEntry,
     selection: nextSelection,
-    setAgent,
     setPrimary,
     setSummarization,
   });
@@ -1481,7 +1437,6 @@ function handleModelOptionKey({
 
 function handleModelChoiceKey({
   activeModelEntry,
-  agent,
   configuredProviders,
   endpoints,
   event,
@@ -1490,7 +1445,6 @@ function handleModelChoiceKey({
   modelIndex,
   modelLoad,
   primary,
-  setAgent,
   setMessage,
   setModelCommitPending,
   setModelFilter,
@@ -1501,7 +1455,6 @@ function handleModelChoiceKey({
   summarization,
 }: {
   activeModelEntry: ModelEntry;
-  agent: ClutchModelSelection;
   configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
@@ -1510,7 +1463,6 @@ function handleModelChoiceKey({
   modelIndex: number;
   modelLoad: ModelLoadState;
   primary: ClutchModelSelection;
-  setAgent: (selection: ClutchModelSelection) => void;
   setMessage: (message: string | null) => void;
   setModelCommitPending: (pending: boolean) => void;
   setModelFilter: (filter: string) => void;
@@ -1521,7 +1473,6 @@ function handleModelChoiceKey({
   summarization: ClutchModelSelection;
 }) {
   const selection = getModelEntrySelection({
-    agent,
     entry: activeModelEntry,
     primary,
     summarization,
@@ -1587,7 +1538,6 @@ function handleModelChoiceKey({
           setActiveSelection({
             activeModelEntry,
             selection: nextSelection,
-            setAgent,
             setPrimary,
             setSummarization,
           });
@@ -1615,7 +1565,6 @@ function handleModelChoiceKey({
     setActiveSelection({
       activeModelEntry,
       selection: { ...selection, model: modelId },
-      setAgent,
       setPrimary,
       setSummarization,
     });
@@ -1916,21 +1865,14 @@ function modelChoiceStatusLabel({
 function setActiveSelection({
   activeModelEntry,
   selection,
-  setAgent,
   setPrimary,
   setSummarization,
 }: {
   activeModelEntry: ModelEntry;
   selection: ClutchModelSelection;
-  setAgent: (selection: ClutchModelSelection) => void;
   setPrimary: (selection: ClutchModelSelection) => void;
   setSummarization: (selection: ClutchModelSelection) => void;
 }) {
-  if (activeModelEntry === "agent") {
-    setAgent(selection);
-    return;
-  }
-
   if (activeModelEntry === "primary") {
     setPrimary(selection);
     return;
@@ -2159,7 +2101,10 @@ function modelOptionIndexFor(
     case "effort":
       return effortIndexFor(getClutchModelEffortLevel(selection));
     case "serviceTier":
-      return serviceTierIndexFor(getClutchOpenRouterServiceTier(selection));
+      return openRouterServiceTierIndex(
+        selection,
+        selection.openRouter?.capabilities,
+      );
     case "vendor":
       return openRouterVendorIndex(
         selection,
@@ -2180,7 +2125,7 @@ function modelOptionLabels(
     case "effort":
       return [...CLUTCH_MODEL_EFFORT_LEVELS];
     case "serviceTier":
-      return [...CLUTCH_MODEL_SERVICE_TIERS];
+      return openRouterServiceTierOptions(selection.openRouter?.capabilities);
     case "vendor":
       return openRouterVendorOptions(selection.openRouter?.capabilities);
     case "sort":
@@ -2226,7 +2171,10 @@ function selectionWithModelOption(
       return { ...selection, effortLevel };
     }
     case "serviceTier": {
-      const serviceTier = CLUTCH_MODEL_SERVICE_TIERS[optionIndex];
+      const options = openRouterServiceTierOptions(
+        selection.openRouter?.capabilities,
+      );
+      const serviceTier = options[optionIndex];
       if (serviceTier === undefined) {
         throw new Error(`Invalid model service tier row index: ${optionIndex}`);
       }
@@ -2266,16 +2214,6 @@ function effortIndexFor(effortLevel: ClutchModelEffortLevel): number {
   );
   if (index === -1) {
     throw new Error(`Unknown model effort level: ${effortLevel}`);
-  }
-  return index;
-}
-
-function serviceTierIndexFor(serviceTier: ClutchModelServiceTier): number {
-  const index = CLUTCH_MODEL_SERVICE_TIERS.findIndex(
-    (candidate) => candidate === serviceTier,
-  );
-  if (index === -1) {
-    throw new Error(`Unknown model service tier: ${serviceTier}`);
   }
   return index;
 }

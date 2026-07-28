@@ -80,7 +80,6 @@ test("workspace stack keeps enough context rows for one summarized item", () => 
 
 function configTask(mode: "first-run" | "settings"): AppTask {
   return {
-    agent: { model: "gpt-test", provider: "openrouter" },
     configuredProviders: [],
     endpoints: [],
     kind: "config",

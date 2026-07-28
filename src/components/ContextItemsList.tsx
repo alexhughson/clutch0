@@ -173,9 +173,11 @@ export function ContextItemRow({
         {`${indent}${marker}${label}`}
       </text>
       {shortSummary === null ? null : (
-        <text wrapMode="word" style={{ fg: "gray", height: 2 }}>
-          {`${indent}    ${shortSummary}`}
-        </text>
+        <box style={{ paddingLeft: indent.length + 4, width: "100%" }}>
+          <text wrapMode="word" style={{ fg: "gray", height: 2 }}>
+            {shortSummary}
+          </text>
+        </box>
       )}
     </box>
   );

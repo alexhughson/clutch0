@@ -169,8 +169,8 @@ test("openrouter reasoning follows capabilities snapshot", async () => {
       ...base,
       openRouter: {
         capabilities: {
+          serviceTiers: [],
           supportsReasoning: true,
-          supportsServiceTier: false,
           vendors: [],
         },
       },
@@ -186,4 +186,45 @@ test("openrouter reasoning follows capabilities snapshot", async () => {
   expect(injected).toMatchObject({
     reasoning: { effort: "low", exclude: true },
   });
+});
+
+test("legacy supportsServiceTier boolean migrates; unsupported tier coerces to default", async () => {
+  const paths = await createTempConfigPaths();
+  await writeFile(
+    paths.settingsPath,
+    JSON.stringify({
+      models: {
+        primary: {
+          model: "openai/gpt-5.2",
+          provider: OPENROUTER_PROVIDER_ID,
+          openRouter: {
+            serviceTier: "priority",
+            capabilities: {
+              supportsReasoning: true,
+              supportsServiceTier: false,
+              vendors: ["openai"],
+            },
+          },
+        },
+        summarization: {
+          model: "openai/gpt-5.2",
+          provider: OPENROUTER_PROVIDER_ID,
+        },
+      },
+    }),
+    "utf-8",
+  );
+  saveClutchApiKey({
+    apiKey: "openrouter-token",
+    paths,
+    provider: OPENROUTER_PROVIDER_ID,
+  });
+
+  const settings = loadClutchSettings(paths);
+  expect(settings.models?.primary?.openRouter?.capabilities).toEqual({
+    serviceTiers: [],
+    supportsReasoning: true,
+    vendors: ["openai"],
+  });
+  expect(settings.models?.primary?.openRouter?.serviceTier).toBeUndefined();
 });

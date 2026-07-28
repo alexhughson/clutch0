@@ -59,20 +59,22 @@ export async function fetchOpenRouterCapabilities(
   const slug = modelId.slice(slashIndex + 1);
   const endpointsUrl = `${OPENROUTER_BASE_URL}/models/${encodeURIComponent(author)}/${encodeURIComponent(slug)}/endpoints`;
 
-  const [modelsResponse, serviceTierResponse, endpointsResponse] =
-    await Promise.all([
-      fetchImpl(`${OPENROUTER_BASE_URL}/models`, { headers }),
-      fetchImpl(
-        `${OPENROUTER_BASE_URL}/models?supported_parameters=service_tier`,
-        { headers },
-      ),
-      fetchImpl(endpointsUrl, { headers }),
-    ]);
+  const [modelsResponse, endpointsResponse] = await Promise.all([
+    fetchImpl(`${OPENROUTER_BASE_URL}/models`, { headers }),
+    fetchImpl(endpointsUrl, { headers }),
+  ]);
 
   if (!modelsResponse.ok) {
     const body = await modelsResponse.text().catch(() => "");
     throw new Error(
       `Could not load OpenRouter capabilities: HTTP ${modelsResponse.status}${body.trim().length === 0 ? "" : ` ${body.trim().slice(0, 300)}`}`,
+    );
+  }
+
+  if (!endpointsResponse.ok) {
+    const body = await endpointsResponse.text().catch(() => "");
+    throw new Error(
+      `Could not load OpenRouter endpoints for "${modelId}": HTTP ${endpointsResponse.status}${body.trim().length === 0 ? "" : ` ${body.trim().slice(0, 300)}`}`,
     );
   }
 
@@ -87,20 +89,14 @@ export async function fetchOpenRouterCapabilities(
     supportedParameters.includes("reasoning") ||
     supportedParameters.includes("reasoning_effort");
 
-  let supportsServiceTier = false;
-  if (serviceTierResponse.ok) {
-    const serviceTierJson = await serviceTierResponse.json();
-    supportsServiceTier = openRouterModelIds(serviceTierJson).has(modelId);
-  }
-
-  const vendors = endpointsResponse.ok
-    ? vendorsFromEndpointsResponse(await endpointsResponse.json())
-    : [];
+  const { serviceTiers, vendors } = capabilitiesFromEndpointsResponse(
+    await endpointsResponse.json(),
+  );
 
   return {
     vendors,
     supportsReasoning,
-    supportsServiceTier,
+    serviceTiers,
   };
 }
 
@@ -108,7 +104,7 @@ export function validateOpenRouterOptions(
   options: OpenRouterOptions,
   capabilities: OpenRouterCapabilities,
 ): OpenRouterOptions {
-  const validated: OpenRouterOptions = { ...options, capabilities };
+  let validated: OpenRouterOptions = { ...options, capabilities };
 
   if (
     validated.vendor !== undefined &&
@@ -116,74 +112,94 @@ export function validateOpenRouterOptions(
   ) {
     const { vendor: _vendor, allowFallbacks: _allowFallbacks, ...rest } =
       validated;
-    return rest;
+    validated = rest;
   }
 
   if (
     validated.serviceTier !== undefined &&
     validated.serviceTier !== "default" &&
-    !capabilities.supportsServiceTier
+    !capabilities.serviceTiers.includes(validated.serviceTier)
   ) {
-    throw new Error(
-      `OpenRouter model does not support service tier "${validated.serviceTier}".`,
-    );
+    const { serviceTier: _serviceTier, ...rest } = validated;
+    validated = rest;
   }
 
   return validated;
 }
 
-function openRouterModelIds(responseJson: unknown): Set<string> {
-  if (
-    responseJson === null ||
-    typeof responseJson !== "object" ||
-    Array.isArray(responseJson)
-  ) {
-    return new Set();
+export function baseVendorTag(tag: string): string {
+  if (tag.endsWith("/flex") || tag.endsWith("/priority")) {
+    return tag.slice(0, tag.lastIndexOf("/"));
   }
-
-  const data = (responseJson as Record<string, unknown>).data;
-  if (!Array.isArray(data)) {
-    return new Set();
-  }
-
-  const ids = new Set<string>();
-  for (const item of data) {
-    if (item === null || typeof item !== "object" || Array.isArray(item)) {
-      continue;
-    }
-    const id = (item as Record<string, unknown>).id;
-    if (typeof id === "string") {
-      ids.add(id);
-    }
-  }
-  return ids;
+  return tag;
 }
 
-function vendorsFromEndpointsResponse(responseJson: unknown): string[] {
+function capabilitiesFromEndpointsResponse(responseJson: unknown): {
+  serviceTiers: OpenRouterCapabilities["serviceTiers"];
+  vendors: string[];
+} {
+  const tags = endpointTagsFromResponse(responseJson);
+  const vendors = new Set<string>();
+  let hasFlex = false;
+  let hasPriority = false;
+
+  for (const tag of tags) {
+    if (tag.endsWith("/flex")) {
+      hasFlex = true;
+    } else if (tag.endsWith("/priority")) {
+      hasPriority = true;
+    }
+    vendors.add(baseVendorTag(tag));
+  }
+
+  const serviceTiers: OpenRouterCapabilities["serviceTiers"] = [];
+  if (hasFlex) {
+    serviceTiers.push("flex");
+  }
+  if (hasPriority) {
+    serviceTiers.push("priority");
+  }
+
+  return {
+    serviceTiers,
+    vendors: [...vendors].sort(),
+  };
+}
+
+function endpointTagsFromResponse(responseJson: unknown): string[] {
   if (
     responseJson === null ||
     typeof responseJson !== "object" ||
     Array.isArray(responseJson)
   ) {
-    return [];
+    throw new Error("OpenRouter endpoints response must be a JSON object.");
   }
 
   const data = (responseJson as Record<string, unknown>).data;
-  if (!Array.isArray(data)) {
-    return [];
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      "OpenRouter endpoints response must include a data object.",
+    );
   }
 
-  const tags = new Set<string>();
-  for (const item of data) {
+  const endpoints = (data as Record<string, unknown>).endpoints;
+  if (!Array.isArray(endpoints)) {
+    throw new Error(
+      "OpenRouter endpoints response must include a data.endpoints array.",
+    );
+  }
+
+  const tags: string[] = [];
+  for (const item of endpoints) {
     if (item === null || typeof item !== "object" || Array.isArray(item)) {
       continue;
     }
     const tag = (item as Record<string, unknown>).tag;
-    if (typeof tag === "string") {
-      tags.add(tag);
+    if (typeof tag === "string" && tag.length > 0) {
+      tags.push(tag);
     }
   }
-  return [...tags].sort();
+  return tags;
 }
 
 function findOpenRouterModelRecord(

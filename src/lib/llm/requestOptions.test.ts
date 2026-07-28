@@ -58,8 +58,8 @@ test("injects openRouter provider object, service tier, and reasoning from capab
     openRouter: {
       allowFallbacks: true,
       capabilities: {
+        serviceTiers: ["flex", "priority"],
         supportsReasoning: true,
-        supportsServiceTier: true,
         vendors: ["Google"],
       },
       providerExtras: { data_collection: "deny" },
