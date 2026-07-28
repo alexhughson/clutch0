@@ -1,9 +1,0 @@
-{
-  "question": "Where is the auth middleware wired into requests?",
-  "workspace": {
-    "files": {
-      "src/server.ts": "import { authMiddleware } from \"./auth\";\nexport function start() {\n  return authMiddleware;\n}\n",
-      "src/auth.ts": "export function authMiddleware() {\n  return null;\n}\n"
-    }
-  }
-}
