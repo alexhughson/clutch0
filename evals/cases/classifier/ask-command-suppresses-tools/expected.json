@@ -1,8 +1,0 @@
-{
-  "classification": "text",
-  "forbiddenClassifications": [
-    "propose_patch",
-    "find_relevant_files",
-    "run_shell_command"
-  ]
-}

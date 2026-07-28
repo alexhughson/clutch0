@@ -1,4 +1,0 @@
-{
-  "classification": "text",
-  "forbiddenClassifications": ["find_relevant_files"]
-}

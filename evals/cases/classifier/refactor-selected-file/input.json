@@ -1,9 +1,0 @@
-{
-  "question": "Refactor this to remove the duplicated status labels.",
-  "workspace": {
-    "files": {
-      "src/status.ts": "export function statusLabel(status: \"open\" | \"closed\") {\n  if (status === \"open\") return \"Open\";\n  if (status === \"closed\") return \"Closed\";\n  return \"Closed\";\n}\n"
-    }
-  },
-  "contextItems": [{ "kind": "file", "path": "src/status.ts", "focused": true }]
-}

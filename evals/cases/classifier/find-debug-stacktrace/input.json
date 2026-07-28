@@ -1,9 +1,0 @@
-{
-  "question": "This stack trace happens on submit. Find the relevant source files.\n\nTypeError: Cannot read properties of undefined (reading 'status')\n    at submitOrder (src/orders/submit.ts:42:17)\n    at CheckoutForm.handleSubmit (src/checkout/CheckoutForm.tsx:88:11)",
-  "workspace": {
-    "files": {
-      "src/orders/submit.ts": "export function submitOrder(order: { status?: string }) {\n  return order.status!.toUpperCase();\n}\n",
-      "src/checkout/CheckoutForm.tsx": "export function CheckoutForm() {\n  return null;\n}\n"
-    }
-  }
-}
