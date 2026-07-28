@@ -7,6 +7,7 @@ import {
   loadClutchAuth,
   loadClutchSettings,
   OPENROUTER_PROVIDER_ID,
+  peekClutchConfigRecoveryNotice,
   resolveConfiguredLlmModel,
   resolveConfiguredLlmRequest,
   saveClutchApiKey,
@@ -98,7 +99,7 @@ test("resolves custom endpoint models with request defaults", async () => {
   expect(resolved.requestDefaults).toEqual({ temperature: 0.2 });
 });
 
-test("rejects legacy provider ids and oauth credentials loudly", async () => {
+test("clears legacy provider ids and oauth credentials on load", async () => {
   const paths = await createTempConfigPaths();
   await writeFile(
     paths.settingsPath,
@@ -109,9 +110,9 @@ test("rejects legacy provider ids and oauth credentials loudly", async () => {
     }),
     "utf-8",
   );
-  expect(() => loadClutchSettings(paths)).toThrow(
-    'Legacy provider "openai" is no longer supported. Re-run /config.',
-  );
+  expect(loadClutchSettings(paths)).toEqual({});
+  expect(loadClutchSettings(paths)).toEqual({});
+  expect(peekClutchConfigRecoveryNotice()).toContain("Cleared incompatible config");
 
   await writeFile(
     paths.authPath,
@@ -120,9 +121,8 @@ test("rejects legacy provider ids and oauth credentials loudly", async () => {
     }),
     "utf-8",
   );
-  expect(() => loadClutchAuth(paths)).toThrow(
-    'Legacy provider "openai" is no longer supported. Re-run /config.',
-  );
+  expect(loadClutchAuth(paths)).toEqual({});
+  expect(loadClutchAuth(paths)).toEqual({});
 
   await writeFile(
     paths.authPath,
@@ -136,9 +136,7 @@ test("rejects legacy provider ids and oauth credentials loudly", async () => {
     }),
     "utf-8",
   );
-  expect(() => loadClutchAuth(paths)).toThrow(
-    "Legacy OAuth credentials are no longer supported. Re-run /config.",
-  );
+  expect(loadClutchAuth(paths)).toEqual({});
 });
 
 test("openrouter reasoning follows capabilities snapshot", async () => {

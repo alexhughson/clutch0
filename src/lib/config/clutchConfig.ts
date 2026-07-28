@@ -173,6 +173,12 @@ export function isClutchProviderId(
   return settings.endpoints?.some((endpoint) => endpoint.id === provider) ?? false;
 }
 
+let clutchConfigRecoveryNotice: string | null = null;
+
+export function peekClutchConfigRecoveryNotice(): string | null {
+  return clutchConfigRecoveryNotice;
+}
+
 export function loadClutchSettings(
   paths = getClutchConfigPaths(),
 ): ClutchSettings {
@@ -180,9 +186,16 @@ export function loadClutchSettings(
     return {};
   }
 
-  return parseClutchSettings(
-    readJsonObject(paths.settingsPath, "Clutch settings"),
-  );
+  const raw = readJsonObject(paths.settingsPath, "Clutch settings");
+  try {
+    return parseClutchSettings(raw);
+  } catch (error) {
+    const recovered = salvageClutchSettings(raw);
+    mkdirSync(paths.configDir, { recursive: true });
+    writeJsonFile(paths.settingsPath, recovered);
+    setClutchConfigRecoveryNotice(error);
+    return recovered;
+  }
 }
 
 export function loadClutchAuth(paths = getClutchConfigPaths()): ClutchAuth {
@@ -190,7 +203,103 @@ export function loadClutchAuth(paths = getClutchConfigPaths()): ClutchAuth {
     return {};
   }
 
-  return parseClutchAuth(readJsonObject(paths.authPath, "Clutch auth"));
+  const raw = readJsonObject(paths.authPath, "Clutch auth");
+  try {
+    return parseClutchAuth(raw);
+  } catch (error) {
+    const recovered = salvageClutchAuth(raw);
+    mkdirSync(paths.configDir, { recursive: true });
+    writeClutchAuth(paths, recovered);
+    setClutchConfigRecoveryNotice(error);
+    return recovered;
+  }
+}
+
+function setClutchConfigRecoveryNotice(error: unknown): void {
+  const detail = error instanceof Error ? error.message : String(error);
+  clutchConfigRecoveryNotice = `Cleared incompatible config. Run /config. (${detail})`;
+}
+
+function salvageClutchSettings(raw: Record<string, unknown>): ClutchSettings {
+  const recovered: ClutchSettings = {};
+
+  try {
+    if (
+      raw.agentBackend !== undefined &&
+      raw.agentBackend !== null &&
+      typeof raw.agentBackend === "object" &&
+      !Array.isArray(raw.agentBackend)
+    ) {
+      recovered.agentBackend = normalizeAgentBackendConfig(
+        raw.agentBackend as Record<string, unknown>,
+      );
+    }
+  } catch {
+    // drop invalid agent backend
+  }
+
+  try {
+    const endpoints = parseEndpoints(raw.endpoints);
+    if (endpoints !== undefined) {
+      recovered.endpoints = endpoints;
+    }
+  } catch {
+    // drop invalid endpoints
+  }
+
+  const modelsRaw = raw.models;
+  if (
+    modelsRaw !== null &&
+    typeof modelsRaw === "object" &&
+    !Array.isArray(modelsRaw)
+  ) {
+    const models: Partial<Record<ClutchModelRole, ClutchModelSelection>> = {};
+    for (const role of ["primary", "summarization", "agent"] as const) {
+      const selection = (modelsRaw as Record<string, unknown>)[role];
+      if (selection === undefined) {
+        continue;
+      }
+      try {
+        models[role] = parseModelSelection(
+          selection,
+          role,
+          recovered.endpoints ?? [],
+        );
+      } catch {
+        // drop invalid role
+      }
+    }
+    if (Object.keys(models).length > 0) {
+      recovered.models = models;
+    }
+  }
+
+  return recovered;
+}
+
+function salvageClutchAuth(raw: Record<string, unknown>): ClutchAuth {
+  const auth: ClutchAuth = {};
+  for (const [provider, credential] of Object.entries(raw)) {
+    if (LEGACY_PROVIDER_IDS.has(provider)) {
+      continue;
+    }
+    if (
+      credential === null ||
+      typeof credential !== "object" ||
+      Array.isArray(credential)
+    ) {
+      continue;
+    }
+    const record = credential as Record<string, unknown>;
+    if (record.type !== "api_key" || typeof record.key !== "string") {
+      continue;
+    }
+    if (record.key.trim().length === 0) {
+      continue;
+    }
+    auth[provider] = { key: record.key, type: "api_key" };
+  }
+  return auth;
 }
 
 export function isClutchConfigured(paths = getClutchConfigPaths()): boolean {

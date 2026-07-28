@@ -1,3 +1,7 @@
+import {
+  isClutchConfigured,
+  peekClutchConfigRecoveryNotice,
+} from "../lib/config/clutchConfig";
 import { getContextItemDisplayEntries } from "../lib/context/contextItemDisplay";
 import { getContextItemById } from "../lib/context/contextItems";
 import type { ContextItem, ContextItemSummaryView } from "../types";
@@ -13,9 +17,12 @@ export function ContextItemsList({
   contextItems,
   focusedContextItemId,
 }: ContextItemsListProps) {
+  const configNotice = getConfigSetupNotice();
+
   if (contextItems.length === 0) {
     return (
       <box style={{ flexDirection: "column", width: "100%" }}>
+        {configNotice}
         <text style={{ fg: "gray" }}>Context</text>
         <text style={{ fg: "gray" }}>No context items.</text>
       </box>
@@ -39,6 +46,7 @@ export function ContextItemsList({
         width: "100%",
       }}
     >
+      {configNotice}
       <text style={{ fg: "gray" }}>Context</text>
       {columns === 1 ? (
         <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
@@ -186,6 +194,18 @@ function FocusedContextItemSummaryContent({ item }: { item: ContextItem }) {
 
 function getIndent(depth: number): string {
   return "  ".repeat(depth);
+}
+
+function getConfigSetupNotice() {
+  if (isClutchConfigured()) {
+    return null;
+  }
+
+  return (
+    <text style={{ fg: "yellow" }}>
+      {peekClutchConfigRecoveryNotice() ?? "LLM not configured. Run /config."}
+    </text>
+  );
 }
 
 function getShortSummary(summary: ContextItemSummaryView): string | null {
