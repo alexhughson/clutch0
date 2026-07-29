@@ -80,6 +80,7 @@ test("workspace stack keeps enough context rows for one summarized item", () => 
 
 function configTask(mode: "first-run" | "settings"): AppTask {
   return {
+    agentHarness: { kind: "cursor", config: {} },
     configuredProviders: [],
     endpoints: [],
     kind: "config",

@@ -24,6 +24,10 @@ export function createAgentAskActions({
   set: SetAppState;
 }): AppActions["agentAsk"] {
   return {
+    attachHarness: ({ itemId, harness }) =>
+      set((state) =>
+        replacePiAgentItem(state, itemId, (item) => item.withHarness(harness)),
+      ),
     attachSandbox: ({ itemId, sandbox }) =>
       set((state) =>
         replacePiAgentItem(state, itemId, (item) => item.withSandbox(sandbox)),

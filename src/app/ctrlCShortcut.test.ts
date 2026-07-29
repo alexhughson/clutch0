@@ -99,6 +99,7 @@ test("arms exit instead of closing first-run config", () => {
   expect(
     getCtrlCShortcutDecision({
       activeTask: {
+        agentHarness: { kind: "cursor", config: {} },
         configuredProviders: [],
         endpoints: [],
         kind: "config",

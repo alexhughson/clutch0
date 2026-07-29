@@ -89,7 +89,7 @@ async function main() {
       { createSessionShutdownController },
       { hydrateAppStore, setSessionRecorder, useAppStore },
       { abortRuntimeWork },
-      { disposeAllAgentAskSessions },
+      { releaseAllAgentHandles },
     ] = await Promise.all([
       import("./App"),
       import("./app/appInitialState"),
@@ -138,7 +138,7 @@ async function main() {
         destroyRenderer: () => {
           renderer?.destroy();
         },
-        disposeAgentSessions: disposeAllAgentAskSessions,
+        disposeAgentSessions: releaseAllAgentHandles,
         reportCleanupFailure: (error) => {
           process.exitCode = 1;
           console.error(error.message);

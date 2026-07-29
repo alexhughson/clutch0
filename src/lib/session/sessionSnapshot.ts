@@ -8,6 +8,8 @@ import type {
   ShellCommandReplacementTarget,
   WorkspaceState,
 } from "../../app/appTypes";
+import { getAgentHarness } from "../agent/harnessRegistry";
+import { registerBuiltinAgentHarnesses } from "../agent/harnesses/registerBuiltinHarnesses";
 import { createAutomaticContextItems } from "../context/automaticContextItems";
 import {
   LiveLlmResponseContextItem,
@@ -22,6 +24,7 @@ import { patchProposalFromLegacyEdits } from "../patch/patchEngine";
 import type { PatchProgressState, PatchReviewState } from "../patch/types";
 import type { ShellCommandResult } from "../shell/shellCommand";
 import type { ContextItem } from "../../types";
+import { existsSync } from "node:fs";
 
 export const APP_SNAPSHOT_SCHEMA_VERSION = 1;
 
@@ -933,13 +936,58 @@ function normalizeRestoredItem(item: ContextItem): ContextItem {
   }
 
   if (item instanceof PiAgentContextItem) {
-    const detached = item.withSessionAvailability("detached");
-    return detached.status === "running"
-      ? detached.withStatus("error", "Interrupted while running agent session.")
-      : detached;
+    const availability = resolveRestoredAgentAvailability(item);
+    const restored = item.withSessionAvailability(availability);
+    if (restored.status !== "running") {
+      return restored;
+    }
+    if (availability !== "live") {
+      return restored.withStatus(
+        "error",
+        "Interrupted while running agent session.",
+      );
+    }
+    // Live + running: allow follow-up only if the agent already produced text.
+    // Otherwise the first deck-backed prompt never completed.
+    const hasAssistantText = restored.blocks.some(
+      (block) =>
+        block.kind === "stream" &&
+        block.streamKind === "assistant" &&
+        block.text.trim().length > 0,
+    );
+    return hasAssistantText
+      ? restored.withStatus("idle")
+      : restored.withStatus(
+          "error",
+          "Interrupted before the agent produced a reply.",
+        );
   }
 
   return item;
+}
+
+function resolveRestoredAgentAvailability(
+  item: PiAgentContextItem,
+): "detached" | "live" {
+  if (item.harness === undefined) {
+    return "detached";
+  }
+  try {
+    registerBuiltinAgentHarnesses();
+    const definition = getAgentHarness(item.harness.kind);
+    const session = definition.parseSession(item.harness.session);
+    const cwd =
+      item.mode === "edit"
+        ? item.sandbox?.path
+        : process.cwd();
+    if (cwd === undefined || (item.mode === "edit" && !existsSync(cwd))) {
+      return "detached";
+    }
+    const resume = definition.canResume(session, { cwd, mode: item.mode });
+    return resume.ok ? "live" : "detached";
+  } catch {
+    return "detached";
+  }
 }
 
 function hasContextItem(

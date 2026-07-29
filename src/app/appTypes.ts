@@ -2,10 +2,11 @@ import type {
   AgentOutputBlock,
   AgentOutputUpdate,
 } from "../lib/agentOutput/agentOutputTypes";
+import type { AgentHarnessPersistence } from "../lib/agent/harnessTypes";
 import type { CreateFileValidationResult } from "../lib/createFile/createFile";
 import type { PatchProgressState, PatchReviewState } from "../lib/patch/types";
 import type {
-  ClutchAgentBackendConfig,
+  ClutchAgentHarnessSettings,
   ClutchEndpoint,
   ClutchModelSelection,
 } from "../lib/config/clutchConfig";
@@ -108,7 +109,7 @@ export type ContextItemViewerTaskState = {
 };
 
 export type ConfigTaskState = {
-  agentBackend?: ClutchAgentBackendConfig;
+  agentHarness: ClutchAgentHarnessSettings;
   configuredProviders: string[];
   endpoints: ClutchEndpoint[];
   kind: "config";
@@ -203,6 +204,10 @@ export type AppActions = {
     openSetup: () => void;
   };
   agentAsk: {
+    attachHarness: (options: {
+      harness: AgentHarnessPersistence;
+      itemId: string;
+    }) => void;
     attachSandbox: (options: {
       itemId: string;
       sandbox: AgentSandboxContext;

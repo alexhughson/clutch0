@@ -14,14 +14,13 @@
     "eval:llm": "bun run evals/run.ts --target openrouter:openai/gpt-5 --judge openrouter:openai/gpt-5-mini",
     "eval:render": "bun run evals/render.ts",
     "start": "bun run src/index.tsx",
-    "smoke:acp": "bun run src/tools/acpBackendSmokeTest.ts",
+    "smoke:agent": "bun run src/tools/agentHarnessSmokeTest.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.2.0",
     "@opentui/core": "^0.2.15",
     "@opentui/react": "^0.2.15",
     "@tree-sitter-grammars/tree-sitter-kotlin": "^1.1.0",
