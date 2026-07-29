@@ -6,6 +6,12 @@ import {
 import { useKeyboard, usePaste } from "@opentui/react";
 import { useEffect, useState } from "react";
 import type { ConfigTaskState } from "../../app/appTypes";
+import { registerBuiltinAgentHarnesses } from "../../lib/agent/harnesses/registerBuiltinHarnesses";
+import {
+  getAgentHarness,
+  listAgentHarnessDefinitions,
+} from "../../lib/agent/harnessRegistry";
+import type { AgentHarnessDefinition } from "../../lib/agent/harnessTypes";
 import {
   CLUTCH_MODEL_EFFORT_LEVELS,
   getClutchModelEffortLevel,
@@ -14,12 +20,12 @@ import {
   loadClutchAuth,
   loadClutchSettings,
   OPENROUTER_PROVIDER_ID,
-  saveClutchAgentBackendConfiguration,
+  saveClutchAgentHarnessConfiguration,
   saveClutchApiKey,
   saveClutchEndpointConfiguration,
   deleteClutchEndpointConfiguration,
   saveClutchModelConfiguration,
-  type ClutchAgentBackendConfig,
+  type ClutchAgentHarnessSettings,
   type ClutchEndpoint,
   type ClutchModelEffortLevel,
   type ClutchModelSelection,
@@ -47,7 +53,6 @@ import {
   selectionWithOpenRouterVendor,
   selectionWithProviderExtrasJson,
   parseJsonObject,
-  parseJsonStringArray,
   parseJsonStringRecord,
   type ModelEntry,
   type ModelSettingsRow,
@@ -58,7 +63,7 @@ type ConfigScreenProps = {
 };
 
 type ConfigStage =
-  | "agent-backend"
+  | "agent-harness"
   | "endpoint-form"
   | "model-model"
   | "model-option"
@@ -72,12 +77,13 @@ type ModelOptionKey =
   | "serviceTier"
   | "sort"
   | "vendor";
-type AgentBackendField = "args" | "command" | "env";
-type AgentBackendRow = AgentBackendField | "save";
-type AgentBackendForm = {
-  argsJson: string;
-  command: string;
-  envJson: string;
+type AgentHarnessRow =
+  | { fieldKey: string; kind: "config-field" }
+  | { harnessId: string; kind: "harness-kind" }
+  | { kind: "save" };
+type AgentHarnessForm = {
+  kind: string;
+  values: Record<string, string>;
 };
 type EndpointFormField =
   | "apiKey"
@@ -113,12 +119,6 @@ type ModelLoadState =
 
 type AppActions = ReturnType<typeof useAppStore.getState>["actions"];
 
-const AGENT_BACKEND_ROWS: AgentBackendRow[] = [
-  "command",
-  "args",
-  "env",
-  "save",
-];
 const VISIBLE_MODEL_COUNT = 10;
 
 export function ConfigScreen({ task }: ConfigScreenProps) {
@@ -135,10 +135,16 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const [modelOptionIndex, setModelOptionIndex] = useState(0);
   const [modelIndex, setModelIndex] = useState(0);
   const [modelFilter, setModelFilter] = useState("");
-  const [agentBackendForm, setAgentBackendForm] = useState(
-    agentBackendFormFromConfig(task.agentBackend),
+  const [agentHarnessForm, setAgentHarnessForm] = useState(() =>
+    agentHarnessFormFromConfig(task.agentHarness),
   );
-  const [agentBackendRowIndex, setAgentBackendRowIndex] = useState(0);
+  const [agentHarnessRowIndex, setAgentHarnessRowIndex] = useState(0);
+  const harnessDefinitions = getRegisteredHarnessDefinitions();
+  const selectedHarnessDefinition = getAgentHarness(agentHarnessForm.kind);
+  const agentHarnessRows = buildAgentHarnessRows({
+    definitions: harnessDefinitions,
+    selectedDefinition: selectedHarnessDefinition,
+  });
   const [primary, setPrimary] = useState(task.primary);
   const [summarization, setSummarization] = useState(task.summarization);
   const [message, setMessage] = useState<string | null>(null);
@@ -202,7 +208,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   usePaste((event) => {
     if (
       stage !== "token" &&
-      stage !== "agent-backend" &&
+      stage !== "agent-harness" &&
       stage !== "endpoint-form" &&
       !(stage === "model-option" && modelOptionKey === "providerExtras")
     ) {
@@ -230,13 +236,11 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         );
       }
     } else {
-      const row = AGENT_BACKEND_ROWS[agentBackendRowIndex];
-      if (row !== undefined && row !== "save") {
-        setAgentBackendForm((form) =>
-          updateAgentBackendField(
-            form,
-            row,
-            (value) => `${value}${pastedToken}`,
+      const row = agentHarnessRows[agentHarnessRowIndex];
+      if (row !== undefined && row.kind === "config-field") {
+        setAgentHarnessForm((form) =>
+          updateAgentHarnessField(form, row.fieldKey, (value) =>
+            `${value}${pastedToken}`,
           ),
         );
       }
@@ -254,7 +258,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         endpoints,
         event,
         providerIndex,
-        agentBackendConfigured: agentBackendForm.command.trim().length > 0,
+        agentHarnessConfigured: isAgentHarnessConfigured(task.agentHarness),
         setEndpointForm,
         setEndpointFormMode,
         setEndpointFormRowIndex,
@@ -284,13 +288,15 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       return;
     }
 
-    if (stage === "agent-backend") {
-      handleAgentBackendKey({
-        agentBackendForm,
-        agentBackendRowIndex,
+    if (stage === "agent-harness") {
+      handleAgentHarnessKey({
+        agentHarnessForm,
+        agentHarnessRowIndex,
+        agentHarnessRows,
+        definitions: harnessDefinitions,
         event,
-        setAgentBackendForm,
-        setAgentBackendRowIndex,
+        setAgentHarnessForm,
+        setAgentHarnessRowIndex,
         setMessage,
         setStage,
       });
@@ -423,7 +429,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
       >
         {stage === "providers" ? (
           <ProvidersStep
-            agentBackendConfigured={agentBackendForm.command.trim().length > 0}
+            agentHarnessConfigured={isAgentHarnessConfigured(task.agentHarness)}
             configuredProviders={configuredProviders}
             endpoints={endpoints}
             message={message}
@@ -447,11 +453,13 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
             provider={tokenProvider}
           />
         ) : null}
-        {stage === "agent-backend" ? (
-          <AgentBackendStep
-            form={agentBackendForm}
+        {stage === "agent-harness" ? (
+          <AgentHarnessStep
+            definitions={harnessDefinitions}
+            form={agentHarnessForm}
             message={message}
-            rowIndex={agentBackendRowIndex}
+            rowIndex={agentHarnessRowIndex}
+            rows={agentHarnessRows}
           />
         ) : null}
         {stage === "model-settings" ? (
@@ -502,14 +510,14 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
 }
 
 function ProvidersStep({
-  agentBackendConfigured,
+  agentHarnessConfigured,
   configuredProviders,
   endpoints,
   message,
   providerIndex,
   task,
 }: {
-  agentBackendConfigured: boolean;
+  agentHarnessConfigured: boolean;
   configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   message: string | null;
@@ -520,11 +528,11 @@ function ProvidersStep({
     <>
       <text>
         {task.mode === "first-run"
-          ? "Add provider credentials, then configure models and ACP."
+          ? "Add provider credentials, then configure models and agent harness."
           : "Provider credentials"}
       </text>
       {providerRows({
-        agentBackendConfigured,
+        agentHarnessConfigured,
         configuredProviders,
         endpoints,
       }).map((row, index) => (
@@ -542,21 +550,28 @@ function ProvidersStep({
   );
 }
 
-function AgentBackendStep({
+function AgentHarnessStep({
+  definitions,
   form,
   message,
   rowIndex,
+  rows,
 }: {
-  form: AgentBackendForm;
+  definitions: readonly AgentHarnessDefinition[];
+  form: AgentHarnessForm;
   message: string | null;
   rowIndex: number;
+  rows: readonly AgentHarnessRow[];
 }) {
   return (
     <>
-      <text>ACP backend</text>
-      {AGENT_BACKEND_ROWS.map((row, index) => (
-        <text key={row} style={index === rowIndex ? selectedStyle : undefined}>
-          {`${index === rowIndex ? ">" : " "} ${agentBackendRowLabel({ form, row })}`}
+      <text>Agent harness</text>
+      {rows.map((row, index) => (
+        <text
+          key={agentHarnessRowKey(row)}
+          style={index === rowIndex ? selectedStyle : undefined}
+        >
+          {`${index === rowIndex ? ">" : " "} ${agentHarnessRowLabel({ definitions, form, row })}`}
         </text>
       ))}
       {message === null ? null : <text style={{ fg: "red" }}>{message}</text>}
@@ -788,7 +803,7 @@ function ModelChoiceStep({
 
 function handleProvidersKey({
   actions,
-  agentBackendConfigured,
+  agentHarnessConfigured,
   configuredProviders,
   endpoints,
   event,
@@ -804,7 +819,7 @@ function handleProvidersKey({
   task,
 }: {
   actions: AppActions;
-  agentBackendConfigured: boolean;
+  agentHarnessConfigured: boolean;
   configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
   event: KeyEvent;
@@ -826,7 +841,7 @@ function handleProvidersKey({
   }
 
   const rows = providerRows({
-    agentBackendConfigured,
+    agentHarnessConfigured,
     configuredProviders,
     endpoints,
   });
@@ -855,8 +870,8 @@ function handleProvidersKey({
     return;
   }
 
-  if (row.kind === "agent-backend") {
-    setStage("agent-backend");
+  if (row.kind === "agent-harness") {
+    setStage("agent-harness");
     setMessage(null);
     prevent(event);
     return;
@@ -893,20 +908,24 @@ function handleProvidersKey({
   prevent(event);
 }
 
-function handleAgentBackendKey({
-  agentBackendForm,
-  agentBackendRowIndex,
+function handleAgentHarnessKey({
+  agentHarnessForm,
+  agentHarnessRowIndex,
+  agentHarnessRows,
+  definitions,
   event,
-  setAgentBackendForm,
-  setAgentBackendRowIndex,
+  setAgentHarnessForm,
+  setAgentHarnessRowIndex,
   setMessage,
   setStage,
 }: {
-  agentBackendForm: AgentBackendForm;
-  agentBackendRowIndex: number;
+  agentHarnessForm: AgentHarnessForm;
+  agentHarnessRowIndex: number;
+  agentHarnessRows: readonly AgentHarnessRow[];
+  definitions: readonly AgentHarnessDefinition[];
   event: KeyEvent;
-  setAgentBackendForm: (form: AgentBackendForm) => void;
-  setAgentBackendRowIndex: (index: number) => void;
+  setAgentHarnessForm: (form: AgentHarnessForm) => void;
+  setAgentHarnessRowIndex: (index: number) => void;
   setMessage: (message: string | null) => void;
   setStage: (stage: ConfigStage) => void;
 }) {
@@ -918,10 +937,10 @@ function handleAgentBackendKey({
   }
 
   if (event.name === "up" || event.name === "down") {
-    setAgentBackendRowIndex(
+    setAgentHarnessRowIndex(
       cycleIndex(
-        agentBackendRowIndex,
-        AGENT_BACKEND_ROWS.length,
+        agentHarnessRowIndex,
+        agentHarnessRows.length,
         event.name === "down" ? 1 : -1,
       ),
     );
@@ -930,36 +949,45 @@ function handleAgentBackendKey({
     return;
   }
 
-  const row = AGENT_BACKEND_ROWS[agentBackendRowIndex];
+  const row = agentHarnessRows[agentHarnessRowIndex];
   if (row === undefined) {
-    throw new Error(`Invalid ACP backend row index: ${agentBackendRowIndex}`);
+    throw new Error(`Invalid agent harness row index: ${agentHarnessRowIndex}`);
   }
 
   if (event.name === "return" || (event.ctrl && event.name === "s")) {
-    if (row === "save" || event.ctrl) {
+    if (row.kind === "save" || event.ctrl) {
       try {
-        const backend = agentBackendFromForm(agentBackendForm);
-        saveClutchAgentBackendConfiguration({
-          backend,
+        const harness = agentHarnessFromForm(agentHarnessForm);
+        saveClutchAgentHarnessConfiguration({
+          harness,
         });
-        setAgentBackendForm(agentBackendFormFromConfig(backend));
+        setAgentHarnessForm(agentHarnessFormFromConfig(harness));
         setStage("providers");
-        setMessage("Saved ACP backend.");
+        setMessage("Saved agent harness.");
       } catch (error) {
         setMessage(error instanceof Error ? error.message : String(error));
       }
+    } else if (row.kind === "harness-kind") {
+      if (row.harnessId !== agentHarnessForm.kind) {
+        const definition = getAgentHarness(row.harnessId);
+        setAgentHarnessForm({
+          kind: row.harnessId,
+          values: agentHarnessValuesFromDefaultConfig(definition),
+        });
+      }
+      setMessage(null);
     }
     prevent(event);
     return;
   }
 
-  if (row === "save") {
+  if (row.kind !== "config-field") {
     return;
   }
 
   if (event.ctrl && event.name === "u") {
-    setAgentBackendForm(
-      updateAgentBackendField(agentBackendForm, row, () => ""),
+    setAgentHarnessForm(
+      updateAgentHarnessField(agentHarnessForm, row.fieldKey, () => ""),
     );
     setMessage(null);
     prevent(event);
@@ -967,8 +995,8 @@ function handleAgentBackendKey({
   }
 
   if (event.name === "backspace") {
-    setAgentBackendForm(
-      updateAgentBackendField(agentBackendForm, row, (value) =>
+    setAgentHarnessForm(
+      updateAgentHarnessField(agentHarnessForm, row.fieldKey, (value) =>
         value.slice(0, -1),
       ),
     );
@@ -979,8 +1007,12 @@ function handleAgentBackendKey({
 
   const input = getPrintableInput(event);
   if (input !== null) {
-    setAgentBackendForm(
-      updateAgentBackendField(agentBackendForm, row, (value) => value + input),
+    setAgentHarnessForm(
+      updateAgentHarnessField(
+        agentHarnessForm,
+        row.fieldKey,
+        (value) => value + input,
+      ),
     );
     setMessage(null);
     prevent(event);
@@ -1730,11 +1762,11 @@ function handleEndpointFormKey({
 }
 
 function providerRows({
-  agentBackendConfigured,
+  agentHarnessConfigured,
   configuredProviders,
   endpoints,
 }: {
-  agentBackendConfigured: boolean;
+  agentHarnessConfigured: boolean;
   configuredProviders: readonly string[];
   endpoints: readonly ClutchEndpoint[];
 }) {
@@ -1762,74 +1794,159 @@ function providerRows({
       label: "Configure models",
     },
     {
-      key: "agent-backend",
-      kind: "agent-backend" as const,
-      label: `Configure ACP backend${agentBackendConfigured ? " ✓" : ""}`,
+      key: "agent-harness",
+      kind: "agent-harness" as const,
+      label: `Configure agent harness${agentHarnessConfigured ? " ✓" : ""}`,
     },
   ];
 }
 
-function agentBackendFormFromConfig(
-  backend: ClutchAgentBackendConfig | undefined,
-): AgentBackendForm {
+function getRegisteredHarnessDefinitions(): readonly AgentHarnessDefinition[] {
+  registerBuiltinAgentHarnesses();
+  return listAgentHarnessDefinitions();
+}
+
+function isAgentHarnessConfigured(harness: ClutchAgentHarnessSettings): boolean {
+  registerBuiltinAgentHarnesses();
+  try {
+    getAgentHarness(harness.kind);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function buildAgentHarnessRows({
+  definitions,
+  selectedDefinition,
+}: {
+  definitions: readonly AgentHarnessDefinition[];
+  selectedDefinition: AgentHarnessDefinition;
+}): AgentHarnessRow[] {
+  return [
+    ...definitions.map((definition) => ({
+      harnessId: definition.id,
+      kind: "harness-kind" as const,
+    })),
+    ...selectedDefinition.configFields.map((field) => ({
+      fieldKey: field.key,
+      kind: "config-field" as const,
+    })),
+    { kind: "save" as const },
+  ];
+}
+
+function agentHarnessFormFromConfig(
+  harness: ClutchAgentHarnessSettings,
+): AgentHarnessForm {
+  registerBuiltinAgentHarnesses();
+  const definition = getAgentHarness(harness.kind);
+  const config = definition.parseConfig(harness.config) as Record<
+    string,
+    unknown
+  >;
+  const values: Record<string, string> = {};
+  for (const field of definition.configFields) {
+    values[field.key] = String(config[field.key] ?? "");
+  }
   return {
-    argsJson: JSON.stringify(backend?.args ?? []),
-    command: backend?.command ?? "",
-    envJson: JSON.stringify(backend?.env ?? {}),
+    kind: definition.id,
+    values,
   };
 }
 
-function agentBackendFromForm(
-  form: AgentBackendForm,
-): ClutchAgentBackendConfig {
-  const args = parseJsonStringArray(
-    form.argsJson,
-    'ACP backend args must be a JSON string array, for example ["acp"].',
-  );
-  const env = parseJsonStringRecord(
-    form.envJson,
-    'ACP backend env must be a JSON object of strings, for example {"KEY":"VALUE"}.',
-  );
+function agentHarnessValuesFromDefaultConfig(
+  definition: AgentHarnessDefinition,
+): Record<string, string> {
+  const config = definition.defaultConfig;
+  if (config === null || typeof config !== "object" || Array.isArray(config)) {
+    throw new Error(
+      `Harness ${definition.id} defaultConfig must be an object.`,
+    );
+  }
+  const record = config as Record<string, unknown>;
+  const values: Record<string, string> = {};
+  for (const field of definition.configFields) {
+    values[field.key] = String(record[field.key] ?? "");
+  }
+  return values;
+}
 
+function agentHarnessFromForm(
+  form: AgentHarnessForm,
+): ClutchAgentHarnessSettings {
+  registerBuiltinAgentHarnesses();
+  const definition = getAgentHarness(form.kind);
+  const configRaw = Object.fromEntries(
+    definition.configFields.map((field) => [
+      field.key,
+      form.values[field.key] ?? "",
+    ]),
+  );
   return {
-    ...(args.length === 0 ? {} : { args }),
-    command: form.command.trim(),
-    ...(Object.keys(env).length === 0 ? {} : { env }),
+    kind: form.kind,
+    config: definition.parseConfig(configRaw),
   };
 }
 
-function agentBackendRowLabel({
+function agentHarnessRowKey(row: AgentHarnessRow): string {
+  switch (row.kind) {
+    case "harness-kind":
+      return `kind:${row.harnessId}`;
+    case "config-field":
+      return `field:${row.fieldKey}`;
+    case "save":
+      return "save";
+  }
+}
+
+function agentHarnessRowLabel({
+  definitions,
   form,
   row,
 }: {
-  form: AgentBackendForm;
-  row: AgentBackendRow;
+  definitions: readonly AgentHarnessDefinition[];
+  form: AgentHarnessForm;
+  row: AgentHarnessRow;
 }): string {
-  switch (row) {
-    case "command":
-      return `Command: ${form.command}`;
-    case "args":
-      return `Args JSON: ${form.argsJson}`;
-    case "env":
-      return `Env JSON: ${form.envJson}`;
+  switch (row.kind) {
+    case "harness-kind": {
+      const definition = definitions.find(
+        (candidate) => candidate.id === row.harnessId,
+      );
+      if (definition === undefined) {
+        throw new Error(`Unknown harness id: ${row.harnessId}`);
+      }
+      const selected = form.kind === row.harnessId ? " ✓" : "";
+      return `${definition.label}${selected}`;
+    }
+    case "config-field": {
+      const definition = getAgentHarness(form.kind);
+      const field = definition.configFields.find(
+        (candidate) => candidate.key === row.fieldKey,
+      );
+      if (field === undefined) {
+        throw new Error(`Unknown config field: ${row.fieldKey}`);
+      }
+      return `${field.label}: ${form.values[row.fieldKey] ?? ""}`;
+    }
     case "save":
-      return "Save ACP backend";
+      return "Save agent harness";
   }
 }
 
-function updateAgentBackendField(
-  form: AgentBackendForm,
-  field: AgentBackendField,
+function updateAgentHarnessField(
+  form: AgentHarnessForm,
+  fieldKey: string,
   update: (value: string) => string,
-): AgentBackendForm {
-  switch (field) {
-    case "command":
-      return { ...form, command: update(form.command) };
-    case "args":
-      return { ...form, argsJson: update(form.argsJson) };
-    case "env":
-      return { ...form, envJson: update(form.envJson) };
-  }
+): AgentHarnessForm {
+  return {
+    ...form,
+    values: {
+      ...form.values,
+      [fieldKey]: update(form.values[fieldKey] ?? ""),
+    },
+  };
 }
 
 function modelProvidersForEntry({
@@ -2234,8 +2351,8 @@ function stageTitle({
   task: ConfigTaskState;
 }): string {
   switch (stage) {
-    case "agent-backend":
-      return "ACP backend";
+    case "agent-harness":
+      return "Agent harness";
     case "endpoint-form":
       return "Endpoint";
     case "providers":
@@ -2259,7 +2376,7 @@ function hotkeysForStage(
   modelOptionKey: ModelOptionKey,
 ): string {
   switch (stage) {
-    case "agent-backend":
+    case "agent-harness":
       return "Esc providers · ↑/↓ field · type edit · Ctrl+u clear · Ctrl+s save";
     case "endpoint-form":
       return "Esc providers · ↑/↓ field · type edit · Ctrl+u clear · Ctrl+s save";

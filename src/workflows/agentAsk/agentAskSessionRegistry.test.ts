@@ -4,23 +4,22 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import * as acp from "@agentclientprotocol/sdk";
 import { createInitialAppState } from "../../app/appInitialState";
-import {
-  createInProcessAcpAgentSessionDriverForTest,
-  type CreateAcpAgentSessionDriverOptions,
-} from "../../lib/agent/acpAgentSessionDriver";
+import type { AgentSessionDriver } from "../../lib/agent/agentSessionDriver";
+import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
+import { createAgentOutputId } from "../../lib/agentOutput/agentOutputBlocks";
 import { CLUTCH_CONFIG_DIR_ENV } from "../../lib/config/clutchConfig";
 import { PiAgentContextItem } from "../../lib/context/contextItems";
 import { hydrateAppStore, useAppStore } from "../../store/appStore";
 import {
   disposeAgentAskSession,
+  releaseAllAgentHandles,
   sendAgentAskMessage,
-  setCreateAgentSessionDriverForTest,
+  setAgentHarnessFactoriesForTest,
   startAgentAskSession,
 } from "./agentAskSessionRegistry";
 
-let resetDriverFactory: (() => void) | null = null;
+let resetFactories: (() => void) | null = null;
 let originalConfigDir: string | undefined;
 
 beforeEach(() => {
@@ -35,23 +34,33 @@ afterEach(async () => {
     process.env[CLUTCH_CONFIG_DIR_ENV] = originalConfigDir;
   }
   originalConfigDir = undefined;
-  resetDriverFactory?.();
-  resetDriverFactory = null;
+  resetFactories?.();
+  resetFactories = null;
   await disposeAgentAskSession("agent:1");
+  await releaseAllAgentHandles();
   hydrateAppStore(createInitialAppState());
 });
 
-test("agent ask registry records ACP startup, prompt, follow-up, and dispose", async () => {
-  await configureFakeAgentBackend();
-  const calls = { closed: 0, cwd: "", prompts: [] as string[] };
-  resetDriverFactory = setCreateAgentSessionDriverForTest(
-    async (options: CreateAcpAgentSessionDriverOptions) =>
-      await createInProcessAcpAgentSessionDriverForTest({
-        agent: createRegistryAgent(calls),
-        cwd: options.cwd,
-        onOutputUpdate: options.onOutputUpdate,
+test("agent ask registry records startup, prompt, follow-up, harness persist, and dispose", async () => {
+  await configureFakeAgentHarness();
+  const calls = { disposed: 0, prompts: [] as string[], sessions: 0 };
+  resetFactories = setAgentHarnessFactoriesForTest({
+    createSession: async () => {
+      calls.sessions += 1;
+      return { chatId: "chat-1" };
+    },
+    createSessionDriver: async ({ ctx }) =>
+      createFakeDriver({
+        onDispose: () => {
+          calls.disposed += 1;
+        },
+        onOutputUpdate: ctx.onOutputUpdate,
+        onPrompt: (message) => {
+          calls.prompts.push(message);
+        },
       }),
-  );
+  });
+
   const itemId = useAppStore.getState().actions.agentAsk.start({
     mode: "ask",
     prompt: "Investigate routing",
@@ -69,49 +78,43 @@ test("agent ask registry records ACP startup, prompt, follow-up, and dispose", a
     root: process.cwd(),
   });
   await sendAgentAskMessage({ itemId, message: "Now check tests" });
-  await disposeAgentAskSession(itemId);
 
   const item = useAppStore.getState().workspace.contextItems[0];
   expect(item).toBeInstanceOf(PiAgentContextItem);
+  expect((item as PiAgentContextItem).harness).toEqual({
+    kind: "cursor",
+    session: { chatId: "chat-1" },
+  });
   expect((item as PiAgentContextItem).status).toBe("idle");
-  expect((item as PiAgentContextItem).blocks).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        kind: "tool",
-        summary: "agent ask session",
-        toolName: "agent",
-      }),
-      expect.objectContaining({
-        kind: "stream",
-        streamKind: "assistant",
-        text: expect.stringContaining("reply:"),
-      }),
-    ]),
-  );
+  expect(calls.sessions).toBe(1);
   expect(calls.prompts).toHaveLength(2);
-  expect(calls.cwd).toBe(process.cwd());
   expect(calls.prompts[0]).toContain("Investigate routing");
   expect(calls.prompts[1]).toBe("Now check tests");
-  expect(calls.closed).toBe(1);
+
+  await disposeAgentAskSession(itemId);
+  expect(calls.disposed).toBe(1);
 });
 
 test("agent edit dispose removes sandbox even when driver dispose fails", async () => {
-  await configureFakeAgentBackend();
+  await configureFakeAgentHarness();
   const root = await createGitRoot();
-  let driverCwd = "";
-  resetDriverFactory = setCreateAgentSessionDriverForTest(async (options) => {
-    driverCwd = options.cwd;
-    return {
-      dispose: async () => {
-        throw new Error("dispose boom");
-      },
-      latestAssistantText: () => "done",
-      prompt: async () => {},
-    };
+  let sandboxPath = "";
+  resetFactories = setAgentHarnessFactoriesForTest({
+    createSession: async () => ({ chatId: "chat-edit" }),
+    createSessionDriver: async ({ ctx }) => {
+      sandboxPath = ctx.cwd;
+      return createFakeDriver({
+        onDispose: async () => {
+          throw new Error("dispose boom");
+        },
+        onOutputUpdate: ctx.onOutputUpdate,
+      });
+    },
   });
+
   const itemId = useAppStore.getState().actions.agentAsk.start({
     mode: "edit",
-    prompt: "Fix routing",
+    prompt: "Edit something",
   });
   if (itemId === null) {
     throw new Error("Failed to create agent context item.");
@@ -122,93 +125,169 @@ test("agent edit dispose removes sandbox even when driver dispose fails", async 
     focusedContextItemId: null,
     itemId,
     mode: "edit",
-    prompt: "Fix routing",
+    prompt: "Edit something",
     root,
   });
-  const item = useAppStore.getState().workspace.contextItems[0];
-  expect(item).toBeInstanceOf(PiAgentContextItem);
-  const sandboxPath = (item as PiAgentContextItem).sandbox?.path;
-  expect(typeof sandboxPath).toBe("string");
-  if (sandboxPath === undefined) {
-    throw new Error("Expected edit session to attach a sandbox.");
-  }
-  expect(driverCwd).toBe(sandboxPath);
+
+  expect(sandboxPath.length).toBeGreaterThan(0);
   expect(existsSync(sandboxPath)).toBe(true);
-
   await expect(disposeAgentAskSession(itemId)).rejects.toThrow("dispose boom");
-
   expect(existsSync(sandboxPath)).toBe(false);
 });
 
-function createRegistryAgent(calls: {
-  closed: number;
-  cwd: string;
-  prompts: string[];
-}) {
-  return acp
-    .agent({ name: "registry-agent" })
-    .onRequest(acp.methods.agent.initialize, () => ({
-      agentCapabilities: { loadSession: false },
-      protocolVersion: acp.PROTOCOL_VERSION,
-    }))
-    .onRequest(acp.methods.agent.session.new, ({ params }) => {
-      calls.cwd = params.cwd;
-      return {
-        sessionId: "session-1",
-      };
-    })
-    .onRequest(acp.methods.agent.session.prompt, async ({ client, params }) => {
-      const text = promptText(params.prompt);
-      calls.prompts.push(text);
-      await client.notify(acp.methods.client.session.update, {
-        sessionId: params.sessionId,
-        update: {
-          content: { text: `reply:${calls.prompts.length}`, type: "text" },
-          messageId: `message-${calls.prompts.length}`,
-          sessionUpdate: "agent_message_chunk",
+test("sendAgentAskMessage rehydrates driver from persisted harness after soft release", async () => {
+  await configureFakeAgentHarness();
+  const calls = { drivers: 0, prompts: [] as string[] };
+  resetFactories = setAgentHarnessFactoriesForTest({
+    createSession: async () => ({ chatId: "chat-rehydrate" }),
+    createSessionDriver: async ({ ctx }) => {
+      calls.drivers += 1;
+      return createFakeDriver({
+        onOutputUpdate: ctx.onOutputUpdate,
+        onPrompt: (message) => {
+          calls.prompts.push(message);
         },
       });
-      return { stopReason: "end_turn" };
-    })
-    .onNotification(acp.methods.agent.session.cancel, () => {})
-    .onRequest(acp.methods.agent.session.close, () => {
-      calls.closed += 1;
-    });
+    },
+  });
+
+  const itemId = useAppStore.getState().actions.agentAsk.start({
+    mode: "ask",
+    prompt: "first",
+  });
+  if (itemId === null) {
+    throw new Error("Failed to create agent context item.");
+  }
+
+  await startAgentAskSession({
+    contextItems: [],
+    focusedContextItemId: null,
+    itemId,
+    mode: "ask",
+    prompt: "first",
+    root: process.cwd(),
+  });
+  await releaseAllAgentHandles();
+  expect(calls.drivers).toBe(1);
+
+  await sendAgentAskMessage({ itemId, message: "follow-up after release" });
+  expect(calls.drivers).toBe(2);
+  expect(calls.prompts.at(-1)).toBe("follow-up after release");
+  expect(
+    (useAppStore.getState().workspace.contextItems[0] as PiAgentContextItem)
+      .status,
+  ).toBe("idle");
+
+  await disposeAgentAskSession(itemId);
+});
+
+test("releaseAllAgentHandles soft-releases drivers without deleting sandbox", async () => {
+  await configureFakeAgentHarness();
+  const root = await createGitRoot();
+  let sandboxPath = "";
+  let disposed = 0;
+  resetFactories = setAgentHarnessFactoriesForTest({
+    createSession: async () => ({ chatId: "chat-soft" }),
+    createSessionDriver: async ({ ctx }) => {
+      sandboxPath = ctx.cwd;
+      return createFakeDriver({
+        onDispose: () => {
+          disposed += 1;
+        },
+        onOutputUpdate: ctx.onOutputUpdate,
+      });
+    },
+  });
+
+  const itemId = useAppStore.getState().actions.agentAsk.start({
+    mode: "edit",
+    prompt: "soft release",
+  });
+  if (itemId === null) {
+    throw new Error("Failed to create agent context item.");
+  }
+
+  await startAgentAskSession({
+    contextItems: [],
+    focusedContextItemId: null,
+    itemId,
+    mode: "edit",
+    prompt: "soft release",
+    root,
+  });
+
+  expect(existsSync(sandboxPath)).toBe(true);
+  await releaseAllAgentHandles();
+  expect(disposed).toBe(1);
+  expect(existsSync(sandboxPath)).toBe(true);
+
+  const item = useAppStore.getState().workspace.contextItems[0];
+  expect(item).toBeInstanceOf(PiAgentContextItem);
+  expect((item as PiAgentContextItem).harness?.session).toEqual({
+    chatId: "chat-soft",
+  });
+
+  await disposeAgentAskSession(itemId);
+  // map already cleared by soft release; hard dispose still removes persisted sandbox
+  expect(existsSync(sandboxPath)).toBe(false);
+});
+
+function createFakeDriver({
+  onDispose,
+  onOutputUpdate,
+  onPrompt,
+}: {
+  onDispose?: () => void | Promise<void>;
+  onOutputUpdate: (update: AgentOutputUpdate) => void;
+  onPrompt?: (message: string) => void;
+}): AgentSessionDriver {
+  let latest: string | null = null;
+  return {
+    async dispose() {
+      await onDispose?.();
+    },
+    latestAssistantText() {
+      return latest;
+    },
+    async prompt(message: string) {
+      onPrompt?.(message);
+      latest = `reply: ${message.slice(0, 40)}`;
+      const id = createAgentOutputId();
+      onOutputUpdate({
+        id,
+        kind: "reconcile-stream",
+        streamKind: "assistant",
+        text: latest,
+        timestamp: Date.now(),
+      });
+    },
+  };
 }
 
-function promptText(prompt: acp.PromptRequest["prompt"]): string {
-  return prompt
-    .filter((content) => content.type === "text")
-    .map((content) => content.text)
-    .join("");
-}
-
-async function createGitRoot() {
-  const root = await mkdtemp(join(tmpdir(), "clutch-agent-registry-"));
-  git(root, "init");
-  git(root, "config", "user.email", "clutch@example.test");
-  git(root, "config", "user.name", "Clutch Test");
-  await writeFile(join(root, "tracked.txt"), "base\n");
-  git(root, "add", ".");
-  git(root, "commit", "-m", "initial");
-  return root;
-}
-
-function git(cwd: string, ...args: string[]) {
-  execFileSync("git", args, { cwd, stdio: "ignore" });
-}
-
-async function configureFakeAgentBackend() {
-  const configDir = await mkdtemp(join(tmpdir(), "clutch-agent-config-"));
+async function configureFakeAgentHarness() {
+  const configDir = await mkdtemp(join(tmpdir(), "clutch-agent-harness-"));
   process.env[CLUTCH_CONFIG_DIR_ENV] = configDir;
   await writeFile(
     join(configDir, "settings.json"),
     JSON.stringify({
-      agentBackend: {
-        args: ["--fake-acp"],
-        command: "fake-agent",
+      agentHarness: {
+        kind: "cursor",
+        config: { command: "cursor-agent", model: "composer-2.5" },
       },
     }),
-    "utf-8",
   );
+  await writeFile(join(configDir, "auth.json"), JSON.stringify({}));
+}
+
+async function createGitRoot() {
+  const root = await mkdtemp(join(tmpdir(), "clutch-agent-git-"));
+  execFileSync("git", ["init"], { cwd: root });
+  execFileSync("git", ["config", "user.email", "test@example.com"], {
+    cwd: root,
+  });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+  await writeFile(join(root, "README.md"), "hello\n");
+  execFileSync("git", ["add", "."], { cwd: root });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: root });
+  return root;
 }

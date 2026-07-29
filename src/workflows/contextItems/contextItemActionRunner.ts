@@ -23,11 +23,13 @@ export function runContextItemAction({
       useAppStore.getState().actions.contextItems.openContextItem({ itemId });
     },
     removeContextItem: (itemId) => {
-      void disposeAgentAskSession(itemId);
-      useAppStore.getState().actions.compose.removeContextItem({ itemId });
-      if (closeAfterRemove) {
-        useAppStore.getState().actions.navigation.dismissPane();
-      }
+      void (async () => {
+        await disposeAgentAskSession(itemId);
+        useAppStore.getState().actions.compose.removeContextItem({ itemId });
+        if (closeAfterRemove) {
+          useAppStore.getState().actions.navigation.dismissPane();
+        }
+      })();
     },
     rerunPrompt: ({ expectedResult, prompt, replaceContextItemId }) =>
       startLlmRequest(prompt, {

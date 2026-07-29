@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
-import { cp, mkdtemp, realpath, readdir, rm } from "node:fs/promises";
+import { access, cp, mkdtemp, realpath, readdir, rm } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import type { AgentSandboxContext } from "../../types";
 
 export type AgentSandbox = {
   baselineTree: string;
@@ -114,10 +115,39 @@ export async function applyAgentSandboxDiff({
   await gitOutput(["apply", "--binary", "-"], { cwd: root, input: diffText });
 }
 
+/** Reopen a sandbox that was retained across Clutch restarts. */
+export async function openAgentSandboxFromPersisted(
+  sandbox: AgentSandboxContext,
+): Promise<AgentSandbox> {
+  try {
+    await access(sandbox.path);
+  } catch {
+    throw new Error(
+      `Agent edit sandbox path no longer exists: ${sandbox.path}`,
+    );
+  }
+  return {
+    baselineTree: sandbox.baselineTree,
+    path: sandbox.path,
+    root: sandbox.root,
+  };
+}
+
 export async function removeAgentSandbox(sandbox: {
   path: string;
   root: string;
 }) {
+  let pathExists = true;
+  try {
+    await access(sandbox.path);
+  } catch {
+    pathExists = false;
+  }
+
+  if (!pathExists) {
+    return;
+  }
+
   try {
     await gitOutput(["worktree", "remove", "--force", sandbox.path], {
       cwd: sandbox.root,

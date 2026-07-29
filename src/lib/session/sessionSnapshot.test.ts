@@ -242,6 +242,72 @@ test("restore detaches legacy agent sessions and marks running agents interrupte
   );
 });
 
+test("restore keeps harness-backed ask sessions live", () => {
+  const initial = createInitialAppState();
+  const agent = createPiAgentContextItem({
+    createdAt: 1,
+    id: "agent:10",
+    mode: "ask",
+    prompt: "research",
+  })
+    .withHarness({ kind: "cursor", session: { chatId: "chat-resume" } })
+    .withStatus("idle");
+  const state: AppState = {
+    ...initial,
+    actions: {} as AppState["actions"],
+    workspace: {
+      ...initial.workspace,
+      contextItems: [agent],
+      focusedContextItemId: agent.id,
+    },
+  };
+
+  const restored = restoreAppStateFromSnapshot(
+    serializeAppSnapshot({ state, workspaceRoot: "/repo" }),
+  );
+  const restoredAgent = restored.workspace.contextItems[0];
+
+  expect(restoredAgent).toBeInstanceOf(PiAgentContextItem);
+  expect((restoredAgent as PiAgentContextItem).sessionAvailability).toBe(
+    "live",
+  );
+  expect((restoredAgent as PiAgentContextItem).status).toBe("idle");
+  expect((restoredAgent as PiAgentContextItem).harness).toEqual({
+    kind: "cursor",
+    session: { chatId: "chat-resume" },
+  });
+});
+
+test("restore marks running harness sessions without assistant text as interrupted", () => {
+  const initial = createInitialAppState();
+  const agent = createPiAgentContextItem({
+    createdAt: 1,
+    id: "agent:11",
+    mode: "ask",
+    prompt: "research",
+  }).withHarness({ kind: "cursor", session: { chatId: "chat-partial" } });
+  expect(agent.status).toBe("running");
+
+  const state: AppState = {
+    ...initial,
+    actions: {} as AppState["actions"],
+    workspace: {
+      ...initial.workspace,
+      contextItems: [agent],
+      focusedContextItemId: agent.id,
+    },
+  };
+
+  const restored = restoreAppStateFromSnapshot(
+    serializeAppSnapshot({ state, workspaceRoot: "/repo" }),
+  );
+  const restoredAgent = restored.workspace.contextItems[0] as PiAgentContextItem;
+
+  expect(restoredAgent.sessionAvailability).toBe("live");
+  expect(restoredAgent.status).toBe("error");
+  expect(restoredAgent.errorMessage).toContain("Interrupted before");
+});
+
 test("interrupted snapshot serializes live items as terminal states", () => {
   const initial = createInitialAppState();
   const live = createLiveLlmResponseContextItem({

@@ -7,11 +7,16 @@ import {
 } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { getDefaultAgentHarness, getAgentHarness } from "../agent/harnessRegistry";
+import type { ClutchAgentHarnessSettings } from "../agent/harnessTypes";
+import { registerBuiltinAgentHarnesses } from "../agent/harnesses/registerBuiltinHarnesses";
 import type { LlmModel } from "../llm/types";
 import {
   OPENROUTER_BASE_URL,
   openRouterModelTraits,
 } from "./openRouterCapabilities";
+
+export type { ClutchAgentHarnessSettings } from "../agent/harnessTypes";
 
 export const CLUTCH_CONFIG_DIR_ENV = "CLUTCH_CONFIG_DIR";
 
@@ -87,15 +92,9 @@ export type ClutchModelSelection = {
 };
 
 export type ClutchSettings = {
-  agentBackend?: ClutchAgentBackendConfig;
+  agentHarness?: ClutchAgentHarnessSettings;
   endpoints?: ClutchEndpoint[];
   models?: Partial<Record<ClutchModelRole, ClutchModelSelection>>;
-};
-
-export type ClutchAgentBackendConfig = {
-  args?: string[];
-  command: string;
-  env?: Record<string, string>;
 };
 
 export type ClutchApiKeyCredential = {
@@ -126,11 +125,6 @@ export type ResolvedConfiguredLlmRequest = {
   model: LlmModel;
   openRouter?: OpenRouterOptions;
   requestDefaults?: Record<string, unknown>;
-};
-
-const DEFAULT_AGENT_BACKEND: ClutchAgentBackendConfig = {
-  args: ["acp"],
-  command: "cursor-agent",
 };
 
 const DEFAULT_PROVIDER = OPENROUTER_PROVIDER_ID;
@@ -224,18 +218,12 @@ function salvageClutchSettings(raw: Record<string, unknown>): ClutchSettings {
   const recovered: ClutchSettings = {};
 
   try {
-    if (
-      raw.agentBackend !== undefined &&
-      raw.agentBackend !== null &&
-      typeof raw.agentBackend === "object" &&
-      !Array.isArray(raw.agentBackend)
-    ) {
-      recovered.agentBackend = normalizeAgentBackendConfig(
-        raw.agentBackend as Record<string, unknown>,
-      );
+    const agentHarness = parseAgentHarnessSettings(raw.agentHarness);
+    if (agentHarness !== undefined) {
+      recovered.agentHarness = agentHarness;
     }
   } catch {
-    // drop invalid agent backend
+    // drop invalid agent harness
   }
 
   try {
@@ -366,12 +354,23 @@ export function resolveConfiguredLlmModel(
   };
 }
 
-export function resolveConfiguredAgentBackend(
+export function resolveConfiguredAgentHarness(
   paths = getClutchConfigPaths(),
-): ClutchAgentBackendConfig {
-  return normalizeAgentBackendConfig(
-    loadClutchSettings(paths).agentBackend ?? DEFAULT_AGENT_BACKEND,
-  );
+): ClutchAgentHarnessSettings {
+  registerBuiltinAgentHarnesses();
+  const configured = loadClutchSettings(paths).agentHarness;
+  if (configured === undefined) {
+    const definition = getDefaultAgentHarness();
+    return {
+      kind: definition.id,
+      config: definition.parseConfig(definition.defaultConfig),
+    };
+  }
+  const definition = getAgentHarness(configured.kind);
+  return {
+    kind: configured.kind,
+    config: definition.parseConfig(configured.config),
+  };
 }
 
 export function resolveConfiguredLlmRequest(
@@ -467,9 +466,9 @@ export function saveClutchModelConfiguration({
     ...(existingSettings.endpoints === undefined
       ? {}
       : { endpoints: existingSettings.endpoints }),
-    ...(existingSettings.agentBackend === undefined
+    ...(existingSettings.agentHarness === undefined
       ? {}
-      : { agentBackend: existingSettings.agentBackend }),
+      : { agentHarness: existingSettings.agentHarness }),
     models: {
       primary: primarySelection,
       summarization: summarizationSelection,
@@ -477,19 +476,19 @@ export function saveClutchModelConfiguration({
   } satisfies ClutchSettings);
 }
 
-export function saveClutchAgentBackendConfiguration({
-  backend,
+export function saveClutchAgentHarnessConfiguration({
+  harness,
   paths = getClutchConfigPaths(),
 }: {
-  backend: ClutchAgentBackendConfig;
+  harness: ClutchAgentHarnessSettings;
   paths?: ClutchConfigPaths;
 }) {
-  const agentBackend = normalizeAgentBackendConfig(backend);
+  const agentHarness = normalizeAgentHarnessSettings(harness);
   const existingSettings = loadClutchSettings(paths);
   mkdirSync(paths.configDir, { recursive: true });
   writeJsonFile(paths.settingsPath, {
     ...existingSettings,
-    agentBackend,
+    agentHarness,
   } satisfies ClutchSettings);
 }
 
@@ -582,7 +581,7 @@ export function deleteClutchEndpointConfiguration({
 export function createDefaultClutchConfigDraft(
   paths = getClutchConfigPaths(),
 ): {
-  agentBackend?: ClutchAgentBackendConfig;
+  agentHarness: ClutchAgentHarnessSettings;
   configuredProviders: string[];
   endpoints: ClutchEndpoint[];
   primary: ClutchModelSelection;
@@ -596,7 +595,7 @@ export function createDefaultClutchConfigDraft(
     settings.models?.summarization?.provider ?? primaryProvider;
 
   return {
-    agentBackend: settings.agentBackend ?? DEFAULT_AGENT_BACKEND,
+    agentHarness: resolveConfiguredAgentHarness(paths),
     configuredProviders: listConfiguredProviders(settings, auth),
     endpoints: settings.endpoints ?? [],
     primary: getExistingOrEmptyModelSelection({
@@ -681,8 +680,14 @@ function parseClutchSettings(raw: Record<string, unknown>): ClutchSettings {
 
   const endpoints = parseEndpoints(raw.endpoints);
 
+  if (raw.agentBackend !== undefined) {
+    throw new Error(
+      "Legacy ACP agentBackend is no longer supported. Configure agentHarness under /config.",
+    );
+  }
+
   return {
-    agentBackend: parseAgentBackendConfig(raw.agentBackend),
+    agentHarness: parseAgentHarnessSettings(raw.agentHarness),
     ...(endpoints === undefined ? {} : { endpoints }),
     ...(models === undefined
       ? {}
@@ -767,41 +772,33 @@ function parseEndpoints(raw: unknown): ClutchEndpoint[] | undefined {
   return endpoints;
 }
 
-function parseAgentBackendConfig(
+function parseAgentHarnessSettings(
   raw: unknown,
-): ClutchAgentBackendConfig | undefined {
+): ClutchAgentHarnessSettings | undefined {
   if (raw === undefined) {
     return undefined;
   }
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error("Clutch settings field agentBackend must be an object.");
+    throw new Error("Clutch settings field agentHarness must be an object.");
   }
 
-  return normalizeAgentBackendConfig(raw as Record<string, unknown>);
+  return normalizeAgentHarnessSettings(raw as Record<string, unknown>);
 }
 
-function normalizeAgentBackendConfig(
-  raw: ClutchAgentBackendConfig | Record<string, unknown>,
-): ClutchAgentBackendConfig {
-  const command = raw.command;
-  if (typeof command !== "string" || command.trim().length === 0) {
-    throw new Error("Clutch agentBackend.command must be a non-empty string.");
+function normalizeAgentHarnessSettings(
+  raw: ClutchAgentHarnessSettings | Record<string, unknown>,
+): ClutchAgentHarnessSettings {
+  registerBuiltinAgentHarnesses();
+  const kind = raw.kind;
+  if (typeof kind !== "string" || kind.trim().length === 0) {
+    throw new Error("Clutch agentHarness.kind must be a non-empty string.");
   }
-
-  const args = raw.args;
-  if (args !== undefined && !isStringArray(args)) {
-    throw new Error("Clutch agentBackend.args must be a string array.");
-  }
-
-  const env = raw.env;
-  if (env !== undefined && !isStringRecord(env)) {
-    throw new Error("Clutch agentBackend.env must be an object of strings.");
-  }
-
+  const definition = getAgentHarness(kind.trim());
   return {
-    ...(args === undefined ? {} : { args }),
-    command,
-    ...(env === undefined ? {} : { env }),
+    kind: definition.id,
+    config: definition.parseConfig(
+      "config" in raw ? raw.config : definition.defaultConfig,
+    ),
   };
 }
 

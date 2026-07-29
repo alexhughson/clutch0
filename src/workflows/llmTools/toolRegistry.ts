@@ -39,7 +39,7 @@ const workflowToolControllers = createWorkflowToolControllers([
 
 const agentAskSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
-  description: "Ask a long-running ACP agent and save its session as context.",
+  description: "Ask a durable agent harness and save its session as context.",
   name: "agent-ask",
   promptDirective: "",
   run: runAgentAskSlashCommand,
@@ -49,7 +49,7 @@ const agentAskSlashCommand: LlmSlashCommand = {
 const agentEditSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
   description:
-    "Ask a writable ACP agent to edit a sandbox copy and save its diff as context.",
+    "Ask a writable agent harness to edit a sandbox copy and save its diff as context.",
   name: "agent-edit",
   promptDirective: "",
   run: runAgentEditSlashCommand,

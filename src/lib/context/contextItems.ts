@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
+import type { AgentHarnessPersistence } from "../agent/harnessTypes";
 import type {
   AgentOutputBlock,
   AgentOutputUpdate,
@@ -102,6 +103,7 @@ export type PiAgentContextItemState = BaseContextItemState<"pi-agent"> & {
   blocks: readonly AgentOutputBlock[];
   createdAt: number;
   errorMessage?: string;
+  harness?: AgentHarnessPersistence;
   mode: AgentAskMode;
   prompt: string;
   sandbox?: AgentSandboxContext;
@@ -951,6 +953,10 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
     return this.state.sessionAvailability;
   }
 
+  get harness(): AgentHarnessPersistence | undefined {
+    return this.state.harness;
+  }
+
   getListLabel(): string {
     return this.getSummaryView().title;
   }
@@ -999,6 +1005,10 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
     sessionAvailability: PiAgentSessionAvailability,
   ): PiAgentContextItem {
     return new PiAgentContextItem({ ...this.state, sessionAvailability });
+  }
+
+  withHarness(harness: AgentHarnessPersistence): PiAgentContextItem {
+    return new PiAgentContextItem({ ...this.state, harness });
   }
 
   getPersistence(): ContextItemPersistence<PiAgentContextItemState> {
@@ -1144,6 +1154,14 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
           }),
       mode: assertOneOf(record.raw.mode, ["ask", "edit"], "pi-agent.mode"),
       prompt: assertString(record.raw.prompt, "pi-agent.prompt"),
+      ...(record.raw.harness === undefined
+        ? {}
+        : {
+            harness: parseAgentHarnessPersistence(
+              record.raw.harness,
+              "pi-agent.harness",
+            ),
+          }),
       ...(record.raw.sandbox === undefined
         ? {}
         : {
@@ -1926,6 +1944,17 @@ function parseAgentSandboxContext(
     ...(record.summary === undefined
       ? {}
       : { summary: assertString(record.summary, `${label}.summary`) }),
+  };
+}
+
+function parseAgentHarnessPersistence(
+  value: unknown,
+  label: string,
+): AgentHarnessPersistence {
+  const record = assertRecord(value, label);
+  return {
+    kind: assertString(record.kind, `${label}.kind`),
+    session: record.session,
   };
 }
 
