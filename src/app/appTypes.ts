@@ -12,7 +12,6 @@ import type {
 } from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
 import type {
-  AgentAskMode,
   AgentSandboxContext,
   ContextItem,
   FilePath,
@@ -224,7 +223,6 @@ export type AppActions = {
       summary: string;
     }) => void;
     start: (options: {
-      mode: AgentAskMode;
       prompt: string;
       rejectComposer?: ComposerState;
     }) => string | null;

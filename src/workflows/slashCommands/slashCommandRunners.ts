@@ -1,10 +1,7 @@
 import type { ComposerState } from "../../app/appTypes";
 import { validateExistingContextFilePaths } from "../../lib/context/contextFilePaths";
 import { useAppStore } from "../../store/appStore";
-import {
-  startAgentAskRequest,
-  startAgentEditRequest,
-} from "../agentAsk/startAgentAskRequest";
+import { startAgentRequest } from "../agentAsk/startAgentRequest";
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
 import type {
   LlmSlashCommand,
@@ -56,18 +53,11 @@ export function runSaySlashCommand({ input }: SlashCommandContext): void {
   useAppStore.getState().actions.say.addToContext({ text: input });
 }
 
-export function runAgentAskSlashCommand({
+export function runAgentSlashCommand({
   input,
   submittedComposer,
 }: SlashCommandContext): void {
-  startAgentAskRequest(input, { rejectComposer: submittedComposer });
-}
-
-export function runAgentEditSlashCommand({
-  input,
-  submittedComposer,
-}: SlashCommandContext): void {
-  startAgentEditRequest(input, { rejectComposer: submittedComposer });
+  startAgentRequest(input, { rejectComposer: submittedComposer });
 }
 
 export function runShellCommandSlashCommand({

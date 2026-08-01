@@ -65,13 +65,9 @@ export const piHarnessDefinition: AgentHarnessDefinition = {
     };
   },
 
-  canResume(session: unknown, ctx) {
+  canResume(session: unknown) {
     try {
-      const parsed = normalizePiSession(session);
-      if (ctx.mode === "edit") {
-        // cwd must still exist for edit resume; checked by caller via sandbox path.
-      }
-      void parsed;
+      normalizePiSession(session);
       return { ok: true as const };
     } catch (error) {
       return {
@@ -98,7 +94,6 @@ export const piHarnessDefinition: AgentHarnessDefinition = {
         args: buildPiPromptArgs({
           config: parsedConfig,
           message,
-          mode: ctx.mode,
           session: parsedSession,
         }),
       }),
@@ -175,12 +170,10 @@ function normalizePiSession(raw: unknown): PiHarnessSession {
 function buildPiPromptArgs({
   config,
   message,
-  mode,
   session,
 }: {
   config: PiHarnessConfig;
   message: string;
-  mode: "ask" | "edit";
   session: PiHarnessSession;
 }): string[] {
   const args = [
@@ -201,9 +194,6 @@ function buildPiPromptArgs({
   }
   if (config.thinking !== undefined) {
     args.push("--thinking", config.thinking);
-  }
-  if (mode === "ask") {
-    args.push("--tools", "read");
   }
   args.push(message);
   return args;

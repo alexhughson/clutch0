@@ -976,14 +976,11 @@ function resolveRestoredAgentAvailability(
     registerBuiltinAgentHarnesses();
     const definition = getAgentHarness(item.harness.kind);
     const session = definition.parseSession(item.harness.session);
-    const cwd =
-      item.mode === "edit"
-        ? item.sandbox?.path
-        : process.cwd();
-    if (cwd === undefined || (item.mode === "edit" && !existsSync(cwd))) {
+    const cwd = item.sandbox?.path;
+    if (cwd === undefined || !existsSync(cwd)) {
       return "detached";
     }
-    const resume = definition.canResume(session, { cwd, mode: item.mode });
+    const resume = definition.canResume(session, { cwd });
     return resume.ok ? "live" : "detached";
   } catch {
     return "detached";

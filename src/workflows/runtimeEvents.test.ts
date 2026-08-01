@@ -1,5 +1,13 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createInitialAppState } from "../app/appInitialState";
+import type { AgentSessionDriver } from "../lib/agent/agentSessionDriver";
+import {
+  CLUTCH_CONFIG_DIR_ENV,
+} from "../lib/config/clutchConfig";
+import { CURSOR_AUTH_PROVIDER_ID } from "../lib/config/clutchConfig";
 import type { SessionRecorder } from "../lib/session/sessionRecorder";
 import { createUserTextContextItem } from "../lib/context/contextItems";
 import {
@@ -7,7 +15,10 @@ import {
   setSessionRecorder,
   useAppStore,
 } from "../store/appStore";
-import { startAgentAskSession } from "./agentAsk/agentAskSessionRegistry";
+import {
+  setAgentHarnessFactoriesForTest,
+  startAgentSession,
+} from "./agentAsk/agentAskSessionRegistry";
 import { startFindFilesSearch } from "./findFiles/findFilesSearchController";
 import {
   setStartLlmRequestStreamForTest,
@@ -240,8 +251,20 @@ test("find-files workflow aborts on cleanup", () => {
 
 test("aborted agent startup records start and failure runtime events", async () => {
   const events = captureRuntimeEvents();
+  await configureAgentHarnessForRuntimeEventsTest();
+  const resetFactories = setAgentHarnessFactoriesForTest({
+    createSession: async () => ({ agentId: "agent-abort" }),
+    createSessionDriver: async () =>
+      ({
+        async dispose() {},
+        latestAssistantText() {
+          return null;
+        },
+        async prompt() {},
+      }) satisfies AgentSessionDriver,
+  });
+
   const itemId = useAppStore.getState().actions.agentAsk.start({
-    mode: "ask",
     prompt: "Summarize the selected file",
   });
   if (itemId === null) {
@@ -250,14 +273,18 @@ test("aborted agent startup records start and failure runtime events", async () 
 
   const controller = new AbortController();
   controller.abort();
-  await startAgentAskSession({
-    contextItems: [],
-    focusedContextItemId: null,
-    itemId,
-    mode: "ask",
-    prompt: "Summarize the selected file",
-    signal: controller.signal,
-  });
+  try {
+    await startAgentSession({
+      contextItems: [],
+      focusedContextItemId: null,
+      itemId,
+      prompt: "Summarize the selected file",
+      root: process.cwd(),
+      signal: controller.signal,
+    });
+  } finally {
+    resetFactories();
+  }
 
   expect(eventKinds(events)).toEqual([
     "agent-session.started",
@@ -299,6 +326,7 @@ function hydrateStoreWithContextItem(
   });
 }
 
+
 function searchingFindFilesScreen() {
   return {
     agentOutput: [],
@@ -309,6 +337,26 @@ function searchingFindFilesScreen() {
     selectedIndex: 0,
     status: "searching" as const,
   };
+}
+
+async function configureAgentHarnessForRuntimeEventsTest() {
+  const configDir = await mkdtemp(join(tmpdir(), "clutch-runtime-events-"));
+  process.env[CLUTCH_CONFIG_DIR_ENV] = configDir;
+  await writeFile(
+    join(configDir, "settings.json"),
+    JSON.stringify({
+      agentHarness: {
+        kind: "cursor",
+        config: { model: "composer-2.5" },
+      },
+    }),
+  );
+  await writeFile(
+    join(configDir, "auth.json"),
+    JSON.stringify({
+      [CURSOR_AUTH_PROVIDER_ID]: { key: "cursor_test_key", type: "api_key" },
+    }),
+  );
 }
 
 async function waitForRuntimeEvent(

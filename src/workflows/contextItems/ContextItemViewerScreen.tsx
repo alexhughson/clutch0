@@ -300,25 +300,22 @@ function AgentDetailView({
 }) {
   return (
     <box
-      style={{ flexDirection: "column", flexGrow: 1, gap: 1, height: "100%" }}
+      style={{
+        flexDirection: "column",
+        flexGrow: 1,
+        gap: 1,
+        height: "100%",
+        minHeight: 0,
+      }}
     >
       <AgentMetadataPanel detail={detail} />
-      {detail.sandbox === undefined ? null : (
-        <box
-          style={{
-            backgroundColor: "#111827",
-            flexDirection: "column",
-            paddingX: 1,
-            paddingY: 1,
-          }}
-        >
-          <text>{`Sandbox: ${detail.sandbox.path}`}</text>
-          <text>{`Sandbox diff: ${formatSandboxDiffStatus(detail.sandbox)}`}</text>
-        </box>
-      )}
-      <AgentOutputLog blocks={detail.blocks} />
+      <box style={{ flexDirection: "column", flexGrow: 1, minHeight: 0 }}>
+        <AgentOutputLog blocks={detail.blocks} />
+      </box>
       {detail.sessionAvailability === "live" ? (
-        <AgentSessionFollowUp itemId={detail.itemId} />
+        <box style={{ flexShrink: 0 }}>
+          <AgentSessionFollowUp itemId={detail.itemId} />
+        </box>
       ) : null}
     </box>
   );
@@ -334,6 +331,8 @@ function AgentMetadataPanel({
       style={{
         backgroundColor: "#111827",
         flexDirection: "column",
+        flexShrink: 0,
+        gap: 0,
         paddingX: 1,
         paddingY: 1,
       }}
@@ -348,6 +347,11 @@ function AgentMetadataPanel({
       >
         {getAgentStatusText(detail)}
       </text>
+      {detail.sandbox === undefined ? null : (
+        <text truncate wrapMode="none" style={{ fg: "#64748b" }}>
+          {`sandbox ${formatSandboxDiffStatus(detail.sandbox)} · ${detail.sandbox.path}`}
+        </text>
+      )}
     </box>
   );
 }

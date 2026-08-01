@@ -2,8 +2,7 @@ import { expect, test } from "bun:test";
 import { parseLlmSlashCommandInvocation } from "../llmTools/toolRegistry";
 import {
   runAddSlashCommand,
-  runAgentAskSlashCommand,
-  runAgentEditSlashCommand,
+  runAgentSlashCommand,
   runConfigSlashCommand,
   runFindSlashCommand,
   runLlmSlashCommand,
@@ -39,11 +38,8 @@ test("slash commands route through a single run handler", () => {
   expect(parseLlmSlashCommandInvocation("/say note")?.command.run).toBe(
     runSaySlashCommand,
   );
-  expect(
-    parseLlmSlashCommandInvocation("/agent-ask inspect")?.command.run,
-  ).toBe(runAgentAskSlashCommand);
-  expect(parseLlmSlashCommandInvocation("/agent-edit fix")?.command.run).toBe(
-    runAgentEditSlashCommand,
+  expect(parseLlmSlashCommandInvocation("/agent inspect")?.command.run).toBe(
+    runAgentSlashCommand,
   );
 });
 

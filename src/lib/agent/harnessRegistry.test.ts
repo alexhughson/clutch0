@@ -19,7 +19,7 @@ test("builtin harnesses register distinct cursor and pi modules", () => {
   expect(getAgentHarness("cursor").label).toContain("Cursor");
   expect(getAgentHarness("pi").label).toBe("Pi");
   expect(getAgentHarness("cursor").parseConfig({})).toEqual(
-    expect.objectContaining({ command: "cursor-agent" }),
+    expect.objectContaining({ model: "composer-2.5" }),
   );
   expect(getAgentHarness("pi").parseConfig({})).toEqual(
     expect.objectContaining({ command: "pi" }),

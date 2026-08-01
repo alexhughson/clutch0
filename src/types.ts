@@ -1,7 +1,6 @@
 import type { AgentOutputBlock } from "./lib/agentOutput/agentOutputTypes";
 
 export type FilePath = string;
-export type AgentAskMode = "ask" | "edit";
 
 export type AgentSandboxContext = {
   baselineTree: string;

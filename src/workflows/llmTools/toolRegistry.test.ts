@@ -419,8 +419,7 @@ test("derives slash commands from workflow tools plus ask", () => {
 
   expect(commands.map((command) => command.name)).toEqual([
     "ask",
-    "agent-ask",
-    "agent-edit",
+    "agent",
     "config",
     "show-context",
     "say",

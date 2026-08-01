@@ -13,7 +13,6 @@ import {
 import type { PatchProposal } from "../patch/types";
 import type { ShellCommandResult } from "../shell/shellCommand";
 import type {
-  AgentAskMode,
   AgentSandboxContext,
   ContextItem,
   ContextItemAction,
@@ -104,7 +103,6 @@ export type PiAgentContextItemState = BaseContextItemState<"pi-agent"> & {
   createdAt: number;
   errorMessage?: string;
   harness?: AgentHarnessPersistence;
-  mode: AgentAskMode;
   prompt: string;
   sandbox?: AgentSandboxContext;
   sessionAvailability: PiAgentSessionAvailability;
@@ -941,10 +939,6 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
     return this.state.errorMessage;
   }
 
-  get mode(): AgentAskMode {
-    return this.state.mode;
-  }
-
   get sandbox(): AgentSandboxContext | undefined {
     return this.state.sandbox;
   }
@@ -971,7 +965,7 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
         this.status === "running"
           ? "Agent is running…"
           : summarize(formatAgentOutputBlocks(this.blocks)),
-      title: `${this.mode === "edit" ? "Agent edit" : "Agent"}: ${summarize(this.prompt)}`,
+      title: `Agent: ${summarize(this.prompt)}`,
     });
   }
 
@@ -1076,7 +1070,7 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
-      ...(this.mode === "edit" &&
+      ...(this.sandbox !== undefined &&
       this.status !== "running" &&
       this.sessionAvailability === "live"
         ? [saveAgentSandboxDiffAction(this.id)]
@@ -1119,7 +1113,7 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
       sandbox: this.sandbox,
       sessionAvailability: this.sessionAvailability,
       status: this.status,
-      title: `${this.mode === "edit" ? "Agent edit" : "Agent"}: ${summarize(this.prompt)}`,
+      title: `Agent: ${summarize(this.prompt)}`,
     };
   }
 
@@ -1134,7 +1128,7 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
 
     return {
       consumedFileCharacters: 0,
-      text: `<agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), mode: this.mode, sandbox_path: this.sandbox?.path, sandbox_diff_status: this.sandbox?.diffStatus, status: this.status })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<response>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</response>\n</agent_session>`,
+      text: `<agent_session${formatAttributes({ focused, created_at: new Date(this.createdAt).toISOString(), sandbox_path: this.sandbox?.path, sandbox_diff_status: this.sandbox?.diffStatus, status: this.status })}>\n<question>\n${truncateContent(this.prompt, MAX_SAVED_CONTEXT_CHARACTERS)}\n</question>\n<response>\n${truncateContent(latestMessage ?? "No agent message yet.", MAX_SAVED_CONTEXT_CHARACTERS)}\n</response>\n</agent_session>`,
     };
   }
 
@@ -1152,7 +1146,6 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
               "pi-agent.errorMessage",
             ),
           }),
-      mode: assertOneOf(record.raw.mode, ["ask", "edit"], "pi-agent.mode"),
       prompt: assertString(record.raw.prompt, "pi-agent.prompt"),
       ...(record.raw.harness === undefined
         ? {}
@@ -1511,19 +1504,16 @@ export function createLiveLlmResponseContextItem({
 export function createPiAgentContextItem({
   createdAt,
   id,
-  mode = "ask",
   prompt,
 }: {
   createdAt: number;
   id: string;
-  mode?: AgentAskMode;
   prompt: string;
 }): PiAgentContextItem {
   return new PiAgentContextItem({
     blocks: [],
     createdAt,
     id,
-    mode,
     prompt,
     schemaVersion: 1,
     sessionAvailability: "live",

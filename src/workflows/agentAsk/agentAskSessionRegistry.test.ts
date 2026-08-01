@@ -8,7 +8,10 @@ import { createInitialAppState } from "../../app/appInitialState";
 import type { AgentSessionDriver } from "../../lib/agent/agentSessionDriver";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import { createAgentOutputId } from "../../lib/agentOutput/agentOutputBlocks";
-import { CLUTCH_CONFIG_DIR_ENV } from "../../lib/config/clutchConfig";
+import {
+  CLUTCH_CONFIG_DIR_ENV,
+} from "../../lib/config/clutchConfig";
+import { CURSOR_AUTH_PROVIDER_ID } from "../../lib/config/clutchConfig";
 import { PiAgentContextItem } from "../../lib/context/contextItems";
 import { hydrateAppStore, useAppStore } from "../../store/appStore";
 import {
@@ -16,7 +19,7 @@ import {
   releaseAllAgentHandles,
   sendAgentAskMessage,
   setAgentHarnessFactoriesForTest,
-  startAgentAskSession,
+  startAgentSession,
 } from "./agentAskSessionRegistry";
 
 let resetFactories: (() => void) | null = null;
@@ -41,13 +44,14 @@ afterEach(async () => {
   hydrateAppStore(createInitialAppState());
 });
 
-test("agent ask registry records startup, prompt, follow-up, harness persist, and dispose", async () => {
+test("agent session registry records startup, prompt, follow-up, harness persist, and dispose", async () => {
+  const root = await createGitRoot();
   await configureFakeAgentHarness();
   const calls = { disposed: 0, prompts: [] as string[], sessions: 0 };
   resetFactories = setAgentHarnessFactoriesForTest({
     createSession: async () => {
       calls.sessions += 1;
-      return { chatId: "chat-1" };
+      return { agentId: "agent-1" };
     },
     createSessionDriver: async ({ ctx }) =>
       createFakeDriver({
@@ -62,20 +66,18 @@ test("agent ask registry records startup, prompt, follow-up, harness persist, an
   });
 
   const itemId = useAppStore.getState().actions.agentAsk.start({
-    mode: "ask",
     prompt: "Investigate routing",
   });
   if (itemId === null) {
     throw new Error("Failed to create agent context item.");
   }
 
-  await startAgentAskSession({
+  await startAgentSession({
     contextItems: [],
     focusedContextItemId: null,
     itemId,
-    mode: "ask",
     prompt: "Investigate routing",
-    root: process.cwd(),
+    root,
   });
   await sendAgentAskMessage({ itemId, message: "Now check tests" });
 
@@ -83,7 +85,7 @@ test("agent ask registry records startup, prompt, follow-up, harness persist, an
   expect(item).toBeInstanceOf(PiAgentContextItem);
   expect((item as PiAgentContextItem).harness).toEqual({
     kind: "cursor",
-    session: { chatId: "chat-1" },
+    session: { agentId: "agent-1" },
   });
   expect((item as PiAgentContextItem).status).toBe("idle");
   expect(calls.sessions).toBe(1);
@@ -95,12 +97,12 @@ test("agent ask registry records startup, prompt, follow-up, harness persist, an
   expect(calls.disposed).toBe(1);
 });
 
-test("agent edit dispose removes sandbox even when driver dispose fails", async () => {
+test("agent dispose removes sandbox even when driver dispose fails", async () => {
   await configureFakeAgentHarness();
   const root = await createGitRoot();
   let sandboxPath = "";
   resetFactories = setAgentHarnessFactoriesForTest({
-    createSession: async () => ({ chatId: "chat-edit" }),
+    createSession: async () => ({ agentId: "agent-edit" }),
     createSessionDriver: async ({ ctx }) => {
       sandboxPath = ctx.cwd;
       return createFakeDriver({
@@ -113,18 +115,16 @@ test("agent edit dispose removes sandbox even when driver dispose fails", async 
   });
 
   const itemId = useAppStore.getState().actions.agentAsk.start({
-    mode: "edit",
     prompt: "Edit something",
   });
   if (itemId === null) {
     throw new Error("Failed to create agent context item.");
   }
 
-  await startAgentAskSession({
+  await startAgentSession({
     contextItems: [],
     focusedContextItemId: null,
     itemId,
-    mode: "edit",
     prompt: "Edit something",
     root,
   });
@@ -136,10 +136,11 @@ test("agent edit dispose removes sandbox even when driver dispose fails", async 
 });
 
 test("sendAgentAskMessage rehydrates driver from persisted harness after soft release", async () => {
+  const root = await createGitRoot();
   await configureFakeAgentHarness();
   const calls = { drivers: 0, prompts: [] as string[] };
   resetFactories = setAgentHarnessFactoriesForTest({
-    createSession: async () => ({ chatId: "chat-rehydrate" }),
+    createSession: async () => ({ agentId: "agent-rehydrate" }),
     createSessionDriver: async ({ ctx }) => {
       calls.drivers += 1;
       return createFakeDriver({
@@ -152,20 +153,18 @@ test("sendAgentAskMessage rehydrates driver from persisted harness after soft re
   });
 
   const itemId = useAppStore.getState().actions.agentAsk.start({
-    mode: "ask",
     prompt: "first",
   });
   if (itemId === null) {
     throw new Error("Failed to create agent context item.");
   }
 
-  await startAgentAskSession({
+  await startAgentSession({
     contextItems: [],
     focusedContextItemId: null,
     itemId,
-    mode: "ask",
     prompt: "first",
-    root: process.cwd(),
+    root,
   });
   await releaseAllAgentHandles();
   expect(calls.drivers).toBe(1);
@@ -187,7 +186,7 @@ test("releaseAllAgentHandles soft-releases drivers without deleting sandbox", as
   let sandboxPath = "";
   let disposed = 0;
   resetFactories = setAgentHarnessFactoriesForTest({
-    createSession: async () => ({ chatId: "chat-soft" }),
+    createSession: async () => ({ agentId: "agent-soft" }),
     createSessionDriver: async ({ ctx }) => {
       sandboxPath = ctx.cwd;
       return createFakeDriver({
@@ -200,18 +199,16 @@ test("releaseAllAgentHandles soft-releases drivers without deleting sandbox", as
   });
 
   const itemId = useAppStore.getState().actions.agentAsk.start({
-    mode: "edit",
     prompt: "soft release",
   });
   if (itemId === null) {
     throw new Error("Failed to create agent context item.");
   }
 
-  await startAgentAskSession({
+  await startAgentSession({
     contextItems: [],
     focusedContextItemId: null,
     itemId,
-    mode: "edit",
     prompt: "soft release",
     root,
   });
@@ -224,11 +221,10 @@ test("releaseAllAgentHandles soft-releases drivers without deleting sandbox", as
   const item = useAppStore.getState().workspace.contextItems[0];
   expect(item).toBeInstanceOf(PiAgentContextItem);
   expect((item as PiAgentContextItem).harness?.session).toEqual({
-    chatId: "chat-soft",
+    agentId: "agent-soft",
   });
 
   await disposeAgentAskSession(itemId);
-  // map already cleared by soft release; hard dispose still removes persisted sandbox
   expect(existsSync(sandboxPath)).toBe(false);
 });
 
@@ -272,11 +268,16 @@ async function configureFakeAgentHarness() {
     JSON.stringify({
       agentHarness: {
         kind: "cursor",
-        config: { command: "cursor-agent", model: "composer-2.5" },
+        config: { model: "composer-2.5" },
       },
     }),
   );
-  await writeFile(join(configDir, "auth.json"), JSON.stringify({}));
+  await writeFile(
+    join(configDir, "auth.json"),
+    JSON.stringify({
+      [CURSOR_AUTH_PROVIDER_ID]: { key: "cursor_test_key", type: "api_key" },
+    }),
+  );
 }
 
 async function createGitRoot() {

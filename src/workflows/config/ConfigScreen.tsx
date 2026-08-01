@@ -6,17 +6,19 @@ import {
 import { useKeyboard, usePaste } from "@opentui/react";
 import { useEffect, useState } from "react";
 import type { ConfigTaskState } from "../../app/appTypes";
-import { registerBuiltinAgentHarnesses } from "../../lib/agent/harnesses/registerBuiltinHarnesses";
 import {
   getAgentHarness,
   listAgentHarnessDefinitions,
 } from "../../lib/agent/harnessRegistry";
 import type { AgentHarnessDefinition } from "../../lib/agent/harnessTypes";
+import { registerBuiltinAgentHarnesses } from "../../lib/agent/harnesses/registerBuiltinHarnesses";
 import {
   CLUTCH_MODEL_EFFORT_LEVELS,
   getClutchModelEffortLevel,
   getClutchOpenRouterServiceTier,
   getClutchProviderLabel,
+  hasUsableApiKey,
+  isAgentHarnessAuthConfigured,
   loadClutchAuth,
   loadClutchSettings,
   OPENROUTER_PROVIDER_ID,
@@ -80,6 +82,7 @@ type ModelOptionKey =
 type AgentHarnessRow =
   | { fieldKey: string; kind: "config-field" }
   | { harnessId: string; kind: "harness-kind" }
+  | { kind: "auth-provider"; providerId: string }
   | { kind: "save" };
 type AgentHarnessForm = {
   kind: string;
@@ -142,6 +145,7 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
   const harnessDefinitions = getRegisteredHarnessDefinitions();
   const selectedHarnessDefinition = getAgentHarness(agentHarnessForm.kind);
   const agentHarnessRows = buildAgentHarnessRows({
+    auth: loadClutchAuth(),
     definitions: harnessDefinitions,
     selectedDefinition: selectedHarnessDefinition,
   });
@@ -299,6 +303,8 @@ export function ConfigScreen({ task }: ConfigScreenProps) {
         setAgentHarnessRowIndex,
         setMessage,
         setStage,
+        setToken,
+        setTokenProvider,
       });
       return;
     }
@@ -918,6 +924,8 @@ function handleAgentHarnessKey({
   setAgentHarnessRowIndex,
   setMessage,
   setStage,
+  setToken,
+  setTokenProvider,
 }: {
   agentHarnessForm: AgentHarnessForm;
   agentHarnessRowIndex: number;
@@ -928,6 +936,8 @@ function handleAgentHarnessKey({
   setAgentHarnessRowIndex: (index: number) => void;
   setMessage: (message: string | null) => void;
   setStage: (stage: ConfigStage) => void;
+  setToken: (token: string) => void;
+  setTokenProvider: (provider: string) => void;
 }) {
   if (event.name === "escape") {
     setStage("providers");
@@ -975,6 +985,11 @@ function handleAgentHarnessKey({
           values: agentHarnessValuesFromDefaultConfig(definition),
         });
       }
+      setMessage(null);
+    } else if (row.kind === "auth-provider") {
+      setTokenProvider(row.providerId);
+      setToken("");
+      setStage("token");
       setMessage(null);
     }
     prevent(event);
@@ -1806,20 +1821,24 @@ function getRegisteredHarnessDefinitions(): readonly AgentHarnessDefinition[] {
   return listAgentHarnessDefinitions();
 }
 
-function isAgentHarnessConfigured(harness: ClutchAgentHarnessSettings): boolean {
+function isAgentHarnessConfigured(
+  harness: ClutchAgentHarnessSettings,
+): boolean {
   registerBuiltinAgentHarnesses();
   try {
     getAgentHarness(harness.kind);
-    return true;
   } catch {
     return false;
   }
+  return isAgentHarnessAuthConfigured(harness, loadClutchAuth());
 }
 
 function buildAgentHarnessRows({
+  auth,
   definitions,
   selectedDefinition,
 }: {
+  auth: ReturnType<typeof loadClutchAuth>;
   definitions: readonly AgentHarnessDefinition[];
   selectedDefinition: AgentHarnessDefinition;
 }): AgentHarnessRow[] {
@@ -1831,6 +1850,10 @@ function buildAgentHarnessRows({
     ...selectedDefinition.configFields.map((field) => ({
       fieldKey: field.key,
       kind: "config-field" as const,
+    })),
+    ...selectedDefinition.authProviderIds.map((providerId) => ({
+      kind: "auth-provider" as const,
+      providerId,
     })),
     { kind: "save" as const },
   ];
@@ -1895,6 +1918,8 @@ function agentHarnessRowKey(row: AgentHarnessRow): string {
       return `kind:${row.harnessId}`;
     case "config-field":
       return `field:${row.fieldKey}`;
+    case "auth-provider":
+      return `auth:${row.providerId}`;
     case "save":
       return "save";
   }
@@ -1929,6 +1954,13 @@ function agentHarnessRowLabel({
         throw new Error(`Unknown config field: ${row.fieldKey}`);
       }
       return `${field.label}: ${form.values[row.fieldKey] ?? ""}`;
+    }
+    case "auth-provider": {
+      const label = getClutchProviderLabel(row.providerId);
+      const configured = hasUsableApiKey(loadClutchAuth()[row.providerId])
+        ? " ✓"
+        : "";
+      return `${label} API key${configured}`;
     }
     case "save":
       return "Save agent harness";

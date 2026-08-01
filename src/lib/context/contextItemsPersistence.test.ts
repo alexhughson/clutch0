@@ -53,7 +53,6 @@ test("persistent context items own durable state and round-trip through restore"
     createPiAgentContextItem({
       createdAt: 6,
       id: "agent:6",
-      mode: "edit",
       prompt: "fix it",
     }),
     createSavedDiffContextItem({
@@ -138,7 +137,6 @@ test("restored agent and live response states can be detached or errored", () =>
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:1",
-    mode: "ask",
     prompt: "work",
   }).withSessionAvailability("detached");
   expect(agent).toBeInstanceOf(PiAgentContextItem);
@@ -180,7 +178,6 @@ test("context items emit semantic history events for state changes", () => {
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:1",
-    mode: "edit",
     prompt: "work",
   });
   expect(

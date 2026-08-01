@@ -10,13 +10,14 @@ import { createAgentToolBlock } from "../../lib/agentOutput/agentOutputBlocks";
 import type { AgentOutputUpdate } from "../../lib/agentOutput/agentOutputTypes";
 import {
   getClutchConfigPaths,
+  hasUsableApiKey,
   loadClutchAuth,
   resolveConfiguredAgentHarness,
 } from "../../lib/config/clutchConfig";
 import { PiAgentContextItem } from "../../lib/context/contextItems";
 import { buildAgentPromptWithContext } from "../../lib/llm/agentContext";
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
-import type { AgentAskMode, ContextItem } from "../../types";
+import type { ContextItem } from "../../types";
 import {
   createAgentSandbox,
   getAgentSandboxDiff,
@@ -115,11 +116,10 @@ async function defaultCreateHarnessSessionDriver({
   return await definition.createSessionDriver(ctx, config, parsedSession);
 }
 
-export async function startAgentAskSession({
+export async function startAgentSession({
   itemId,
   contextItems,
   focusedContextItemId,
-  mode = "ask",
   prompt,
   root = process.cwd(),
   signal,
@@ -127,7 +127,6 @@ export async function startAgentAskSession({
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
   itemId: string;
-  mode?: AgentAskMode;
   prompt: string;
   root?: string;
   signal?: AbortSignal;
@@ -143,11 +142,10 @@ export async function startAgentAskSession({
     registered: false,
   };
   agentAskStartups.set(itemId, startup);
-  startup.done = runAgentAskSessionStartup({
+  startup.done = runAgentSessionStartup({
     contextItems,
     focusedContextItemId,
     itemId,
-    mode,
     prompt,
     root,
     signal: abortHandle.signal,
@@ -159,11 +157,10 @@ export async function startAgentAskSession({
   await startup.done;
 }
 
-async function runAgentAskSessionStartup({
+async function runAgentSessionStartup({
   itemId,
   contextItems,
   focusedContextItemId,
-  mode,
   prompt,
   root,
   signal,
@@ -172,7 +169,6 @@ async function runAgentAskSessionStartup({
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
   itemId: string;
-  mode: AgentAskMode;
   prompt: string;
   root: string;
   signal: AbortSignal;
@@ -183,32 +179,31 @@ async function runAgentAskSessionStartup({
     focusedContextItemId,
     itemId,
     kind: "agent-session.started",
-    mode,
   });
 
   try {
     throwIfAgentSessionAborted(signal);
-    const sandbox =
-      mode === "edit" ? await createAgentSandbox({ root, signal }) : undefined;
+    const harness = resolveConfiguredAgentHarness();
+    assertConfiguredHarnessAuth(harness, loadClutchAuth(getClutchConfigPaths()));
+
+    const sandbox = await createAgentSandbox({ root, signal });
     startup.sandbox = sandbox;
     throwIfAgentSessionAborted(signal);
-    const sessionRoot = sandbox?.path ?? root;
-    if (sandbox !== undefined) {
-      useAppStore.getState().actions.agentAsk.attachSandbox({
-        itemId,
-        sandbox: {
-          baselineTree: sandbox.baselineTree,
-          diffStatus: "unknown",
-          path: sandbox.path,
-          root: sandbox.root,
-        },
-      });
-      recordSessionRuntimeEvent({
-        itemId,
-        kind: "agent-session.sandbox-attached",
-        sandboxPath: sandbox.path,
-      });
-    }
+    const sessionRoot = sandbox.path;
+    useAppStore.getState().actions.agentAsk.attachSandbox({
+      itemId,
+      sandbox: {
+        baselineTree: sandbox.baselineTree,
+        diffStatus: "unknown",
+        path: sandbox.path,
+        root: sandbox.root,
+      },
+    });
+    recordSessionRuntimeEvent({
+      itemId,
+      kind: "agent-session.sandbox-attached",
+      sandboxPath: sandbox.path,
+    });
 
     const initialPrompt = await buildInitialAgentPrompt({
       contextItems,
@@ -218,11 +213,9 @@ async function runAgentAskSessionStartup({
     });
     throwIfAgentSessionAborted(signal);
 
-    const harness = resolveConfiguredAgentHarness();
     const runtimeCtx = createRuntimeContext({
       cwd: sessionRoot,
       itemId,
-      mode,
       signal,
     });
     const session = await createHarnessSession({
@@ -266,10 +259,7 @@ async function runAgentAskSessionStartup({
       update: {
         block: createAgentToolBlock({
           phase: "start",
-          summary:
-            mode === "edit"
-              ? "agent edit sandbox session"
-              : "agent ask session",
+          summary: "agent sandbox session",
           toolName: "agent",
         }),
         kind: "append-block",
@@ -409,12 +399,10 @@ async function rehydrateHandle(
   registerBuiltinAgentHarnesses();
   const definition = getAgentHarness(item.harness.kind);
   const session = definition.parseSession(item.harness.session);
-  const mode = item.mode;
-  const sandbox =
-    mode === "edit" ? await reopenSandboxForItem(item) : undefined;
+  const sandbox = await reopenSandboxForItem(item);
   throwIfAgentSessionAborted(signal);
-  const cwd = sandbox?.path ?? process.cwd();
-  const resume = definition.canResume(session, { cwd, mode });
+  const cwd = sandbox.path;
+  const resume = definition.canResume(session, { cwd });
   if (!resume.ok) {
     useAppStore.getState().actions.agentAsk.fail({
       errorMessage: `Cannot resume agent session: ${resume.reason}`,
@@ -437,7 +425,6 @@ async function rehydrateHandle(
   const runtimeCtx = createRuntimeContext({
     cwd,
     itemId,
-    mode,
     signal,
   });
   const driver = await createHarnessSessionDriver({
@@ -465,7 +452,7 @@ async function reopenSandboxForItem(
   item: PiAgentContextItem,
 ): Promise<AgentSandbox> {
   if (item.sandbox === undefined) {
-    throw new Error("Agent edit session is missing persisted sandbox metadata.");
+    throw new Error("Agent session is missing persisted sandbox metadata.");
   }
   return await openAgentSandboxFromPersisted(item.sandbox);
 }
@@ -644,16 +631,32 @@ async function runAgentPrompt(itemId: string, message: string) {
 
 function recordFinalAgentOutput(itemId: string, handle: AgentAskHandle) {
   const latestAssistantText = handle.driver.latestAssistantText();
-  if (latestAssistantText === null || latestAssistantText.trim().length === 0) {
-    throw new Error("Agent did not produce assistant text.");
+  const messageLength = latestAssistantText?.trim().length ?? 0;
+  if (messageLength === 0) {
+    return;
   }
 
   recordSessionRuntimeEvent({
     itemId,
     kind: "agent-session.final-output-reconciled",
-    messageLength: latestAssistantText.length,
+    messageLength,
     updateCount: 0,
   });
+}
+
+function assertConfiguredHarnessAuth(
+  harness: ClutchAgentHarnessSettings,
+  auth: ReturnType<typeof loadClutchAuth>,
+): void {
+  registerBuiltinAgentHarnesses();
+  const definition = getAgentHarness(harness.kind);
+  for (const providerId of definition.authProviderIds) {
+    if (!hasUsableApiKey(auth[providerId])) {
+      throw new Error(
+        `Missing API key for ${definition.label} (provider "${providerId}"). Configure it under /config → agent harness.`,
+      );
+    }
+  }
 }
 
 function recordAgentOutputUpdates({
@@ -708,12 +711,10 @@ async function refreshAgentSandboxDiff(itemId: string, sandbox: AgentSandbox) {
 function createRuntimeContext({
   cwd,
   itemId,
-  mode,
   signal,
 }: {
   cwd: string;
   itemId: string;
-  mode: AgentAskMode;
   signal?: AbortSignal;
 }): AgentHarnessRuntimeContext {
   const paths = getClutchConfigPaths();
@@ -721,7 +722,6 @@ function createRuntimeContext({
     auth: loadClutchAuth(paths),
     configDir: paths.configDir,
     cwd,
-    mode,
     onOutputUpdate: (update) => {
       recordAgentOutputUpdates({
         itemId,
