@@ -23,12 +23,20 @@ type FileTreeNode = {
 export function getContextItemDisplayEntries(
   contextItems: readonly ContextItem[],
 ): ContextItemDisplayEntry[] {
-  const fileItems = getFileContextItems(contextItems);
-  const nonFileEntries = contextItems
+  const pinnedEntries = contextItems
+    .filter((item) => item.isPinned())
+    .map((item) => ({ depth: 0, item, kind: "item" as const }));
+  const unpinnedItems = contextItems.filter((item) => !item.isPinned());
+  const fileItems = getFileContextItems(unpinnedItems);
+  const nonFileEntries = unpinnedItems
     .filter((item) => !(item instanceof FileContextItem))
     .map((item) => ({ depth: 0, item, kind: "item" as const }));
 
-  return [...getFileDisplayEntries(fileItems), ...nonFileEntries];
+  return [
+    ...pinnedEntries,
+    ...getFileDisplayEntries(fileItems),
+    ...nonFileEntries,
+  ];
 }
 
 export function getContextItemDisplayOrder(

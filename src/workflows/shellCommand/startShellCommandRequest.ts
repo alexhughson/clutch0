@@ -8,6 +8,7 @@ import { createRuntimeAbortHandle } from "../../lib/session/runtimeInterrupts";
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "../llmTools/shellCommandWorkflowTool";
 import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
+import { markContextItemRerunStarted } from "../contextItems/regenerateContextItem";
 
 export function startShellCommandRequest(
   prompt: string,
@@ -101,6 +102,8 @@ export function startShellCommandRerun({
   if (requestId === null) {
     return;
   }
+
+  markContextItemRerunStarted(replaceContextItemId);
 
   const abortHandle = createRuntimeAbortHandle();
   recordSessionRuntimeEvent({

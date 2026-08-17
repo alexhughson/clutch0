@@ -100,6 +100,69 @@ test("item methods update durable state", () => {
   expect(item.state.summaryState).toEqual({ status: "missing" });
 });
 
+test("old snapshots default pin and auto-regenerate off", () => {
+  const restored = restoreContextItem({
+    createdAt: 1,
+    id: "saved:1",
+    output: "answer",
+    prompt: "question",
+    schemaVersion: 1,
+    sourceRequestId: 1,
+    summaryState: { status: "missing" },
+    type: "llm-response",
+  });
+
+  expect(restored.isPinned()).toBe(false);
+  expect(restored.getAutoRegenerate?.()).toBe(false);
+  expect(restored.getRegenStatus?.()).toEqual({ status: "idle" });
+  expect(serializeContextItem(restored)).not.toHaveProperty("regenStatus");
+  expect(serializeContextItem(restored)).toMatchObject({
+    autoRegenerate: false,
+    pinned: false,
+  });
+});
+
+test("unknown autoRegenerate values throw", () => {
+  expect(() =>
+    restoreContextItem({
+      autoRegenerate: "sometimes",
+      createdAt: 1,
+      id: "saved:1",
+      output: "answer",
+      prompt: "question",
+      schemaVersion: 1,
+      sourceRequestId: 1,
+      summaryState: { status: "missing" },
+      type: "llm-response",
+    }),
+  ).toThrow("llm-response.autoRegenerate must be a boolean");
+});
+
+test("pinned and auto-regenerate round-trip", () => {
+  const item = createSavedLlmResponseContextItem({
+    createdAt: 1,
+    id: "saved:1",
+    output: "answer",
+    prompt: "question",
+    sourceRequestId: 1,
+  })
+    .withPinned(true)
+    .withAutoRegenerate(true)
+    .withRegenStatus({ status: "running" });
+
+  const snapshot = serializeContextItem(item);
+  expect(snapshot).toMatchObject({
+    autoRegenerate: true,
+    pinned: true,
+  });
+  expect(snapshot).not.toHaveProperty("regenStatus");
+
+  const restored = restoreContextItem(snapshot);
+  expect(restored.isPinned()).toBe(true);
+  expect(restored.getAutoRegenerate?.()).toBe(true);
+  expect(restored.getRegenStatus?.()).toEqual({ status: "idle" });
+});
+
 test("restore rejects unknown context item schema and type", () => {
   expect(() =>
     restoreContextItem({

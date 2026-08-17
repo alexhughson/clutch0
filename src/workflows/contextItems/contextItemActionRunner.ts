@@ -6,7 +6,7 @@ import {
 import { startLlmRequest } from "../llmRequest/startLlmRequest";
 import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
 import { useAppStore } from "../../store/appStore";
-import { applySavedDiffContextItem } from "./contextItemEffects";
+import { applyDiffForContextItem } from "./contextItemEffects";
 
 export function runContextItemAction({
   action,
@@ -17,7 +17,7 @@ export function runContextItemAction({
 }) {
   void action.run({
     applyDiff: (itemId) => {
-      void applySavedDiffContextItem(itemId);
+      void applyDiffForContextItem(itemId);
     },
     openContextItem: (itemId) => {
       useAppStore.getState().actions.contextItems.openContextItem({ itemId });
@@ -42,6 +42,15 @@ export function runContextItemAction({
       startShellCommandRerun({ command, replaceContextItemId }),
     saveAgentSandboxDiff: (itemId) => {
       void saveAgentSandboxDiffToContext(itemId);
+    },
+    setAutoRegenerate: (itemId, enabled) => {
+      useAppStore.getState().actions.contextItems.setAutoRegenerate({
+        enabled,
+        itemId,
+      });
+    },
+    setPinned: (itemId, pinned) => {
+      useAppStore.getState().actions.contextItems.setPinned({ itemId, pinned });
     },
   });
 }

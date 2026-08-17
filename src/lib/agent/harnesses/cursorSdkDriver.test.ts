@@ -52,6 +52,28 @@ test("mapDeltaToAgentOutputUpdates maps tool-call-started with args", () => {
   }
 });
 
+test("mapDeltaToAgentOutputUpdates strips sandbox roots from tool paths", () => {
+  const sandbox = "/tmp/clutch-agent-edit-xyz";
+  const updates = mapDeltaToAgentOutputUpdates(
+    {
+      type: "tool-call-started",
+      callId: "call-1",
+      modelCallId: "model-1",
+      toolCall: {
+        type: "read",
+        args: { path: `${sandbox}/src/app/layout.ts` },
+      },
+    },
+    { assistantStreamId: null, thinkingStreamId: null },
+    sandbox,
+  );
+
+  expect(updates).toHaveLength(1);
+  if (updates[0]?.kind === "append-block" && updates[0].block.kind === "tool") {
+    expect(updates[0].block.summary).toBe("src/app/layout.ts");
+  }
+});
+
 test("mapDeltaToAgentOutputUpdates maps tool-call-completed errors", () => {
   const updates = mapDeltaToAgentOutputUpdates(
     {

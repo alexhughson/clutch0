@@ -162,6 +162,14 @@ class UnstagedChangesContextItem implements ContextItem {
     return [openContextItemAction(this.id)];
   }
 
+  isPinned(): boolean {
+    return false;
+  }
+
+  withPinned(): ContextItem {
+    throw new Error("Automatic context items cannot be pinned.");
+  }
+
   async getDetailView({
     root,
   }: {
@@ -289,6 +297,14 @@ class FileListContextItem implements ContextItem {
 
   getActions(): readonly ContextItemAction[] {
     return [openContextItemAction(this.id)];
+  }
+
+  isPinned(): boolean {
+    return false;
+  }
+
+  withPinned(): ContextItem {
+    throw new Error("Automatic context items cannot be pinned.");
   }
 
   async getDetailView({

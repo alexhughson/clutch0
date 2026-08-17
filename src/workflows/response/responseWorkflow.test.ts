@@ -33,7 +33,9 @@ test("finishing a text rerun replaces the saved response context item", () => {
     output: "old output",
     prompt: "Explain the app",
     sourceRequestId: 1,
-  });
+  })
+    .withPinned(true)
+    .withAutoRegenerate(true);
   const workspace = {
     ...createInitialComposeScreen(),
     contextItems: [saved],
@@ -77,6 +79,9 @@ test("finishing a text rerun replaces the saved response context item", () => {
   expect(replacement?.id).toBe(saved.id);
   expect(replacement?.getDetailView).toBeDefined();
   expect(replacement?.getListLabel()).toContain("Explain the app");
+  expect(replacement?.isPinned()).toBe(true);
+  expect(replacement?.getAutoRegenerate?.()).toBe(true);
+  expect((replacement as SavedLlmResponseContextItem).createdAt).toBe(1);
 });
 
 test("saving a running response creates live context and finish updates it", () => {

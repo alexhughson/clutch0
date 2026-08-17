@@ -2,8 +2,22 @@ import { expect, test } from "bun:test";
 import {
   orderAgentOutputBlocksForDisplay,
   splitAgentOutputBlocksForDisplay,
+  stripAgentSandboxPathPrefix,
 } from "./agentOutputDisplay";
 import type { AgentOutputBlock } from "./agentOutputTypes";
+
+test("stripAgentSandboxPathPrefix removes worktree roots from tool paths", () => {
+  const sandbox = "/var/folders/xx/yy/T/clutch-agent-edit-abc123";
+  expect(
+    stripAgentSandboxPathPrefix(`${sandbox}/src/app/layout.ts`, sandbox),
+  ).toBe("src/app/layout.ts");
+  expect(
+    stripAgentSandboxPathPrefix(
+      "/var/folders/xx/yy/T/clutch-agent-edit-abc123/src/foo.ts",
+    ),
+  ).toBe("src/foo.ts");
+  expect(stripAgentSandboxPathPrefix("src/foo.ts", sandbox)).toBe("src/foo.ts");
+});
 
 test("keeps the latest assistant response at the bottom after trailing pi events", () => {
   const blocks = [

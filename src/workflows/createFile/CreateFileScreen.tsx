@@ -2,7 +2,7 @@ import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { CreateFileTaskState } from "../../app/appTypes";
 import { HighlightedCode } from "../../components/SyntaxHighlightedContent";
-import { applyCreateFileProposal } from "../../lib/createFile/createFile";
+import { applyCreateFileProposalWithRuntimeEvents } from "./createFileApplyRuntime";
 import { isEnterKey } from "../../lib/keymap";
 import { useAppStore } from "../../store/appStore";
 
@@ -105,8 +105,9 @@ async function applyCreateFile(
 ) {
   actions.startApply({ requestId: task.id });
   try {
-    const result = await applyCreateFileProposal({
+    const result = await applyCreateFileProposalWithRuntimeEvents({
       proposal: task.validation.proposal,
+      requestId: task.id,
     });
 
     if (result.status === "invalid") {

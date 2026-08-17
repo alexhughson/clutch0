@@ -1,3 +1,5 @@
+import type { ScrollBoxRenderable } from "@opentui/core";
+import { useEffect, useRef } from "react";
 import {
   isClutchConfigured,
   peekClutchConfigRecoveryNotice,
@@ -49,26 +51,22 @@ export function ContextItemsList({
       {configNotice}
       <text style={{ fg: "gray" }}>Context</text>
       {columns === 1 ? (
-        <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
-          <ContextEntryColumn
-            entries={entryColumns[0] ?? []}
-            focusedContextItemId={focusedContextItemId}
-          />
-        </scrollbox>
+        <ContextEntryScroll
+          entries={entryColumns[0] ?? []}
+          focusedContextItemId={focusedContextItemId}
+          width="100%"
+        />
       ) : (
         <box
           style={{ flexDirection: "row", flexGrow: 1, gap: 2, width: "100%" }}
         >
           {entryColumns.map((entries, index) => (
-            <scrollbox
+            <ContextEntryScroll
               key={index}
-              style={{ flexGrow: 1, height: "100%", width: "50%" }}
-            >
-              <ContextEntryColumn
-                entries={entries}
-                focusedContextItemId={focusedContextItemId}
-              />
-            </scrollbox>
+              entries={entries}
+              focusedContextItemId={focusedContextItemId}
+              width="50%"
+            />
           ))}
         </box>
       )}
@@ -97,6 +95,44 @@ export function FocusedContextItemSummary({
   );
 }
 
+function ContextEntryScroll({
+  entries,
+  focusedContextItemId,
+  width,
+}: {
+  entries: ReturnType<typeof getContextItemDisplayEntries>;
+  focusedContextItemId: string | null;
+  width: `${number}%` | "100%";
+}) {
+  const scrollBoxRef = useRef<ScrollBoxRenderable | null>(null);
+  const focusedInColumn =
+    focusedContextItemId !== null &&
+    entries.some(
+      (entry) => entry.kind === "item" && entry.item.id === focusedContextItemId,
+    );
+
+  useEffect(() => {
+    if (!focusedInColumn || focusedContextItemId === null) {
+      return;
+    }
+    scrollBoxRef.current?.scrollChildIntoView(
+      getContextItemRowId(focusedContextItemId),
+    );
+  }, [focusedContextItemId, focusedInColumn]);
+
+  return (
+    <scrollbox
+      ref={scrollBoxRef}
+      style={{ flexGrow: 1, height: "100%", width }}
+    >
+      <ContextEntryColumn
+        entries={entries}
+        focusedContextItemId={focusedContextItemId}
+      />
+    </scrollbox>
+  );
+}
+
 function ContextEntryColumn({
   entries,
   focusedContextItemId,
@@ -119,13 +155,22 @@ function ContextEntryColumn({
 
         const isFocused = entry.item.id === focusedContextItemId;
         const summary = entry.item.getSummaryView();
+        const regenStatus = entry.item.getRegenStatus?.();
 
         return (
           <ContextItemRow
             key={entry.item.id}
             depth={entry.depth}
             focused={isFocused}
+            id={getContextItemRowId(entry.item.id)}
             label={entry.label ?? summary.label}
+            pinned={entry.item.isPinned()}
+            regenerating={regenStatus?.status === "running"}
+            regenError={
+              regenStatus?.status === "error"
+                ? regenStatus.errorMessage
+                : undefined
+            }
             summary={summary}
           />
         );
@@ -151,27 +196,48 @@ function ContextFolderHeader({
 export function ContextItemRow({
   depth,
   focused,
+  id,
   label,
+  pinned = false,
+  regenError,
+  regenerating = false,
   summary,
 }: {
   depth: number;
   focused: boolean;
+  id?: string;
   label: string;
+  pinned?: boolean;
+  regenError?: string;
+  regenerating?: boolean;
   summary: ContextItemSummaryView;
 }) {
   const shortSummary = getShortSummary(summary);
   const indent = getIndent(depth);
-  const marker = focused ? "> " : "  ";
+  const marker = focused ? "> " : pinned ? "* " : "  ";
+  const labelStyle = focused
+    ? { bg: "blue", fg: "white" }
+    : pinned
+      ? { bg: "gray", fg: "white" }
+      : undefined;
+  const statusLine = regenerating
+    ? "Regenerating…"
+    : regenError === undefined
+      ? null
+      : `Regen failed: ${regenError}`;
 
   return (
-    <box style={{ flexDirection: "column" }}>
-      <text
-        truncate
-        wrapMode="none"
-        style={focused ? { bg: "blue", fg: "white" } : undefined}
-      >
+    <box id={id} style={{ flexDirection: "column" }}>
+      <text truncate wrapMode="none" style={labelStyle}>
         {`${indent}${marker}${label}`}
       </text>
+      {statusLine === null ? null : (
+        <box style={{ paddingLeft: indent.length + 4, width: "100%" }}>
+          <text wrapMode="none" style={{ fg: "yellow" }}>
+            {statusLine}
+          </text>
+        </box>
+      )}
       {shortSummary === null ? null : (
         <box style={{ paddingLeft: indent.length + 4, width: "100%" }}>
           <text wrapMode="word" style={{ fg: "gray", height: 2 }}>
@@ -196,6 +262,10 @@ function FocusedContextItemSummaryContent({ item }: { item: ContextItem }) {
 
 function getIndent(depth: number): string {
   return "  ".repeat(depth);
+}
+
+function getContextItemRowId(itemId: string): string {
+  return `context-item-row-${itemId}`;
 }
 
 function getConfigSetupNotice() {

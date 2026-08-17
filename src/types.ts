@@ -55,8 +55,20 @@ export interface ContextItem<
   ): Promise<ContextItemSummarizationInput | null>;
   getSummaryState(): ContextItemSummaryState;
   getSummaryView(): ContextItemSummaryView;
+  isPinned(): boolean;
+  withPinned(pinned: boolean): ContextItem;
+  withCreatedAt?(createdAt: number): ContextItem;
+  getAutoRegenerate?(): boolean;
+  withAutoRegenerate?(enabled: boolean): ContextItem;
+  getRegenStatus?(): RegenStatus;
+  withRegenStatus?(status: RegenStatus): ContextItem;
   withSummaryState(summaryState: ContextItemSummaryState): ContextItem;
 }
+
+export type RegenStatus =
+  | { status: "idle" }
+  | { status: "running" }
+  | { status: "error"; errorMessage: string };
 
 export type GeneratedContextItemSummary = {
   details: string;
@@ -180,6 +192,8 @@ export type ContextItemActionContext = {
     replaceContextItemId: string;
   }) => void;
   saveAgentSandboxDiff: (itemId: string) => void;
+  setAutoRegenerate: (itemId: string, enabled: boolean) => void;
+  setPinned: (itemId: string, pinned: boolean) => void;
 };
 
 export type FormatContextItemForLlmOptions = {

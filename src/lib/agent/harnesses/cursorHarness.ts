@@ -104,6 +104,7 @@ export const cursorHarnessDefinition: AgentHarnessDefinition = {
 
     return createCursorSdkDriver({
       agent,
+      cwd: ctx.cwd,
       onOutputUpdate: ctx.onOutputUpdate,
       signal: ctx.signal,
     });

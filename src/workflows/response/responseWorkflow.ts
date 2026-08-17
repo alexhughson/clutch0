@@ -13,7 +13,9 @@ import {
   getContextItemById,
   hasContextItem,
   LiveLlmResponseContextItem,
+  preserveContextItemPlacement,
 } from "../../lib/context/contextItems";
+import type { ContextItem } from "../../types";
 import type {
   PatchProgressState,
   PatchReviewState,
@@ -165,9 +167,7 @@ function finishResponse(
     });
 
     return {
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(item)
-        .applyTo(state.workspace),
+      workspace: replacePreservingPlacement(state, item),
     };
   }
 
@@ -194,9 +194,7 @@ function finishResponse(
           savedContextItemId: item.id,
         },
       },
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(item)
-        .applyTo(state.workspace),
+      workspace: replacePreservingPlacement(state, item),
     };
   }
 
@@ -227,9 +225,7 @@ function finishResponse(
         savedContextItemId: item.id,
       },
     },
-    workspace: ContextDeck.fromComposeScreen(state.workspace)
-      .replace(item)
-      .applyTo(state.workspace),
+    workspace: replacePreservingPlacement(state, item),
   };
 }
 
@@ -260,9 +256,7 @@ function setPatchOnActiveRequest(
     });
 
     return {
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(item)
-        .applyTo(state.workspace),
+      workspace: replacePreservingPlacement(state, item),
     };
   }
 
@@ -293,9 +287,7 @@ function setPatchOnActiveRequest(
               },
             }
           : state.activeTask,
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(item)
-        .applyTo(state.workspace),
+      workspace: replacePreservingPlacement(state, item),
     };
   }
 
@@ -327,9 +319,7 @@ function setPatchOnActiveRequest(
         savedContextItemId: item.id,
       },
     },
-    workspace: ContextDeck.fromComposeScreen(state.workspace)
-      .replace(item)
-      .applyTo(state.workspace),
+    workspace: replacePreservingPlacement(state, item),
   };
 }
 
@@ -564,6 +554,18 @@ function updateLiveLlmResponseItem(
       .replace(update(item))
       .applyTo(state.workspace),
   };
+}
+
+function replacePreservingPlacement(
+  state: AppState,
+  item: ContextItem,
+) {
+  const previous = getContextItemById(state.workspace.contextItems, item.id);
+  const next =
+    previous === null ? item : preserveContextItemPlacement(previous, item);
+  return ContextDeck.fromComposeScreen(state.workspace)
+    .replace(next)
+    .applyTo(state.workspace);
 }
 
 function getLiveLlmResponseItemByRequestId(

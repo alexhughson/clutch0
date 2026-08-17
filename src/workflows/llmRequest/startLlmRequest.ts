@@ -10,6 +10,7 @@ import {
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
 import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
 import { createRuntimeAbortHandle } from "../../lib/session/runtimeInterrupts";
+import { markContextItemRerunStarted } from "../contextItems/regenerateContextItem";
 
 let streamLlmInteractionForStart: typeof streamLlmInteraction =
   streamLlmInteraction;
@@ -48,6 +49,10 @@ export function startLlmRequest(
   });
   if (requestId === null) {
     return;
+  }
+
+  if (options.replacement !== undefined) {
+    markContextItemRerunStarted(options.replacement.contextItemId);
   }
 
   const abortHandle = createRuntimeAbortHandle();

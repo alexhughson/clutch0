@@ -246,8 +246,12 @@ export type AppActions = {
       errorMessage: string;
       itemId: string;
     }) => void;
+    finishAgentSessionDiffApply: (options: { itemId: string }) => void;
     finishSavedDiffApply: (options: { itemId: string }) => void;
     openContextItem: (options: { itemId: string }) => void;
+    allocateLlmRequestId: () => number;
+    setAutoRegenerate: (options: { enabled: boolean; itemId: string }) => void;
+    setPinned: (options: { itemId: string; pinned: boolean }) => void;
     startSavedDiffApply: (options: { itemId: string }) => void;
   };
   showContext: {

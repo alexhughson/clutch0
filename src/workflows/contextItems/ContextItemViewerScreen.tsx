@@ -53,7 +53,12 @@ export function ContextItemViewerScreen({
     ? undefined
     : (detail?.title ?? item?.getListLabel() ?? "Context item");
   const bottomTitle = isAgentDetail
-    ? formatAgentShortcutHints(itemActions)
+    ? [
+        formatAgentShortcutHints(itemActions),
+        screen.rejectComposer === undefined ? "Esc back" : "Esc edit prompt",
+      ]
+        .filter((part): part is string => part !== undefined && part.length > 0)
+        .join(" · ")
     : canRunPaneActions
       ? [
           formatPaneActionHints(itemActions),
@@ -326,6 +331,8 @@ function AgentMetadataPanel({
 }: {
   detail: Extract<ContextItemDetailView, { kind: "agent-output" }>;
 }) {
+  const canActOnDiff =
+    detail.sandbox?.diffStatus === "dirty" && detail.status !== "running";
   return (
     <box
       style={{
@@ -347,9 +354,17 @@ function AgentMetadataPanel({
       >
         {getAgentStatusText(detail)}
       </text>
-      {detail.sandbox === undefined ? null : (
+      {detail.sandbox === undefined ? null : canActOnDiff ? (
+        <text truncate wrapMode="none" style={{ fg: "#fbbf24" }}>
+          {`diff ready · ${formatDirtyDiffSummary(detail.sandbox)} · Ctrl+y apply · Ctrl+d add to context`}
+        </text>
+      ) : detail.sandbox.diffStatus === "dirty" ? (
+        <text truncate wrapMode="none" style={{ fg: "#fbbf24" }}>
+          {`diff pending · ${formatDirtyDiffSummary(detail.sandbox)}`}
+        </text>
+      ) : (
         <text truncate wrapMode="none" style={{ fg: "#64748b" }}>
-          {`sandbox ${formatSandboxDiffStatus(detail.sandbox)} · ${detail.sandbox.path}`}
+          {`sandbox ${formatSandboxDiffStatus(detail.sandbox)}`}
         </text>
       )}
     </box>
@@ -392,14 +407,22 @@ function formatSandboxDiffStatus(
   return sandbox.diffStatus;
 }
 
+function formatDirtyDiffSummary(
+  sandbox: NonNullable<
+    Extract<ContextItemDetailView, { kind: "agent-output" }>["sandbox"]
+  >,
+): string {
+  if (sandbox.summary !== undefined && sandbox.summary.trim().length > 0) {
+    return sandbox.summary.replace(/\s+/g, " ");
+  }
+  return "sandbox has changes";
+}
+
 function formatAgentShortcutHints(
   actions: readonly ContextItemAction[],
 ): string | undefined {
   const hints = actions
-    .filter(
-      (action) =>
-        action.shortcut !== undefined && action.paneShortcut === undefined,
-    )
+    .filter((action) => action.shortcut !== undefined)
     .map(formatContextItemAction);
   return hints.length === 0 ? undefined : hints.join(" · ");
 }

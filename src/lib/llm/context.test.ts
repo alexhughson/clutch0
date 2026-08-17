@@ -263,6 +263,7 @@ test("agent session context includes only the latest assistant message", async (
         ],
         createdAt: 1_700_000_000_000,
         id: "agent:1",
+        pinned: false,
         prompt: "Investigate routing",
         schemaVersion: 1,
         sessionAvailability: "live",

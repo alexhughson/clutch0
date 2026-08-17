@@ -5,6 +5,7 @@ import {
   type SDKAgent,
 } from "@cursor/sdk";
 import { createAgentOutputId } from "../../agentOutput/agentOutputBlocks";
+import { stripAgentSandboxPathPrefix } from "../../agentOutput/agentOutputDisplay";
 import type { AgentOutputUpdate } from "../../agentOutput/agentOutputTypes";
 import type { AgentSessionDriver } from "../agentSessionDriver";
 
@@ -15,10 +16,12 @@ type SdkStreamState = {
 
 export function createCursorSdkDriver({
   agent,
+  cwd,
   onOutputUpdate,
   signal,
 }: {
   agent: SDKAgent;
+  cwd: string;
   onOutputUpdate: (update: AgentOutputUpdate) => void;
   signal?: AbortSignal;
 }): AgentSessionDriver {
@@ -77,6 +80,7 @@ export function createCursorSdkDriver({
             for (const mapped of mapDeltaToAgentOutputUpdates(
               update,
               streamState,
+              cwd,
             )) {
               emit(mapped);
             }
@@ -165,6 +169,7 @@ function createSdkStreamState(): SdkStreamState {
 export function mapDeltaToAgentOutputUpdates(
   update: InteractionUpdate,
   streamState: SdkStreamState,
+  cwd?: string,
 ): readonly AgentOutputUpdate[] {
   if (update.type === "text-delta") {
     if (update.text.length === 0) {
@@ -213,7 +218,7 @@ export function mapDeltaToAgentOutputUpdates(
           id: createAgentOutputId(),
           kind: "tool",
           phase: "start",
-          summary: summarizeToolPayload(args) || toolName,
+          summary: summarizeToolPayload(args, cwd) || toolName,
           timestamp: Date.now(),
           toolName,
         },
@@ -244,7 +249,7 @@ export function mapDeltaToAgentOutputUpdates(
           kind: "tool",
           phase: "end",
           // Prefer the call target over raw result JSON — keep the log tight.
-          summary: summarizeToolPayload(args) || toolName,
+          summary: summarizeToolPayload(args, cwd) || toolName,
           timestamp: Date.now(),
           toolName,
         },
@@ -272,15 +277,17 @@ function ensureStreamId(
   return streamState.thinkingStreamId;
 }
 
-function summarizeToolPayload(value: unknown): string {
+function summarizeToolPayload(value: unknown, cwd?: string): string {
   if (value === undefined || value === null) {
     return "";
   }
   if (typeof value === "string") {
-    return collapseWhitespace(value);
+    return collapseWhitespace(stripAgentSandboxPathPrefix(value, cwd));
   }
   if (typeof value !== "object" || Array.isArray(value)) {
-    return collapseWhitespace(safeJson(value));
+    return collapseWhitespace(
+      stripAgentSandboxPathPrefix(safeJson(value), cwd),
+    );
   }
 
   const record = value as Record<string, unknown>;
@@ -297,11 +304,13 @@ function summarizeToolPayload(value: unknown): string {
   ]) {
     const candidate = record[key];
     if (typeof candidate === "string" && candidate.trim().length > 0) {
-      return collapseWhitespace(candidate);
+      return collapseWhitespace(stripAgentSandboxPathPrefix(candidate, cwd));
     }
   }
 
-  return collapseWhitespace(safeJson(value));
+  return collapseWhitespace(
+    stripAgentSandboxPathPrefix(safeJson(value), cwd),
+  );
 }
 
 function collapseWhitespace(text: string): string {

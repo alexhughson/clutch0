@@ -19,6 +19,8 @@ import { buildAgentPromptWithContext } from "../../lib/llm/agentContext";
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
 import type { ContextItem } from "../../types";
 import {
+  advanceAgentSandboxBaseline,
+  applyAgentSandboxDiff,
   createAgentSandbox,
   getAgentSandboxDiff,
   openAgentSandboxFromPersisted,
@@ -540,23 +542,9 @@ export async function releaseAllAgentHandles(): Promise<void> {
 }
 
 export async function saveAgentSandboxDiffToContext(itemId: string) {
-  const handle = agentAskSessions.get(itemId);
-  let sandbox = handle?.sandbox;
-  if (sandbox === undefined) {
-    const item = useAppStore
-      .getState()
-      .workspace.contextItems.find((candidate) => candidate.id === itemId);
-    if (!(item instanceof PiAgentContextItem) || item.sandbox === undefined) {
-      useAppStore.getState().actions.agentAsk.fail({
-        errorMessage: "This agent edit session does not have an active sandbox.",
-        itemId,
-      });
-      return;
-    }
-    sandbox = await openAgentSandboxFromPersisted(item.sandbox);
-    if (handle !== undefined) {
-      handle.sandbox = sandbox;
-    }
+  const sandbox = await resolveAgentSandboxForItem(itemId);
+  if (sandbox === null) {
+    return;
   }
 
   const diff = await refreshAgentSandboxDiff(itemId, sandbox);
@@ -585,6 +573,90 @@ export async function saveAgentSandboxDiffToContext(itemId: string) {
     kind: "agent-session.sandbox-diff-saved",
     summary: diff.summary,
   });
+}
+
+export async function applyAgentSandboxDiffFromSession(itemId: string) {
+  useAppStore.getState().actions.contextItems.startSavedDiffApply({ itemId });
+
+  try {
+    const sandbox = await resolveAgentSandboxForItem(itemId);
+    if (sandbox === null) {
+      useAppStore.getState().actions.contextItems.failSavedDiffApply({
+        errorMessage: "This agent edit session does not have an active sandbox.",
+        itemId,
+      });
+      return;
+    }
+
+    const diff = await refreshAgentSandboxDiff(itemId, sandbox);
+    if (diff.diffText.trim().length === 0) {
+      useAppStore.getState().actions.contextItems.failSavedDiffApply({
+        errorMessage: "No sandbox changes to apply.",
+        itemId,
+      });
+      return;
+    }
+
+    // Snapshot the post-edit tree before applying so a failed workspace apply
+    // never leaves the session marked clean, and a failed baseline write never
+    // happens after the workspace has already been mutated.
+    const advanced = await advanceAgentSandboxBaseline(sandbox);
+    await applyAgentSandboxDiff({
+      diffText: diff.diffText,
+      root: sandbox.root,
+    });
+    const handle = agentAskSessions.get(itemId);
+    if (handle !== undefined) {
+      handle.sandbox = advanced;
+    }
+    useAppStore.getState().actions.agentAsk.updateSandboxDiff({
+      itemId,
+      sandbox: {
+        baselineTree: advanced.baselineTree,
+        diffStatus: "clean",
+        path: advanced.path,
+        root: advanced.root,
+      },
+    });
+    useAppStore
+      .getState()
+      .actions.contextItems.finishAgentSessionDiffApply({ itemId });
+    recordSessionRuntimeEvent({
+      itemId,
+      kind: "agent-session.sandbox-diff-applied",
+      summary: diff.summary,
+    });
+  } catch (error) {
+    useAppStore.getState().actions.contextItems.failSavedDiffApply({
+      errorMessage: error instanceof Error ? error.message : String(error),
+      itemId,
+    });
+  }
+}
+
+async function resolveAgentSandboxForItem(itemId: string) {
+  const handle = agentAskSessions.get(itemId);
+  let sandbox = handle?.sandbox;
+  if (sandbox !== undefined) {
+    return sandbox;
+  }
+
+  const item = useAppStore
+    .getState()
+    .workspace.contextItems.find((candidate) => candidate.id === itemId);
+  if (!(item instanceof PiAgentContextItem) || item.sandbox === undefined) {
+    useAppStore.getState().actions.agentAsk.fail({
+      errorMessage: "This agent edit session does not have an active sandbox.",
+      itemId,
+    });
+    return null;
+  }
+
+  sandbox = await openAgentSandboxFromPersisted(item.sandbox);
+  if (handle !== undefined) {
+    handle.sandbox = sandbox;
+  }
+  return sandbox;
 }
 
 async function runAgentPrompt(itemId: string, message: string) {

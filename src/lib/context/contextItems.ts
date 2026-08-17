@@ -6,6 +6,7 @@ import type {
   AgentOutputUpdate,
 } from "../agentOutput/agentOutputTypes";
 import { applyAgentOutputUpdate } from "../agentOutput/agentOutputReducer";
+import { formatUnifiedDiffFilesLabel } from "../git/unifiedDiffFiles";
 import {
   getPatchProposalPaths,
   patchProposalFromLegacyEdits,
@@ -24,6 +25,7 @@ import type {
   FormattedContextItem,
   FormatContextItemForLlmOptions,
   LlmFileContext,
+  RegenStatus,
   SessionEvent,
 } from "../../types";
 import {
@@ -64,25 +66,31 @@ type BaseContextItemState<Type extends string> = ContextItemState & {
 
 export type FileContextItemState = BaseContextItemState<"file"> & {
   filePath: FilePath;
+  pinned: boolean;
 };
 
 export type SavedLlmResponseContextItemState =
   BaseContextItemState<"llm-response"> & {
+    autoRegenerate: boolean;
     createdAt: number;
     output: string;
+    pinned: boolean;
     prompt: string;
     sourceRequestId: number;
   };
 
 export type ShellCommandOutputContextItemState =
   BaseContextItemState<"shell-command-output"> & {
+    autoRegenerate: boolean;
     createdAt: number;
+    pinned: boolean;
     result: ShellCommandResult;
     sourceRequestId: number;
   };
 
 export type UserTextContextItemState = BaseContextItemState<"user-text"> & {
   createdAt: number;
+  pinned: boolean;
   text: string;
 };
 
@@ -91,6 +99,7 @@ export type LiveLlmResponseContextItemState =
     createdAt: number;
     errorMessage?: string;
     output: string;
+    pinned: boolean;
     prompt: string;
     sourceRequestId: number;
     status: "error" | "running";
@@ -103,6 +112,7 @@ export type PiAgentContextItemState = BaseContextItemState<"pi-agent"> & {
   createdAt: number;
   errorMessage?: string;
   harness?: AgentHarnessPersistence;
+  pinned: boolean;
   prompt: string;
   sandbox?: AgentSandboxContext;
   sessionAvailability: PiAgentSessionAvailability;
@@ -110,8 +120,10 @@ export type PiAgentContextItemState = BaseContextItemState<"pi-agent"> & {
 };
 
 export type SavedDiffContextItemState = BaseContextItemState<"diff"> & {
+  autoRegenerate: boolean;
   createdAt: number;
   diffText: string;
+  pinned: boolean;
   prompt: string;
   proposal: PatchProposal;
   sourceRequestId: number;
@@ -122,6 +134,7 @@ export type SavedAgentSandboxDiffContextItemState =
   BaseContextItemState<"agent-sandbox-diff"> & {
     createdAt: number;
     diffText: string;
+    pinned: boolean;
     prompt: string;
     sourceAgentItemId: string;
     summary: string;
@@ -233,6 +246,14 @@ export class FileContextItem implements ContextItem<FileContextItemState> {
     return new FileContextItem({ ...this.state, summaryState });
   }
 
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): FileContextItem {
+    return new FileContextItem({ ...this.state, pinned });
+  }
+
   getPersistence(): ContextItemPersistence<FileContextItemState> {
     return persistentContextItemState(this.state);
   }
@@ -253,7 +274,11 @@ export class FileContextItem implements ContextItem<FileContextItemState> {
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      pinContextItemAction(this),
+      removeContextItemAction(this.id),
+    ];
   }
 
   async getSummarizationInput({ root }: { root: string }) {
@@ -319,6 +344,7 @@ export class FileContextItem implements ContextItem<FileContextItemState> {
     return new FileContextItem({
       ...record,
       filePath: assertString(record.raw.filePath, "file.filePath"),
+      pinned: parseOptionalBoolean(record.raw.pinned, "file.pinned", false),
       type: "file",
     });
   }
@@ -327,7 +353,10 @@ export class FileContextItem implements ContextItem<FileContextItemState> {
 export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponseContextItemState> {
   readonly type = "llm-response";
 
-  constructor(readonly state: SavedLlmResponseContextItemState) {}
+  constructor(
+    readonly state: SavedLlmResponseContextItemState,
+    readonly regenStatus: RegenStatus = { status: "idle" },
+  ) {}
 
   get id(): string {
     return this.state.id;
@@ -367,7 +396,47 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
   withSummaryState(
     summaryState: ContextItemSummaryState,
   ): SavedLlmResponseContextItem {
-    return new SavedLlmResponseContextItem({ ...this.state, summaryState });
+    return new SavedLlmResponseContextItem(
+      { ...this.state, summaryState },
+      this.regenStatus,
+    );
+  }
+
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): SavedLlmResponseContextItem {
+    return new SavedLlmResponseContextItem(
+      { ...this.state, pinned },
+      this.regenStatus,
+    );
+  }
+
+  withCreatedAt(createdAt: number): SavedLlmResponseContextItem {
+    return new SavedLlmResponseContextItem(
+      { ...this.state, createdAt },
+      this.regenStatus,
+    );
+  }
+
+  getAutoRegenerate(): boolean {
+    return this.state.autoRegenerate;
+  }
+
+  withAutoRegenerate(enabled: boolean): SavedLlmResponseContextItem {
+    return new SavedLlmResponseContextItem(
+      { ...this.state, autoRegenerate: enabled },
+      this.regenStatus,
+    );
+  }
+
+  getRegenStatus(): RegenStatus {
+    return this.regenStatus;
+  }
+
+  withRegenStatus(status: RegenStatus): SavedLlmResponseContextItem {
+    return new SavedLlmResponseContextItem(this.state, status);
   }
 
   getPersistence(): ContextItemPersistence<SavedLlmResponseContextItemState> {
@@ -409,11 +478,17 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
-      rerunPromptAction({
-        expectedResult: "text",
-        prompt: this.prompt,
-        replaceContextItemId: this.id,
-      }),
+      pinContextItemAction(this),
+      toggleAutoRegenerateAction(this),
+      ...(this.regenStatus.status === "running"
+        ? []
+        : [
+            rerunPromptAction({
+              expectedResult: "text" as const,
+              prompt: this.prompt,
+              replaceContextItemId: this.id,
+            }),
+          ]),
       removeContextItemAction(this.id),
     ];
   }
@@ -451,8 +526,18 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
     const record = parseContextItemStateBase(snapshot, "llm-response");
     return new SavedLlmResponseContextItem({
       ...record,
+      autoRegenerate: parseOptionalBoolean(
+        record.raw.autoRegenerate,
+        "llm-response.autoRegenerate",
+        false,
+      ),
       createdAt: assertNumber(record.raw.createdAt, "llm-response.createdAt"),
       output: assertString(record.raw.output, "llm-response.output"),
+      pinned: parseOptionalBoolean(
+        record.raw.pinned,
+        "llm-response.pinned",
+        false,
+      ),
       prompt: assertString(record.raw.prompt, "llm-response.prompt"),
       sourceRequestId: assertNumber(
         record.raw.sourceRequestId,
@@ -466,7 +551,10 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
 export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOutputContextItemState> {
   readonly type = "shell-command-output";
 
-  constructor(readonly state: ShellCommandOutputContextItemState) {}
+  constructor(
+    readonly state: ShellCommandOutputContextItemState,
+    readonly regenStatus: RegenStatus = { status: "idle" },
+  ) {}
 
   get id(): string {
     return this.state.id;
@@ -502,7 +590,47 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
   withSummaryState(
     summaryState: ContextItemSummaryState,
   ): ShellCommandOutputContextItem {
-    return new ShellCommandOutputContextItem({ ...this.state, summaryState });
+    return new ShellCommandOutputContextItem(
+      { ...this.state, summaryState },
+      this.regenStatus,
+    );
+  }
+
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): ShellCommandOutputContextItem {
+    return new ShellCommandOutputContextItem(
+      { ...this.state, pinned },
+      this.regenStatus,
+    );
+  }
+
+  withCreatedAt(createdAt: number): ShellCommandOutputContextItem {
+    return new ShellCommandOutputContextItem(
+      { ...this.state, createdAt },
+      this.regenStatus,
+    );
+  }
+
+  getAutoRegenerate(): boolean {
+    return this.state.autoRegenerate;
+  }
+
+  withAutoRegenerate(enabled: boolean): ShellCommandOutputContextItem {
+    return new ShellCommandOutputContextItem(
+      { ...this.state, autoRegenerate: enabled },
+      this.regenStatus,
+    );
+  }
+
+  getRegenStatus(): RegenStatus {
+    return this.regenStatus;
+  }
+
+  withRegenStatus(status: RegenStatus): ShellCommandOutputContextItem {
+    return new ShellCommandOutputContextItem(this.state, status);
   }
 
   getPersistence(): ContextItemPersistence<ShellCommandOutputContextItemState> {
@@ -538,10 +666,16 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
-      rerunShellCommandAction({
-        command: this.result.command,
-        replaceContextItemId: this.id,
-      }),
+      pinContextItemAction(this),
+      toggleAutoRegenerateAction(this),
+      ...(this.regenStatus.status === "running"
+        ? []
+        : [
+            rerunShellCommandAction({
+              command: this.result.command,
+              replaceContextItemId: this.id,
+            }),
+          ]),
       removeContextItemAction(this.id),
     ];
   }
@@ -579,9 +713,19 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
     const record = parseContextItemStateBase(snapshot, "shell-command-output");
     return new ShellCommandOutputContextItem({
       ...record,
+      autoRegenerate: parseOptionalBoolean(
+        record.raw.autoRegenerate,
+        "shell-command-output.autoRegenerate",
+        false,
+      ),
       createdAt: assertNumber(
         record.raw.createdAt,
         "shell-command-output.createdAt",
+      ),
+      pinned: parseOptionalBoolean(
+        record.raw.pinned,
+        "shell-command-output.pinned",
+        false,
       ),
       result: parseShellCommandResult(
         record.raw.result,
@@ -632,6 +776,18 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
     return new UserTextContextItem({ ...this.state, summaryState });
   }
 
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): UserTextContextItem {
+    return new UserTextContextItem({ ...this.state, pinned });
+  }
+
+  withCreatedAt(createdAt: number): UserTextContextItem {
+    return new UserTextContextItem({ ...this.state, createdAt });
+  }
+
   withText(text: string): UserTextContextItem {
     return new UserTextContextItem({
       ...this.state,
@@ -677,7 +833,11 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      pinContextItemAction(this),
+      removeContextItemAction(this.id),
+    ];
   }
 
   async getSummarizationInput() {
@@ -714,6 +874,7 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
     return new UserTextContextItem({
       ...record,
       createdAt: assertNumber(record.raw.createdAt, "user-text.createdAt"),
+      pinned: parseOptionalBoolean(record.raw.pinned, "user-text.pinned", false),
       text: assertString(record.raw.text, "user-text.text"),
       type: "user-text",
     });
@@ -777,6 +938,18 @@ export class LiveLlmResponseContextItem implements ContextItem<LiveLlmResponseCo
     return new LiveLlmResponseContextItem({ ...this.state, summaryState });
   }
 
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): LiveLlmResponseContextItem {
+    return new LiveLlmResponseContextItem({ ...this.state, pinned });
+  }
+
+  withCreatedAt(createdAt: number): LiveLlmResponseContextItem {
+    return new LiveLlmResponseContextItem({ ...this.state, createdAt });
+  }
+
   withOutput(output: string): LiveLlmResponseContextItem {
     return new LiveLlmResponseContextItem({ ...this.state, output });
   }
@@ -837,7 +1010,11 @@ export class LiveLlmResponseContextItem implements ContextItem<LiveLlmResponseCo
   }
 
   getActions(): readonly ContextItemAction[] {
-    return [openContextItemAction(this.id), removeContextItemAction(this.id)];
+    return [
+      openContextItemAction(this.id),
+      pinContextItemAction(this),
+      removeContextItemAction(this.id),
+    ];
   }
 
   async getSummarizationInput() {
@@ -885,6 +1062,11 @@ export class LiveLlmResponseContextItem implements ContextItem<LiveLlmResponseCo
       createdAt: assertNumber(
         record.raw.createdAt,
         "llm-response-live.createdAt",
+      ),
+      pinned: parseOptionalBoolean(
+        record.raw.pinned,
+        "llm-response-live.pinned",
+        false,
       ),
       ...(record.raw.errorMessage === undefined
         ? {}
@@ -960,17 +1142,37 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
   }
 
   getSummaryView() {
+    const dirtyDiff = this.sandbox?.diffStatus === "dirty";
+    const filesLabel =
+      dirtyDiff && this.sandbox?.summary !== undefined
+        ? this.sandbox.summary.replace(/\s+/g, " ").trim()
+        : null;
     return getGeneratedSummaryView(this.state.summaryState, {
       detail:
         this.status === "running"
           ? "Agent is running…"
-          : summarize(formatAgentOutputBlocks(this.blocks)),
-      title: `Agent: ${summarize(this.prompt)}`,
+          : (filesLabel ??
+            summarize(formatAgentOutputBlocks(this.blocks))),
+      title: dirtyDiff
+        ? `Agent · diff: ${summarize(this.prompt)}`
+        : `Agent: ${summarize(this.prompt)}`,
     });
   }
 
   withSummaryState(summaryState: ContextItemSummaryState): PiAgentContextItem {
     return new PiAgentContextItem({ ...this.state, summaryState });
+  }
+
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): PiAgentContextItem {
+    return new PiAgentContextItem({ ...this.state, pinned });
+  }
+
+  withCreatedAt(createdAt: number): PiAgentContextItem {
+    return new PiAgentContextItem({ ...this.state, createdAt });
   }
 
   withAgentOutputUpdate(update: AgentOutputUpdate): PiAgentContextItem {
@@ -1068,12 +1270,16 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
   }
 
   getActions(): readonly ContextItemAction[] {
+    const canUseDirtyDiff =
+      this.sandbox?.diffStatus === "dirty" && this.status !== "running";
     return [
       openContextItemAction(this.id),
-      ...(this.sandbox !== undefined &&
-      this.status !== "running" &&
-      this.sessionAvailability === "live"
-        ? [saveAgentSandboxDiffAction(this.id)]
+      pinContextItemAction(this),
+      ...(canUseDirtyDiff
+        ? [
+            applyDiffAction(this.id),
+            saveAgentSandboxDiffAction(this.id),
+          ]
         : []),
       removeContextItemAction(this.id),
     ];
@@ -1146,6 +1352,7 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
               "pi-agent.errorMessage",
             ),
           }),
+      pinned: parseOptionalBoolean(record.raw.pinned, "pi-agent.pinned", false),
       prompt: assertString(record.raw.prompt, "pi-agent.prompt"),
       ...(record.raw.harness === undefined
         ? {}
@@ -1181,7 +1388,10 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
 export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemState> {
   readonly type = "diff";
 
-  constructor(readonly state: SavedDiffContextItemState) {}
+  constructor(
+    readonly state: SavedDiffContextItemState,
+    readonly regenStatus: RegenStatus = { status: "idle" },
+  ) {}
 
   get id(): string {
     return this.state.id;
@@ -1220,16 +1430,59 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
   }
 
   getSummaryView() {
+    const filesLabel = formatUnifiedDiffFilesLabel(this.diffText);
+    const summary =
+      this.summary.length > 0 ? this.summary : summarize(this.prompt);
     return getGeneratedSummaryView(this.state.summaryState, {
-      detail: summarize(this.prompt),
-      title: `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`,
+      detail: filesLabel,
+      title: formatDiffContextTitle({ filesLabel, kind: "Diff", summary }),
     });
   }
 
   withSummaryState(
     summaryState: ContextItemSummaryState,
   ): SavedDiffContextItem {
-    return new SavedDiffContextItem({ ...this.state, summaryState });
+    return new SavedDiffContextItem(
+      { ...this.state, summaryState },
+      this.regenStatus,
+    );
+  }
+
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): SavedDiffContextItem {
+    return new SavedDiffContextItem(
+      { ...this.state, pinned },
+      this.regenStatus,
+    );
+  }
+
+  withCreatedAt(createdAt: number): SavedDiffContextItem {
+    return new SavedDiffContextItem(
+      { ...this.state, createdAt },
+      this.regenStatus,
+    );
+  }
+
+  getAutoRegenerate(): boolean {
+    return this.state.autoRegenerate;
+  }
+
+  withAutoRegenerate(enabled: boolean): SavedDiffContextItem {
+    return new SavedDiffContextItem(
+      { ...this.state, autoRegenerate: enabled },
+      this.regenStatus,
+    );
+  }
+
+  getRegenStatus(): RegenStatus {
+    return this.regenStatus;
+  }
+
+  withRegenStatus(status: RegenStatus): SavedDiffContextItem {
+    return new SavedDiffContextItem(this.state, status);
   }
 
   getPersistence(): ContextItemPersistence<SavedDiffContextItemState> {
@@ -1264,12 +1517,18 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
+      pinContextItemAction(this),
+      toggleAutoRegenerateAction(this),
       applyDiffAction(this.id),
-      rerunPromptAction({
-        expectedResult: "diff",
-        prompt: this.prompt,
-        replaceContextItemId: this.id,
-      }),
+      ...(this.regenStatus.status === "running"
+        ? []
+        : [
+            rerunPromptAction({
+              expectedResult: "diff" as const,
+              prompt: this.prompt,
+              replaceContextItemId: this.id,
+            }),
+          ]),
       removeContextItemAction(this.id),
     ];
   }
@@ -1287,11 +1546,14 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
   }
 
   async getDetailView() {
+    const filesLabel = formatUnifiedDiffFilesLabel(this.diffText);
+    const summary =
+      this.summary.length > 0 ? this.summary : summarize(this.prompt);
     return {
       diffText: this.diffText,
       kind: "diff" as const,
-      summary: this.summary,
-      title: `Diff: ${this.summary.length > 0 ? this.summary : summarize(this.prompt)}`,
+      summary: `${filesLabel}\n${summary}`,
+      title: formatDiffContextTitle({ filesLabel, kind: "Diff", summary }),
     };
   }
 
@@ -1308,8 +1570,14 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
     const record = parseContextItemStateBase(snapshot, "diff");
     return new SavedDiffContextItem({
       ...record,
+      autoRegenerate: parseOptionalBoolean(
+        record.raw.autoRegenerate,
+        "diff.autoRegenerate",
+        false,
+      ),
       createdAt: assertNumber(record.raw.createdAt, "diff.createdAt"),
       diffText: assertString(record.raw.diffText, "diff.diffText"),
+      pinned: parseOptionalBoolean(record.raw.pinned, "diff.pinned", false),
       prompt: assertString(record.raw.prompt, "diff.prompt"),
       proposal: parsePatchProposal(record.raw.proposal, "diff.proposal"),
       sourceRequestId: assertNumber(
@@ -1360,9 +1628,17 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
   }
 
   getSummaryView() {
+    const filesLabel = formatUnifiedDiffFilesLabel(this.diffText);
+    const summary = summarize(
+      this.summary.length > 0 ? this.summary : this.prompt,
+    );
     return getGeneratedSummaryView(this.state.summaryState, {
-      detail: summarize(this.summary.length > 0 ? this.summary : this.prompt),
-      title: `Agent diff: ${summarize(this.prompt)}`,
+      detail: filesLabel,
+      title: formatDiffContextTitle({
+        filesLabel,
+        kind: "Agent diff",
+        summary,
+      }),
     });
   }
 
@@ -1373,6 +1649,18 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
       ...this.state,
       summaryState,
     });
+  }
+
+  isPinned(): boolean {
+    return this.state.pinned;
+  }
+
+  withPinned(pinned: boolean): SavedAgentSandboxDiffContextItem {
+    return new SavedAgentSandboxDiffContextItem({ ...this.state, pinned });
+  }
+
+  withCreatedAt(createdAt: number): SavedAgentSandboxDiffContextItem {
+    return new SavedAgentSandboxDiffContextItem({ ...this.state, createdAt });
   }
 
   getPersistence(): ContextItemPersistence<SavedAgentSandboxDiffContextItemState> {
@@ -1407,6 +1695,7 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
   getActions(): readonly ContextItemAction[] {
     return [
       openContextItemAction(this.id),
+      pinContextItemAction(this),
       applyDiffAction(this.id),
       removeContextItemAction(this.id),
     ];
@@ -1425,11 +1714,19 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
   }
 
   async getDetailView() {
+    const filesLabel = formatUnifiedDiffFilesLabel(this.diffText);
+    const summary = summarize(
+      this.summary.length > 0 ? this.summary : this.prompt,
+    );
     return {
       diffText: this.diffText,
       kind: "diff" as const,
-      summary: this.summary,
-      title: `Agent diff: ${summarize(this.prompt)}`,
+      summary: `${filesLabel}\n${this.summary.length > 0 ? this.summary : summary}`,
+      title: formatDiffContextTitle({
+        filesLabel,
+        kind: "Agent diff",
+        summary,
+      }),
     };
   }
 
@@ -1454,6 +1751,11 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
         record.raw.diffText,
         "agent-sandbox-diff.diffText",
       ),
+      pinned: parseOptionalBoolean(
+        record.raw.pinned,
+        "agent-sandbox-diff.pinned",
+        false,
+      ),
       prompt: assertString(record.raw.prompt, "agent-sandbox-diff.prompt"),
       sourceAgentItemId: assertString(
         record.raw.sourceAgentItemId,
@@ -1469,6 +1771,7 @@ export function createFileContextItem(filePath: FilePath): FileContextItem {
   return new FileContextItem({
     filePath,
     id: getFileContextItemId(filePath),
+    pinned: false,
     schemaVersion: 1,
     summaryState: MISSING_SUMMARY_STATE,
     type: "file",
@@ -1492,6 +1795,7 @@ export function createLiveLlmResponseContextItem({
     createdAt,
     id,
     output,
+    pinned: false,
     prompt,
     schemaVersion: 1,
     sourceRequestId,
@@ -1514,6 +1818,7 @@ export function createPiAgentContextItem({
     blocks: [],
     createdAt,
     id,
+    pinned: false,
     prompt,
     schemaVersion: 1,
     sessionAvailability: "live",
@@ -1524,22 +1829,28 @@ export function createPiAgentContextItem({
 }
 
 export function createSavedLlmResponseContextItem({
+  autoRegenerate = false,
   createdAt,
   id,
   output,
+  pinned = false,
   prompt,
   sourceRequestId,
 }: {
+  autoRegenerate?: boolean;
   createdAt: number;
   id: string;
   output: string;
+  pinned?: boolean;
   prompt: string;
   sourceRequestId: number;
 }): SavedLlmResponseContextItem {
   return new SavedLlmResponseContextItem({
+    autoRegenerate,
     createdAt,
     id,
     output,
+    pinned,
     prompt,
     schemaVersion: 1,
     sourceRequestId,
@@ -1549,19 +1860,25 @@ export function createSavedLlmResponseContextItem({
 }
 
 export function createShellCommandOutputContextItem({
+  autoRegenerate = false,
   createdAt,
   id,
+  pinned = false,
   result,
   sourceRequestId,
 }: {
+  autoRegenerate?: boolean;
   createdAt: number;
   id: string;
+  pinned?: boolean;
   result: ShellCommandResult;
   sourceRequestId: number;
 }): ShellCommandOutputContextItem {
   return new ShellCommandOutputContextItem({
+    autoRegenerate,
     createdAt,
     id,
+    pinned,
     result,
     schemaVersion: 1,
     sourceRequestId,
@@ -1582,6 +1899,7 @@ export function createUserTextContextItem({
   return new UserTextContextItem({
     createdAt,
     id,
+    pinned: false,
     schemaVersion: 1,
     summaryState: MISSING_SUMMARY_STATE,
     text,
@@ -1590,26 +1908,32 @@ export function createUserTextContextItem({
 }
 
 export function createSavedDiffContextItem({
+  autoRegenerate = false,
   createdAt,
   diffText,
   id,
+  pinned = false,
   prompt,
   proposal,
   sourceRequestId,
   summary,
 }: {
+  autoRegenerate?: boolean;
   createdAt: number;
   diffText: string;
   id: string;
+  pinned?: boolean;
   prompt: string;
   proposal: PatchProposal;
   sourceRequestId: number;
   summary: string;
 }): SavedDiffContextItem {
   return new SavedDiffContextItem({
+    autoRegenerate,
     createdAt,
     diffText,
     id,
+    pinned,
     prompt,
     proposal,
     schemaVersion: 1,
@@ -1639,6 +1963,7 @@ export function createSavedAgentSandboxDiffContextItem({
     createdAt,
     diffText,
     id,
+    pinned: false,
     prompt,
     schemaVersion: 1,
     sourceAgentItemId,
@@ -1646,6 +1971,22 @@ export function createSavedAgentSandboxDiffContextItem({
     summaryState: MISSING_SUMMARY_STATE,
     type: "agent-sandbox-diff",
   });
+}
+
+function formatDiffContextTitle({
+  filesLabel,
+  kind,
+  summary,
+}: {
+  filesLabel: string;
+  kind: string;
+  summary: string;
+}): string {
+  const multiFileMatch = /^(\d+) files · /.exec(filesLabel);
+  if (multiFileMatch !== null) {
+    return `${kind} (${multiFileMatch[1]} files): ${summary}`;
+  }
+  return `${kind}: ${summary}`;
 }
 
 const contextItemRestorers = {
@@ -1996,6 +2337,18 @@ function assertBoolean(value: unknown, label: string): boolean {
   return value;
 }
 
+function parseOptionalBoolean(
+  value: unknown,
+  label: string,
+  defaultValue: boolean,
+): boolean {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  return assertBoolean(value, label);
+}
+
 function assertOneOf<const Value extends string>(
   value: unknown,
   values: readonly Value[],
@@ -2040,6 +2393,57 @@ function saveAgentSandboxDiffAction(itemId: string): ContextItemAction {
     label: "add diff to context",
     shortcut: { ctrl: true, display: "Ctrl+d", name: "d" },
     run: (context) => context.saveAgentSandboxDiff(itemId),
+  };
+}
+
+export function preserveContextItemPlacement(
+  previous: ContextItem,
+  next: ContextItem,
+): ContextItem {
+  let item = next.withPinned(previous.isPinned());
+  const previousAuto = previous.getAutoRegenerate?.();
+  if (previousAuto === true) {
+    if (item.withAutoRegenerate === undefined) {
+      throw new Error(
+        `Cannot preserve auto-regenerate on ${item.type} item ${item.id}`,
+      );
+    }
+    item = item.withAutoRegenerate(true);
+  } else if (previousAuto === false && item.withAutoRegenerate !== undefined) {
+    item = item.withAutoRegenerate(false);
+  }
+
+  const previousCreatedAt = (previous.state as { createdAt?: unknown })
+    .createdAt;
+  if (
+    typeof previousCreatedAt === "number" &&
+    item.withCreatedAt !== undefined
+  ) {
+    item = item.withCreatedAt(previousCreatedAt);
+  }
+
+  return item;
+}
+
+function pinContextItemAction(item: ContextItem): ContextItemAction {
+  const pinned = item.isPinned();
+  return {
+    id: "pin",
+    label: pinned ? "unpin" : "pin",
+    paneShortcut: { display: "p", name: "p" },
+    shortcut: { ctrl: true, display: "Ctrl+t", name: "t" },
+    run: (context) => context.setPinned(item.id, !pinned),
+  };
+}
+
+function toggleAutoRegenerateAction(item: ContextItem): ContextItemAction {
+  const enabled = item.getAutoRegenerate?.() === true;
+  return {
+    id: "auto-regenerate",
+    label: enabled ? "disable auto-regen" : "auto-regen",
+    paneShortcut: { display: "w", name: "w" },
+    shortcut: { ctrl: true, display: "Ctrl+g", name: "g" },
+    run: (context) => context.setAutoRegenerate(item.id, !enabled),
   };
 }
 

@@ -115,6 +115,19 @@ export async function applyAgentSandboxDiff({
   await gitOutput(["apply", "--binary", "-"], { cwd: root, input: diffText });
 }
 
+/** After applying sandbox changes to the workspace, advance the baseline so the session looks clean. */
+export async function advanceAgentSandboxBaseline(
+  sandbox: AgentSandbox,
+  signal?: AbortSignal,
+): Promise<AgentSandbox> {
+  const baselineTree = await writeSnapshotTree(sandbox.path, signal);
+  return {
+    baselineTree,
+    path: sandbox.path,
+    root: sandbox.root,
+  };
+}
+
 /** Reopen a sandbox that was retained across Clutch restarts. */
 export async function openAgentSandboxFromPersisted(
   sandbox: AgentSandboxContext,

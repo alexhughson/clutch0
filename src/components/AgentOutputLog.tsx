@@ -1,5 +1,8 @@
 import type { AgentOutputBlock } from "../lib/agentOutput/agentOutputTypes";
-import { orderAgentOutputBlocksForDisplay } from "../lib/agentOutput/agentOutputDisplay";
+import {
+  orderAgentOutputBlocksForDisplay,
+  stripAgentSandboxPathPrefix,
+} from "../lib/agentOutput/agentOutputDisplay";
 import { HighlightedMarkdown } from "./SyntaxHighlightedContent";
 
 type AgentOutputLogProps = {
@@ -114,7 +117,9 @@ function findLatestAssistantBlockId(
 }
 
 function formatToolBlock(block: Extract<AgentOutputBlock, { kind: "tool" }>) {
-  const summary = block.summary.replace(/\s+/g, " ").trim();
+  const summary = stripAgentSandboxPathPrefix(
+    block.summary.replace(/\s+/g, " ").trim(),
+  );
   const detail =
     summary.length === 0 || summary === block.toolName
       ? block.toolName
