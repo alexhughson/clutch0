@@ -209,6 +209,7 @@ function item(id: string, withSummary: boolean): ContextItem {
 
   return {
     id,
+    getListGroup: () => null,
     getSummaryView: () => summary,
     isPinned: () => false,
   } as ContextItem;

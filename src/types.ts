@@ -48,6 +48,7 @@ export interface ContextItem<
   ): Promise<ContextItemDetailView | null>;
   getLiveDetailView?(): ContextItemDetailView | null;
   getHistoryEvents(previous: ContextItem | null): readonly SessionEvent[];
+  getListGroup(): ContextItemListGroup | null;
   getListLabel(): string;
   getPersistence(): ContextItemPersistence<State>;
   getSummarizationInput(
@@ -97,6 +98,19 @@ export type ContextItemSummaryView = {
   label: string;
   status: ContextItemSummaryState["status"];
   title: string;
+};
+
+export type ContextItemListGroupId =
+  | "agent"
+  | "ask"
+  | "commands"
+  | "edit"
+  | "say"
+  | "workspace";
+
+export type ContextItemListGroup = {
+  id: ContextItemListGroupId;
+  itemLabel: string;
 };
 
 export type ContextItemSummarizationInput = {

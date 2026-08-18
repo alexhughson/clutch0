@@ -18,6 +18,7 @@ import type {
   ContextItem,
   ContextItemAction,
   ContextItemDetailView,
+  ContextItemListGroup,
   ContextItemPersistence,
   ContextItemState,
   ContextItemSummaryState,
@@ -231,6 +232,10 @@ export class FileContextItem implements ContextItem<FileContextItemState> {
     return this.getSummaryView().title;
   }
 
+  getListGroup(): ContextItemListGroup | null {
+    return null;
+  }
+
   getSummaryState(): ContextItemSummaryState {
     return this.state.summaryState;
   }
@@ -380,6 +385,10 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
 
   getListLabel(): string {
     return this.getSummaryView().title;
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return { id: "ask", itemLabel: summarize(this.prompt) };
   }
 
   getSummaryState(): ContextItemSummaryState {
@@ -576,6 +585,10 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
     return this.getSummaryView().title;
   }
 
+  getListGroup(): ContextItemListGroup {
+    return { id: "commands", itemLabel: summarize(this.result.command) };
+  }
+
   getSummaryState(): ContextItemSummaryState {
     return this.state.summaryState;
   }
@@ -761,6 +774,10 @@ export class UserTextContextItem implements ContextItem<UserTextContextItemState
     return this.getSummaryView().title;
   }
 
+  getListGroup(): ContextItemListGroup {
+    return { id: "say", itemLabel: summarize(this.text) };
+  }
+
   getSummaryState(): ContextItemSummaryState {
     return this.state.summaryState;
   }
@@ -916,6 +933,10 @@ export class LiveLlmResponseContextItem implements ContextItem<LiveLlmResponseCo
 
   getListLabel(): string {
     return this.getSummaryView().title;
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return { id: "ask", itemLabel: summarize(this.prompt) };
   }
 
   getSummaryState(): ContextItemSummaryState {
@@ -1135,6 +1156,10 @@ export class PiAgentContextItem implements ContextItem<PiAgentContextItemState> 
 
   getListLabel(): string {
     return this.getSummaryView().title;
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return { id: "agent", itemLabel: summarize(this.prompt) };
   }
 
   getSummaryState(): ContextItemSummaryState {
@@ -1425,6 +1450,15 @@ export class SavedDiffContextItem implements ContextItem<SavedDiffContextItemSta
     return this.getSummaryView().title;
   }
 
+  getListGroup(): ContextItemListGroup {
+    return {
+      id: "edit",
+      itemLabel: summarize(
+        this.summary.length > 0 ? this.summary : this.prompt,
+      ),
+    };
+  }
+
   getSummaryState(): ContextItemSummaryState {
     return this.state.summaryState;
   }
@@ -1621,6 +1655,15 @@ export class SavedAgentSandboxDiffContextItem implements ContextItem<SavedAgentS
 
   getListLabel(): string {
     return this.getSummaryView().title;
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return {
+      id: "agent",
+      itemLabel: summarize(
+        this.summary.length > 0 ? this.summary : this.prompt,
+      ),
+    };
   }
 
   getSummaryState(): ContextItemSummaryState {

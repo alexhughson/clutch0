@@ -12,6 +12,7 @@ import type {
   ContextItem,
   ContextItemAction,
   ContextItemDetailView,
+  ContextItemListGroup,
   ContextItemPersistence,
   ContextItemState,
   ContextItemSummaryState,
@@ -209,6 +210,10 @@ class UnstagedChangesContextItem implements ContextItem {
     return "Current changes";
   }
 
+  getListGroup(): ContextItemListGroup {
+    return { id: "workspace", itemLabel: "Current changes" };
+  }
+
   async getSummarizationInput({ root }: { root: string }) {
     let diffText: string;
     try {
@@ -325,6 +330,10 @@ class FileListContextItem implements ContextItem {
 
   getListLabel(): string {
     return "File list";
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return { id: "workspace", itemLabel: "File list" };
   }
 
   async getSummarizationInput({ root }: { root: string }) {
