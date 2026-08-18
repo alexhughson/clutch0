@@ -17,6 +17,14 @@ test("shows automatic current changes in the visible context list", () => {
   );
 });
 
+test("automatic items cannot be pinned", () => {
+  const item = getUnstagedChangesItem();
+  expect(item.isPinned()).toBe(false);
+  expect(() => item.withPinned(true)).toThrow(
+    "Automatic context items cannot be pinned.",
+  );
+});
+
 test("unstaged changes detail shows the working tree diff", async () => {
   const root = await mkdtemp(join(tmpdir(), "clutch-unstaged-context-"));
   await git(root, ["init"]);

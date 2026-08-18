@@ -12,7 +12,6 @@ import type {
 } from "../lib/config/clutchConfig";
 import type { ShellCommandResult } from "../lib/shell/shellCommand";
 import type {
-  AgentAskMode,
   AgentSandboxContext,
   ContextItem,
   FilePath,
@@ -224,7 +223,6 @@ export type AppActions = {
       summary: string;
     }) => void;
     start: (options: {
-      mode: AgentAskMode;
       prompt: string;
       rejectComposer?: ComposerState;
     }) => string | null;
@@ -248,8 +246,12 @@ export type AppActions = {
       errorMessage: string;
       itemId: string;
     }) => void;
+    finishAgentSessionDiffApply: (options: { itemId: string }) => void;
     finishSavedDiffApply: (options: { itemId: string }) => void;
     openContextItem: (options: { itemId: string }) => void;
+    allocateLlmRequestId: () => number;
+    setAutoRegenerate: (options: { enabled: boolean; itemId: string }) => void;
+    setPinned: (options: { itemId: string; pinned: boolean }) => void;
     startSavedDiffApply: (options: { itemId: string }) => void;
   };
   showContext: {

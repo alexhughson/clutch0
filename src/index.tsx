@@ -90,6 +90,7 @@ async function main() {
       { hydrateAppStore, setSessionRecorder, useAppStore },
       { abortRuntimeWork },
       { releaseAllAgentHandles },
+      { registerAutoRegenTrigger },
     ] = await Promise.all([
       import("./App"),
       import("./app/appInitialState"),
@@ -101,6 +102,7 @@ async function main() {
       import("./store/appStore"),
       import("./lib/session/runtimeInterrupts"),
       import("./workflows/agentAsk/agentAskSessionRegistry"),
+      import("./workflows/contextItems/regenerateContextItem"),
     ]);
 
     if (startupInterrupted) {
@@ -120,6 +122,7 @@ async function main() {
       workspaceRoot: session.metadata.workspaceRoot,
     });
     setSessionRecorder(recorder);
+    registerAutoRegenTrigger();
     closeInitializedSession = async () => {
       setSessionRecorder(null);
       await recorder.close({ status: "interrupted" });

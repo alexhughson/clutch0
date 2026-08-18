@@ -1,4 +1,4 @@
-import type { ContextItem } from "../../types";
+import type { ContextItem, ContextItemListGroupId } from "../../types";
 import { FileContextItem } from "./contextItems";
 
 export type ContextItemDisplayEntry =
@@ -20,15 +20,39 @@ type FileTreeNode = {
   files: Map<string, FileContextItem>;
 };
 
+const LIST_GROUP_ORDER = [
+  "workspace",
+  "say",
+  "ask",
+  "agent",
+  "edit",
+  "commands",
+] as const satisfies readonly ContextItemListGroupId[];
+
+const LIST_GROUP_LABELS: Record<ContextItemListGroupId, string> = {
+  agent: "/agent",
+  ask: "/ask",
+  commands: "commands",
+  edit: "/edit",
+  say: "/say",
+  workspace: "workspace",
+};
+
 export function getContextItemDisplayEntries(
   contextItems: readonly ContextItem[],
 ): ContextItemDisplayEntry[] {
-  const fileItems = getFileContextItems(contextItems);
-  const nonFileEntries = contextItems
-    .filter((item) => !(item instanceof FileContextItem))
-    .map((item) => ({ depth: 0, item, kind: "item" as const }));
+  const pinnedItems = contextItems.filter((item) => item.isPinned());
+  const unpinnedItems = contextItems.filter((item) => !item.isPinned());
+  const fileItems = getFileContextItems(unpinnedItems);
+  const nonFileItems = unpinnedItems.filter(
+    (item) => !(item instanceof FileContextItem),
+  );
 
-  return [...getFileDisplayEntries(fileItems), ...nonFileEntries];
+  return [
+    ...getPinnedDisplayEntries(pinnedItems),
+    ...getFileDisplayEntries(fileItems),
+    ...getTypeGroupDisplayEntries(nonFileItems),
+  ];
 }
 
 export function getContextItemDisplayOrder(
@@ -40,6 +64,94 @@ export function getContextItemDisplayOrder(
         entry.kind === "item",
     )
     .map((entry) => entry.item);
+}
+
+function getPinnedDisplayEntries(
+  pinnedItems: readonly ContextItem[],
+): ContextItemDisplayEntry[] {
+  if (pinnedItems.length === 0) {
+    return [];
+  }
+
+  return [
+    {
+      depth: 0,
+      key: "group:pinned",
+      kind: "folder",
+      label: "pinned",
+    },
+    ...pinnedItems.map((item) => ({
+      depth: 1,
+      item,
+      kind: "item" as const,
+      label: item.getListGroup()?.itemLabel,
+    })),
+  ];
+}
+
+function getTypeGroupDisplayEntries(
+  items: readonly ContextItem[],
+): ContextItemDisplayEntry[] {
+  const ungrouped: ContextItem[] = [];
+  const buckets = new Map<
+    ContextItemListGroupId,
+    { item: ContextItem; itemLabel: string }[]
+  >();
+
+  for (const item of items) {
+    const group = item.getListGroup();
+    if (group === null) {
+      ungrouped.push(item);
+      continue;
+    }
+
+    if (!isListGroupId(group.id)) {
+      throw new Error(
+        `Unknown context item list group: ${group.id} (${item.id})`,
+      );
+    }
+
+    const existing = buckets.get(group.id);
+    if (existing === undefined) {
+      buckets.set(group.id, [{ item, itemLabel: group.itemLabel }]);
+      continue;
+    }
+
+    existing.push({ item, itemLabel: group.itemLabel });
+  }
+
+  const entries: ContextItemDisplayEntry[] = [];
+  for (const item of ungrouped) {
+    entries.push({ depth: 0, item, kind: "item" });
+  }
+
+  for (const groupId of LIST_GROUP_ORDER) {
+    const groupItems = buckets.get(groupId);
+    if (groupItems === undefined) {
+      continue;
+    }
+
+    entries.push({
+      depth: 0,
+      key: `group:${groupId}`,
+      kind: "folder",
+      label: LIST_GROUP_LABELS[groupId],
+    });
+    for (const { item, itemLabel } of groupItems) {
+      entries.push({
+        depth: 1,
+        item,
+        kind: "item",
+        label: itemLabel,
+      });
+    }
+  }
+
+  return entries;
+}
+
+function isListGroupId(value: string): value is ContextItemListGroupId {
+  return (LIST_GROUP_ORDER as readonly string[]).includes(value);
 }
 
 function getFileContextItems(

@@ -35,7 +35,7 @@ export function createAppActions({
     compose: createComposeActions({ get, set }),
     config: createConfigActions({ set }),
     contextSummaries: createContextSummariesActions({ get, set }),
-    contextItems: createContextItemsActions({ set }),
+    contextItems: createContextItemsActions({ get, set }),
     createFile: createCreateFileActions({ set }),
     findFiles: createFindFilesActions({ set }),
     navigation: createNavigationActions({ set }),

@@ -26,11 +26,10 @@ function createHarness() {
   };
 }
 
-test("agent ask creates a live context item and opens it", () => {
+test("agent creates a live context item and opens it", () => {
   const harness = createHarness();
 
   const itemId = harness.agentAsk.start({
-    mode: "ask",
     prompt: "Investigate routing",
   });
 
@@ -45,15 +44,14 @@ test("agent ask creates a live context item and opens it", () => {
   );
 });
 
-test("agent ask can keep a submitted draft for reject-to-edit", () => {
+test("agent can keep a submitted draft for reject-to-edit", () => {
   const harness = createHarness();
 
   const itemId = harness.agentAsk.start({
-    mode: "edit",
     prompt: "Fix routing",
     rejectComposer: {
-      cursorPosition: 23,
-      message: "/agent-edit Fix routing",
+      cursorPosition: 14,
+      message: "/agent Fix routing",
     },
   });
 
@@ -62,16 +60,15 @@ test("agent ask can keep a submitted draft for reject-to-edit", () => {
     itemId: "agent:1",
     kind: "context-item-viewer",
     rejectComposer: {
-      cursorPosition: 23,
-      message: "/agent-edit Fix routing",
+      cursorPosition: 14,
+      message: "/agent Fix routing",
     },
   });
 });
 
-test("agent ask output updates the same context item", () => {
+test("agent output updates the same context item", () => {
   const harness = createHarness();
   const itemId = harness.agentAsk.start({
-    mode: "ask",
     prompt: "Investigate routing",
   });
   expect(itemId).toBe("agent:1");

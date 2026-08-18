@@ -1,13 +1,11 @@
 import type { AgentOutputUpdate } from "../agentOutput/agentOutputTypes";
 import type { ClutchAuth } from "../config/clutchConfig";
-import type { AgentAskMode } from "../../types";
 import type { AgentSessionDriver } from "./agentSessionDriver";
 
 export type AgentHarnessRuntimeContext = {
   auth: ClutchAuth;
   configDir: string;
   cwd: string;
-  mode: AgentAskMode;
   onOutputUpdate: (update: AgentOutputUpdate) => void;
   signal?: AbortSignal;
 };
@@ -36,7 +34,7 @@ export type AgentHarnessDefinition = {
 
   canResume(
     session: unknown,
-    ctx: Pick<AgentHarnessRuntimeContext, "cwd" | "mode">,
+    ctx: Pick<AgentHarnessRuntimeContext, "cwd">,
   ): AgentHarnessCanResumeResult;
 
   createSession(

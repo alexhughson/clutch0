@@ -48,7 +48,12 @@ export function App({ filePaths, onExit }: AppProps) {
   const { height, width } = useTerminalDimensions();
   const paneTask = isWorkspacePaneTask(activeTask) ? activeTask : null;
   const lastBaseCtrlCAt = useRef<number | null>(null);
+  const visibleContextItems = getVisibleContextItems(
+    workspace.contextItems,
+    workspace.automaticContextItems,
+  );
   const layout = getWorkspaceLayout({
+    contextItems: visibleContextItems,
     hasPaneTask: paneTask !== null,
     height,
     width,
@@ -273,71 +278,14 @@ function WorkspaceLayout({
     );
   }
 
-  if (mode === "medium") {
-    const { contextHeight, inputHeight, suggestionHeight, summaryHeight } =
-      getWorkspaceStackLayout({
-        composerHasSuggestions,
-        hasPaneTask: paneTask !== null,
-        mode,
-        terminalHeight,
-      });
-
-    return (
-      <box
-        style={{
-          flexDirection: "column",
-          flexGrow: 1,
-          gap: 1,
-          height: "100%",
-          padding: 1,
-          width: "100%",
-        }}
-      >
-        <text>Clutch0</text>
-        <ContextHotkeys
-          automaticContextItems={workspace.automaticContextItems}
-          contextItems={workspace.contextItems}
-          focusedContextItemId={workspace.focusedContextItemId}
-          showItemActions={paneTask === null}
-        />
-        <box style={{ flexDirection: "column", height: contextHeight }}>
-          <ContextItemsList
-            columns={2}
-            contextItems={contextItems}
-            focusedContextItemId={workspace.focusedContextItemId}
-          />
-        </box>
-        <box style={{ flexDirection: "column", height: summaryHeight }}>
-          <FocusedContextItemSummary
-            contextItems={contextItems}
-            focusedContextItemId={workspace.focusedContextItemId}
-          />
-        </box>
-        {paneTask === null ? (
-          <MessageComposer
-            composeScreen={workspace}
-            filePaths={filePaths}
-            inputHeight={inputHeight}
-            suggestionHeight={suggestionHeight}
-          />
-        ) : (
-          <CommandPane task={paneTask} />
-        )}
-      </box>
-    );
-  }
-
-  const {
-    contextHeight: compactContextHeight,
-    inputHeight: compactInputHeight,
-    suggestionHeight: compactSuggestionHeight,
-    summaryHeight: compactSummaryHeight,
-  } = getWorkspaceStackLayout({
-    composerHasSuggestions,
-    hasPaneTask: paneTask !== null,
-    mode,
-    terminalHeight,
-  });
+  const columns = mode === "medium" ? 2 : 1;
+  const { contextHeight, inputHeight, suggestionHeight, summaryHeight } =
+    getWorkspaceStackLayout({
+      composerHasSuggestions,
+      contextItems,
+      mode,
+      terminalHeight,
+    });
 
   return (
     <box
@@ -357,24 +305,35 @@ function WorkspaceLayout({
         focusedContextItemId={workspace.focusedContextItemId}
         showItemActions={paneTask === null}
       />
-      <box style={{ flexDirection: "column", height: compactContextHeight }}>
+      <box style={{ flexDirection: "column", flexShrink: 0, height: contextHeight }}>
         <ContextItemsList
+          columns={columns}
           contextItems={contextItems}
           focusedContextItemId={workspace.focusedContextItemId}
         />
       </box>
-      <box style={{ flexDirection: "column", height: compactSummaryHeight }}>
+      <box
+        style={{
+          flexDirection: "column",
+          flexShrink: 0,
+          height: summaryHeight,
+        }}
+      >
         <FocusedContextItemSummary
           contextItems={contextItems}
           focusedContextItemId={workspace.focusedContextItemId}
         />
       </box>
-      <MessageComposer
-        composeScreen={workspace}
-        filePaths={filePaths}
-        inputHeight={compactInputHeight}
-        suggestionHeight={compactSuggestionHeight}
-      />
+      {paneTask === null ? (
+        <MessageComposer
+          composeScreen={workspace}
+          filePaths={filePaths}
+          inputHeight={inputHeight}
+          suggestionHeight={suggestionHeight}
+        />
+      ) : (
+        <CommandPane task={paneTask} />
+      )}
     </box>
   );
 }

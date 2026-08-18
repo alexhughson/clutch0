@@ -4,7 +4,11 @@ import type {
   AppState,
   ShellCommandReplacementTarget,
 } from "../../app/appTypes";
-import { createShellCommandOutputContextItem } from "../../lib/context/contextItems";
+import {
+  createShellCommandOutputContextItem,
+  getContextItemById,
+  preserveContextItemPlacement,
+} from "../../lib/context/contextItems";
 import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 
 type SetAppState = (
@@ -115,9 +119,7 @@ function finishShellCommand(
         savedContextItemId: item.id,
         status: "done",
       },
-      workspace: ContextDeck.fromComposeScreen(state.workspace)
-        .replace(item)
-        .applyTo(state.workspace),
+      workspace: replacePreservingPlacement(state, item),
     };
   }
 
@@ -128,6 +130,18 @@ function finishShellCommand(
       status: "done",
     },
   };
+}
+
+function replacePreservingPlacement(
+  state: AppState,
+  item: ReturnType<typeof createShellCommandOutputContextItem>,
+) {
+  const previous = getContextItemById(state.workspace.contextItems, item.id);
+  const next =
+    previous === null ? item : preserveContextItemPlacement(previous, item);
+  return ContextDeck.fromComposeScreen(state.workspace)
+    .replace(next)
+    .applyTo(state.workspace);
 }
 
 function failShellCommand(

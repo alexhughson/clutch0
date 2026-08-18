@@ -12,6 +12,7 @@ import type {
   ContextItem,
   ContextItemAction,
   ContextItemDetailView,
+  ContextItemListGroup,
   ContextItemPersistence,
   ContextItemState,
   ContextItemSummaryState,
@@ -162,6 +163,14 @@ class UnstagedChangesContextItem implements ContextItem {
     return [openContextItemAction(this.id)];
   }
 
+  isPinned(): boolean {
+    return false;
+  }
+
+  withPinned(): ContextItem {
+    throw new Error("Automatic context items cannot be pinned.");
+  }
+
   async getDetailView({
     root,
   }: {
@@ -199,6 +208,10 @@ class UnstagedChangesContextItem implements ContextItem {
 
   getListLabel(): string {
     return "Current changes";
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return { id: "workspace", itemLabel: "Current changes" };
   }
 
   async getSummarizationInput({ root }: { root: string }) {
@@ -291,6 +304,14 @@ class FileListContextItem implements ContextItem {
     return [openContextItemAction(this.id)];
   }
 
+  isPinned(): boolean {
+    return false;
+  }
+
+  withPinned(): ContextItem {
+    throw new Error("Automatic context items cannot be pinned.");
+  }
+
   async getDetailView({
     root,
   }: {
@@ -309,6 +330,10 @@ class FileListContextItem implements ContextItem {
 
   getListLabel(): string {
     return "File list";
+  }
+
+  getListGroup(): ContextItemListGroup {
+    return { id: "workspace", itemLabel: "File list" };
   }
 
   async getSummarizationInput({ root }: { root: string }) {

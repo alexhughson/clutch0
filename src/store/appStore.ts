@@ -24,6 +24,9 @@ type StoreSet = (
 ) => void;
 
 let sessionRecorder: SessionRecorder | null = null;
+let workspaceEditListener:
+  | ((event: Record<string, unknown>) => void)
+  | null = null;
 
 type AppStore = UseBoundStore<StoreApi<AppState>>;
 type AppStoreRuntime = {
@@ -90,8 +93,27 @@ export function setSessionRecorder(recorder: SessionRecorder | null) {
   sessionRecorder = recorder;
 }
 
+export function setWorkspaceEditListener(
+  listener: ((event: Record<string, unknown>) => void) | null,
+) {
+  workspaceEditListener = listener;
+}
+
 export function recordSessionRuntimeEvent(event: Record<string, unknown>) {
   sessionRecorder?.recordRuntimeEvent(event);
+  try {
+    workspaceEditListener?.(event);
+  } catch (error) {
+    sessionRecorder?.recordRuntimeEvent({
+      errorMessage: error instanceof Error ? error.message : String(error),
+      kind: "auto-regen.listener-failed",
+    });
+    if (sessionRecorder === null) {
+      queueMicrotask(() => {
+        throw error;
+      });
+    }
+  }
 }
 
 function attachAppStoreSideEffects({

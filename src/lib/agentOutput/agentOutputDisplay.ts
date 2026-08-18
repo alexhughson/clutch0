@@ -5,6 +5,26 @@ export type AgentOutputDisplayBlocks = {
   latestAssistantBlock: AgentOutputBlock | null;
 };
 
+/** Drop absolute sandbox/worktree roots from tool log paths. */
+export function stripAgentSandboxPathPrefix(
+  text: string,
+  sandboxRoot?: string,
+): string {
+  let result = text;
+  const root = sandboxRoot?.replace(/\/+$/, "");
+  if (root !== undefined && root.length > 0) {
+    if (result === root) {
+      result = ".";
+    } else if (result.startsWith(`${root}/`)) {
+      result = result.slice(root.length + 1);
+    } else if (result.includes(`${root}/`)) {
+      result = result.split(`${root}/`).join("");
+    }
+  }
+
+  return result.replace(/(?:\/[^/\s]*)*\/clutch-agent-edit-[^/]+\//g, "");
+}
+
 export function orderAgentOutputBlocksForDisplay(
   blocks: readonly AgentOutputBlock[],
 ): readonly AgentOutputBlock[] {

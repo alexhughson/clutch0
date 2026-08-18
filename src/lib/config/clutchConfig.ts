@@ -21,6 +21,7 @@ export type { ClutchAgentHarnessSettings } from "../agent/harnessTypes";
 export const CLUTCH_CONFIG_DIR_ENV = "CLUTCH_CONFIG_DIR";
 
 export const OPENROUTER_PROVIDER_ID = "openrouter";
+export const CURSOR_AUTH_PROVIDER_ID = "cursor";
 export { OPENROUTER_BASE_URL };
 
 const LEGACY_PROVIDER_IDS = new Set([
@@ -152,6 +153,9 @@ export function getClutchProviderLabel(
   if (provider === OPENROUTER_PROVIDER_ID) {
     return "OpenRouter";
   }
+  if (provider === CURSOR_AUTH_PROVIDER_ID) {
+    return "Cursor agent";
+  }
 
   const endpoint = settings.endpoints?.find((candidate) => candidate.id === provider);
   return endpoint?.label ?? provider;
@@ -162,6 +166,9 @@ export function isClutchProviderId(
   settings: ClutchSettings = {},
 ): boolean {
   if (provider === OPENROUTER_PROVIDER_ID) {
+    return true;
+  }
+  if (provider === CURSOR_AUTH_PROVIDER_ID) {
     return true;
   }
   return settings.endpoints?.some((endpoint) => endpoint.id === provider) ?? false;
@@ -627,6 +634,22 @@ export function hasUsableApiKey(
   return credential?.type === "api_key" && credential.key.trim().length > 0;
 }
 
+export function isAgentHarnessAuthConfigured(
+  harness: ClutchAgentHarnessSettings,
+  auth: ClutchAuth,
+): boolean {
+  registerBuiltinAgentHarnesses();
+  try {
+    getAgentHarness(harness.kind);
+  } catch {
+    return false;
+  }
+  const definition = getAgentHarness(harness.kind);
+  return definition.authProviderIds.every((providerId) =>
+    hasUsableApiKey(auth[providerId]),
+  );
+}
+
 export function listConfiguredProviders(
   settings: ClutchSettings,
   auth: ClutchAuth,
@@ -634,6 +657,9 @@ export function listConfiguredProviders(
   const providers: string[] = [];
   if (hasUsableApiKey(auth[OPENROUTER_PROVIDER_ID])) {
     providers.push(OPENROUTER_PROVIDER_ID);
+  }
+  if (hasUsableApiKey(auth[CURSOR_AUTH_PROVIDER_ID])) {
+    providers.push(CURSOR_AUTH_PROVIDER_ID);
   }
   for (const endpoint of settings.endpoints ?? []) {
     if (hasUsableApiKey(auth[endpoint.id])) {

@@ -1,6 +1,7 @@
 import { ContextDeck } from "../../app/contextDeck";
 import type { AppActions, AppState } from "../../app/appTypes";
 import { getVisibleContextItemById } from "../../lib/context/automaticContextItems";
+import { getContextItemById } from "../../lib/context/contextItems";
 
 type SetAppState = (
   partial:
@@ -9,12 +10,21 @@ type SetAppState = (
     | ((state: AppState) => Partial<AppState> | AppState),
 ) => void;
 
+type GetAppState = () => AppState;
+
 export function createContextItemsActions({
+  get,
   set,
 }: {
+  get: GetAppState;
   set: SetAppState;
 }): AppActions["contextItems"] {
   return {
+    allocateLlmRequestId: () => {
+      const requestId = get().nextLlmRequestId;
+      set({ nextLlmRequestId: requestId + 1 });
+      return requestId;
+    },
     failSavedDiffApply: ({ errorMessage, itemId }) =>
       set((state) =>
         state.activeTask?.kind === "context-item-viewer" &&
@@ -28,10 +38,16 @@ export function createContextItemsActions({
             }
           : state,
       ),
+    finishAgentSessionDiffApply: ({ itemId }) =>
+      set((state) => finishAgentSessionDiffApply(state, itemId)),
     finishSavedDiffApply: ({ itemId }) =>
       set((state) => finishSavedDiffApply(state, itemId)),
     openContextItem: ({ itemId }) =>
       set((state) => openContextItem(state, itemId)),
+    setAutoRegenerate: ({ enabled, itemId }) =>
+      set((state) => setAutoRegenerate(state, itemId, enabled)),
+    setPinned: ({ itemId, pinned }) =>
+      set((state) => setPinned(state, itemId, pinned)),
     startSavedDiffApply: ({ itemId }) =>
       set((state) => startSavedDiffApply(state, itemId)),
   };
@@ -91,5 +107,66 @@ function finishSavedDiffApply(
     workspace: ContextDeck.fromComposeScreen(state.workspace)
       .remove(itemId)
       .applyTo(state.workspace),
+  };
+}
+
+function setPinned(
+  state: AppState,
+  itemId: string,
+  pinned: boolean,
+): Partial<AppState> | AppState {
+  const item = getContextItemById(state.workspace.contextItems, itemId);
+  if (item === null) {
+    throw new Error(`Cannot pin context item ${itemId}: item is not in the workspace deck.`);
+  }
+
+  return {
+    workspace: ContextDeck.fromComposeScreen(state.workspace)
+      .replace(item.withPinned(pinned))
+      .applyTo(state.workspace),
+  };
+}
+
+function setAutoRegenerate(
+  state: AppState,
+  itemId: string,
+  enabled: boolean,
+): Partial<AppState> | AppState {
+  const item = getContextItemById(state.workspace.contextItems, itemId);
+  if (item === null) {
+    throw new Error(
+      `Cannot set auto-regenerate on context item ${itemId}: item is not in the workspace deck.`,
+    );
+  }
+  if (item.withAutoRegenerate === undefined) {
+    throw new Error(
+      `Cannot set auto-regenerate on ${item.type} item ${itemId}.`,
+    );
+  }
+
+  return {
+    workspace: ContextDeck.fromComposeScreen(state.workspace)
+      .replace(item.withAutoRegenerate(enabled))
+      .applyTo(state.workspace),
+  };
+}
+
+function finishAgentSessionDiffApply(
+  state: AppState,
+  itemId: string,
+): Partial<AppState> | AppState {
+  if (
+    state.activeTask?.kind !== "context-item-viewer" ||
+    state.activeTask.itemId !== itemId
+  ) {
+    return state;
+  }
+
+  return {
+    activeTask: {
+      ...state.activeTask,
+      applyErrorMessage: undefined,
+      applyStatus: "idle",
+    },
   };
 }

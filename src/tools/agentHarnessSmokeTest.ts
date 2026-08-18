@@ -1,11 +1,6 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
-import {
-  assertCommandAvailable,
-  runAgentHarnessSmokeTest,
-} from "../lib/agent/agentHarnessSmokeTest";
-import { getAgentHarness } from "../lib/agent/harnessRegistry";
-import { registerBuiltinAgentHarnesses } from "../lib/agent/harnesses/registerBuiltinHarnesses";
+import { runAgentHarnessSmokeTest } from "../lib/agent/agentHarnessSmokeTest";
 import { resolveConfiguredAgentHarness } from "../lib/config/clutchConfig";
 
 const { values } = parseArgs({
@@ -25,21 +20,14 @@ Options:
   --kind <id>         Harness id (default: configured / cursor)
   --prompt <text>     Prompt to send
   --timeout-ms <ms>   Timeout (default 120000)
+
+Requires CURSOR_API_KEY when using the cursor harness.
 `);
   process.exit(0);
 }
 
-registerBuiltinAgentHarnesses();
 const configured = resolveConfiguredAgentHarness();
 const kind = values.kind ?? configured.kind;
-const definition = getAgentHarness(kind);
-const config = definition.parseConfig(
-  kind === configured.kind ? configured.config : definition.defaultConfig,
-) as { command?: string };
-
-if (typeof config.command === "string") {
-  await assertCommandAvailable(config.command);
-}
 
 const result = await runAgentHarnessSmokeTest({
   harnessKind: kind,

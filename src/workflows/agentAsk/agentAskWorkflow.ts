@@ -56,8 +56,8 @@ export function createAgentAskActions({
           summary,
         }),
       ),
-    start: ({ mode, prompt, rejectComposer }) =>
-      startAgentAsk({ get, mode, prompt, rejectComposer, set }),
+    start: ({ prompt, rejectComposer }) =>
+      startAgent({ get, prompt, rejectComposer, set }),
     startMessage: ({ itemId }) =>
       set((state) =>
         replacePiAgentItem(state, itemId, (item) => item.withStatus("running")),
@@ -69,15 +69,13 @@ export function createAgentAskActions({
   };
 }
 
-function startAgentAsk({
+function startAgent({
   get,
-  mode,
   prompt,
   rejectComposer,
   set,
 }: {
   get: GetAppState;
-  mode: "ask" | "edit";
   prompt: string;
   rejectComposer?: AppState["workspace"]["composer"];
   set: SetAppState;
@@ -91,7 +89,6 @@ function startAgentAsk({
   const item = createPiAgentContextItem({
     createdAt: Date.now(),
     id: itemId,
-    mode,
     prompt,
   });
 

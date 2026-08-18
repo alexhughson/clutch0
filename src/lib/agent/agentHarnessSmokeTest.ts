@@ -43,7 +43,6 @@ export async function runAgentHarnessSmokeTest({
       auth: {},
       configDir: configPaths.configDir,
       cwd: process.cwd(),
-      mode: "ask" as const,
       onOutputUpdate: (update: AgentOutputUpdate) => {
         if (
           update.kind === "reconcile-stream" &&

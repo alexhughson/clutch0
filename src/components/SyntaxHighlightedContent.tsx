@@ -7,6 +7,7 @@ import {
 } from "@opentui/core";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { splitUnifiedDiffByFile } from "../lib/git/unifiedDiffFiles";
 
 let sharedSyntaxStyle: SyntaxStyle | null = null;
 let sharedTreeSitterClient: ReturnType<typeof getTreeSitterClient> | null =
@@ -41,6 +42,28 @@ export function HighlightedCode({
 }
 
 export function HighlightedDiff({ diff }: { diff: string }) {
+  const files = splitUnifiedDiffByFile(diff);
+  if (files.length <= 1) {
+    return <SingleFileHighlightedDiff diff={files[0]?.diff ?? diff} />;
+  }
+
+  // OpenTUI's <diff> only renders the first file of a multi-file patch.
+  return (
+    <box style={{ flexDirection: "column", gap: 1, width: "100%" }}>
+      {files.map((file) => (
+        <box
+          key={file.path}
+          style={{ flexDirection: "column", gap: 0, width: "100%" }}
+        >
+          <text style={{ fg: "#94a3b8" }}>{file.path}</text>
+          <SingleFileHighlightedDiff diff={file.diff} />
+        </box>
+      ))}
+    </box>
+  );
+}
+
+function SingleFileHighlightedDiff({ diff }: { diff: string }) {
   return (
     <diff
       diff={diff}

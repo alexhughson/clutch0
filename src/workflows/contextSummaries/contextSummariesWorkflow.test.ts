@@ -193,7 +193,6 @@ test("agent output reconciled while summarizing is preserved when summary finish
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:summary-race",
-    mode: "ask",
     prompt: "Investigate",
   })
     .withAgentOutputUpdate({

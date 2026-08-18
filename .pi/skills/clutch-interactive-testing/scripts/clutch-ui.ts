@@ -758,19 +758,6 @@ async function createRenderedApp(options: DaemonOptions) {
   const fileListModule = await import(
     pathToFileURL(join(options.cwd, "src/lib/fileListLoader.ts")).href
   );
-  const agentResourcesModule = await import(
-    pathToFileURL(
-      join(options.cwd, "src/workflows/agentAsk/agentAskResources.ts"),
-    ).href
-  );
-  const toolRegistryModule = await import(
-    pathToFileURL(join(options.cwd, "src/workflows/llmTools/toolRegistry.ts"))
-      .href
-  );
-
-  const agentAskSkillSlashCommands =
-    await agentResourcesModule.loadAgentAskSkillSlashCommands();
-  toolRegistryModule.setAgentAskSkillSlashCommands(agentAskSkillSlashCommands);
 
   if (options.configCheck) {
     const [configModule, storeModule] = await Promise.all([

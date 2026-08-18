@@ -214,7 +214,6 @@ test("restore detaches legacy agent sessions and marks running agents interrupte
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:9",
-    mode: "edit",
     prompt: "fix",
   });
   const state: AppState = {
@@ -242,15 +241,20 @@ test("restore detaches legacy agent sessions and marks running agents interrupte
   );
 });
 
-test("restore keeps harness-backed ask sessions live", () => {
+test("restore keeps harness-backed agent sessions live when sandbox exists", () => {
   const initial = createInitialAppState();
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:10",
-    mode: "ask",
     prompt: "research",
   })
-    .withHarness({ kind: "cursor", session: { chatId: "chat-resume" } })
+    .withHarness({ kind: "cursor", session: { agentId: "agent-resume" } })
+    .withSandbox({
+      baselineTree: "abc",
+      diffStatus: "unknown",
+      path: process.cwd(),
+      root: process.cwd(),
+    })
     .withStatus("idle");
   const state: AppState = {
     ...initial,
@@ -274,7 +278,7 @@ test("restore keeps harness-backed ask sessions live", () => {
   expect((restoredAgent as PiAgentContextItem).status).toBe("idle");
   expect((restoredAgent as PiAgentContextItem).harness).toEqual({
     kind: "cursor",
-    session: { chatId: "chat-resume" },
+    session: { agentId: "agent-resume" },
   });
 });
 
@@ -283,9 +287,15 @@ test("restore marks running harness sessions without assistant text as interrupt
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:11",
-    mode: "ask",
     prompt: "research",
-  }).withHarness({ kind: "cursor", session: { chatId: "chat-partial" } });
+  })
+    .withHarness({ kind: "cursor", session: { agentId: "agent-partial" } })
+    .withSandbox({
+      baselineTree: "abc",
+      diffStatus: "unknown",
+      path: process.cwd(),
+      root: process.cwd(),
+    });
   expect(agent.status).toBe("running");
 
   const state: AppState = {
@@ -522,7 +532,6 @@ test("snapshot parser rejects malformed known active tasks and counters", () => 
   const agent = createPiAgentContextItem({
     createdAt: 1,
     id: "agent:1",
-    mode: "ask",
     prompt: "work",
   });
   const serializedAgent = serializeAppSnapshot({

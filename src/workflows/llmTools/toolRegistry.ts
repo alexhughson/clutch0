@@ -6,8 +6,7 @@ import { findFilesWorkflowTool } from "../findFiles/findFilesTool";
 import { invariant } from "../../lib/invariant";
 import { askCommandPromptDirective } from "../../lib/llm/prompts";
 import {
-  runAgentAskSlashCommand,
-  runAgentEditSlashCommand,
+  runAgentSlashCommand,
   runConfigSlashCommand,
   runAddSlashCommand,
   runFindSlashCommand,
@@ -37,23 +36,14 @@ const workflowToolControllers = createWorkflowToolControllers([
   shellCommandWorkflowTool,
 ]);
 
-const agentAskSlashCommand: LlmSlashCommand = {
-  allowedToolNames: [],
-  description: "Ask a durable agent harness and save its session as context.",
-  name: "agent-ask",
-  promptDirective: "",
-  run: runAgentAskSlashCommand,
-  title: "Ask agent",
-};
-
-const agentEditSlashCommand: LlmSlashCommand = {
+const agentSlashCommand: LlmSlashCommand = {
   allowedToolNames: [],
   description:
-    "Ask a writable agent harness to edit a sandbox copy and save its diff as context.",
-  name: "agent-edit",
+    "Run a Cursor agent in a sandbox, save its session as context, and review diffs before applying.",
+  name: "agent",
   promptDirective: "",
-  run: runAgentEditSlashCommand,
-  title: "Edit in agent sandbox",
+  run: runAgentSlashCommand,
+  title: "Run agent",
 };
 
 const askSlashCommand: LlmSlashCommand = {
@@ -108,8 +98,7 @@ export function getLlmWorkflowTools({
 export function getLlmSlashCommands(): LlmSlashCommand[] {
   return [
     askSlashCommand,
-    agentAskSlashCommand,
-    agentEditSlashCommand,
+    agentSlashCommand,
     configSlashCommand,
     showContextSlashCommand,
     saySlashCommand,

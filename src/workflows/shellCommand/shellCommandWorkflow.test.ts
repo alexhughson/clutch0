@@ -79,7 +79,9 @@ test("rerunning a saved shell command replaces the context item", () => {
       truncated: false,
     },
     sourceRequestId: 1,
-  });
+  })
+    .withPinned(true)
+    .withAutoRegenerate(true);
   const harness = createHarness({
     ...createInitialAppState(),
     workspace: {
@@ -119,6 +121,10 @@ test("rerunning a saved shell command replaces the context item", () => {
     savedContextItemId: saved.id,
     status: "done",
   });
+  expect(harness.state.workspace.contextItems[0]?.isPinned()).toBe(true);
+  expect(
+    harness.state.workspace.contextItems[0]?.getAutoRegenerate?.(),
+  ).toBe(true);
 });
 
 test("shell command output stays in its own task until saved", () => {
