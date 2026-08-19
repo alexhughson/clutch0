@@ -61,8 +61,15 @@ export function createComposeActions({
           composer,
         },
       })),
-    startLlmRequest: ({ question, rejectComposer, replacement }) =>
-      startLlmRequest({ get, question, rejectComposer, replacement, set }),
+    startLlmRequest: ({ question, rejectComposer, replacement, autoSaveTextToContext }) =>
+      startLlmRequest({
+        autoSaveTextToContext,
+        get,
+        question,
+        rejectComposer,
+        replacement,
+        set,
+      }),
   };
 }
 
@@ -127,12 +134,14 @@ function startLlmRequest({
   question,
   rejectComposer,
   replacement,
+  autoSaveTextToContext,
   set,
 }: {
   get: GetAppState;
   question: string;
   rejectComposer?: ComposerState;
   replacement?: ContextItemReplacementTarget;
+  autoSaveTextToContext?: boolean;
   set: SetAppState;
 }): number | null {
   // Compose reruns intentionally overwrite activeTask even when a response pane
@@ -151,6 +160,7 @@ function startLlmRequest({
       kind: "response",
       ...(rejectComposer === undefined ? {} : { rejectComposer }),
       request: {
+        autoSaveTextToContext,
         contextItems,
         focusedContextItemId,
         id: requestId,

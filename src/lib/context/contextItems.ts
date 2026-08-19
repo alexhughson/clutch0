@@ -517,12 +517,22 @@ export class SavedLlmResponseContextItem implements ContextItem<SavedLlmResponse
     };
   }
 
-  async getDetailView() {
+  getLiveDetailView(): Extract<
+    ContextItemDetailView,
+    { kind: "llm-text-response" }
+  > {
     return {
-      content: this.output,
-      kind: "markdown" as const,
+      kind: "llm-text-response" as const,
+      question: this.prompt,
+      responseText: this.output,
+      savedContextItemId: this.id,
+      status: "done" as const,
       title: `Output for: ${summarize(this.prompt)}`,
     };
+  }
+
+  async getDetailView() {
+    return this.getLiveDetailView();
   }
 
   async formatForLlm({
@@ -1106,14 +1116,19 @@ export class LiveLlmResponseContextItem implements ContextItem<LiveLlmResponseCo
   }
 
   async getDetailView() {
-    const statusLine =
-      this.status === "running"
-        ? "[Request still running.]"
-        : `[Request failed: ${this.errorMessage ?? "unknown error"}]`;
+    return this.getLiveDetailView();
+  }
 
+  getLiveDetailView(): Extract<
+    ContextItemDetailView,
+    { kind: "llm-text-response" }
+  > {
     return {
-      content: `${statusLine}\n\n${this.output}`,
-      kind: "markdown" as const,
+      errorMessage: this.errorMessage,
+      kind: "llm-text-response" as const,
+      question: this.prompt,
+      responseText: this.output,
+      status: this.status === "error" ? "error" : "streaming",
       title: `Running prompt: ${summarize(this.prompt)}`,
     };
   }

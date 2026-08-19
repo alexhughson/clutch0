@@ -4,7 +4,11 @@ import {
   isClutchConfigured,
   peekClutchConfigRecoveryNotice,
 } from "../lib/config/clutchConfig";
-import { getContextItemDisplayEntries } from "../lib/context/contextItemDisplay";
+import {
+  getContextItemDisplayEntries,
+  getContextItemInlineListContent,
+  getContextItemShortSummary,
+} from "../lib/context/contextItemDisplay";
 import { getContextItemById } from "../lib/context/contextItems";
 import type { ContextItem, ContextItemSummaryView } from "../types";
 
@@ -156,6 +160,7 @@ function ContextEntryColumn({
         const isFocused = entry.item.id === focusedContextItemId;
         const summary = entry.item.getSummaryView();
         const regenStatus = entry.item.getRegenStatus?.();
+        const inlineContent = getContextItemInlineListContent(entry.item);
 
         return (
           <ContextItemRow
@@ -163,7 +168,10 @@ function ContextEntryColumn({
             depth={entry.depth}
             focused={isFocused}
             id={getContextItemRowId(entry.item.id)}
-            label={entry.label ?? summary.label}
+            inlineContent={inlineContent}
+            label={
+              inlineContent === null ? (entry.label ?? summary.label) : undefined
+            }
             pinned={entry.item.isPinned()}
             regenerating={regenStatus?.status === "running"}
             regenError={
@@ -197,6 +205,7 @@ export function ContextItemRow({
   depth,
   focused,
   id,
+  inlineContent,
   label,
   pinned = false,
   regenError,
@@ -206,13 +215,17 @@ export function ContextItemRow({
   depth: number;
   focused: boolean;
   id?: string;
-  label: string;
+  inlineContent?: string | null;
+  label?: string;
   pinned?: boolean;
   regenError?: string;
   regenerating?: boolean;
   summary: ContextItemSummaryView;
 }) {
-  const shortSummary = getShortSummary(summary);
+  const shortSummary =
+    inlineContent === null || inlineContent === undefined
+      ? getContextItemShortSummary(summary)
+      : null;
   const indent = getIndent(depth);
   const marker = focused ? "> " : pinned ? "* " : "  ";
   const labelStyle = focused
@@ -228,9 +241,15 @@ export function ContextItemRow({
 
   return (
     <box id={id} style={{ flexDirection: "column" }}>
-      <text truncate wrapMode="none" style={labelStyle}>
-        {`${indent}${marker}${label}`}
-      </text>
+      {inlineContent === null || inlineContent === undefined ? (
+        <text truncate wrapMode="none" style={labelStyle}>
+          {`${indent}${marker}${label ?? ""}`}
+        </text>
+      ) : (
+        <text wrapMode="word" style={labelStyle}>
+          {`${indent}${marker}${inlineContent}`}
+        </text>
+      )}
       {statusLine === null ? null : (
         <box style={{ paddingLeft: indent.length + 4, width: "100%" }}>
           <text wrapMode="none" style={{ fg: "yellow" }}>
@@ -240,7 +259,7 @@ export function ContextItemRow({
       )}
       {shortSummary === null ? null : (
         <box style={{ paddingLeft: indent.length + 4, width: "100%" }}>
-          <text wrapMode="word" style={{ fg: "gray", height: 2 }}>
+          <text wrapMode="word" style={{ fg: "gray" }}>
             {shortSummary}
           </text>
         </box>
@@ -251,7 +270,8 @@ export function ContextItemRow({
 
 function FocusedContextItemSummaryContent({ item }: { item: ContextItem }) {
   const summary = item.getSummaryView();
-  const detail = summary.detail ?? getShortSummary(summary) ?? summary.label;
+  const detail =
+    summary.detail ?? getContextItemShortSummary(summary) ?? summary.label;
 
   return (
     <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
@@ -280,14 +300,3 @@ function getConfigSetupNotice() {
   );
 }
 
-function getShortSummary(summary: ContextItemSummaryView): string | null {
-  if (summary.status === "ready" && summary.title !== summary.label) {
-    return summary.title;
-  }
-
-  if (summary.status === "pending") {
-    return "Summarizing…";
-  }
-
-  return null;
-}

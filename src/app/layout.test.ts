@@ -137,10 +137,10 @@ test("workspace stack sizes context to content until the composer is pinned", ()
 test("estimateContextListHeight accounts for summary rows and columns", () => {
   const items = [item("a", true), item("b", true), item("c", false)];
   expect(estimateContextListHeight({ columns: 1, contextItems: items })).toBe(
-    1 + 3 + 3 + 1,
+    1 + 2 + 2 + 1,
   );
   expect(estimateContextListHeight({ columns: 2, contextItems: items })).toBe(
-    1 + Math.max(3 + 3, 1),
+    1 + Math.max(2 + 2, 1),
   );
 });
 

@@ -1,5 +1,11 @@
-import type { ContextItem, ContextItemListGroupId } from "../../types";
-import { FileContextItem } from "./contextItems";
+import type {
+  ContextItem,
+  ContextItemListGroupId,
+  ContextItemSummaryView,
+} from "../../types";
+import { FileContextItem, UserTextContextItem } from "./contextItems";
+
+const CONTEXT_LIST_SUMMARY_WRAP_WIDTH = 80;
 
 export type ContextItemDisplayEntry =
   | {
@@ -21,9 +27,9 @@ type FileTreeNode = {
 };
 
 const LIST_GROUP_ORDER = [
-  "workspace",
   "say",
   "ask",
+  "workspace",
   "agent",
   "edit",
   "commands",
@@ -50,9 +56,67 @@ export function getContextItemDisplayEntries(
 
   return [
     ...getPinnedDisplayEntries(pinnedItems),
-    ...getFileDisplayEntries(fileItems),
     ...getTypeGroupDisplayEntries(nonFileItems),
+    ...getFileDisplayEntries(fileItems),
   ];
+}
+
+export function getContextItemInlineListContent(
+  item: ContextItem,
+): string | null {
+  if (item instanceof UserTextContextItem) {
+    return item.text.length > 0 ? item.text : "Empty note";
+  }
+
+  return null;
+}
+
+export function getContextItemShortSummary(
+  summary: ContextItemSummaryView,
+): string | null {
+  if (summary.status === "ready" && summary.title !== summary.label) {
+    return summary.title;
+  }
+
+  if (summary.status === "pending") {
+    return "Summarizing…";
+  }
+
+  return null;
+}
+
+export function getContextItemSummaryRowCount(summary: string): number {
+  const normalized = summary.replace(/\s+/g, " ").trim();
+  if (normalized.length === 0) {
+    return 0;
+  }
+
+  const explicitLines = summary.split("\n").length;
+  const wrappedLines = Math.ceil(normalized.length / CONTEXT_LIST_SUMMARY_WRAP_WIDTH);
+  return Math.max(explicitLines, wrappedLines, 1);
+}
+
+export function estimateContextItemListRowCount(item: ContextItem): number {
+  const inlineContent = getContextItemInlineListContent(item);
+  if (inlineContent !== null) {
+    return getContextItemSummaryRowCount(inlineContent);
+  }
+
+  let rows = 1;
+  const regenStatus = item.getRegenStatus?.();
+  if (
+    regenStatus?.status === "running" ||
+    regenStatus?.status === "error"
+  ) {
+    rows += 1;
+  }
+
+  const shortSummary = getContextItemShortSummary(item.getSummaryView());
+  if (shortSummary !== null) {
+    rows += getContextItemSummaryRowCount(shortSummary);
+  }
+
+  return rows;
 }
 
 export function getContextItemDisplayOrder(

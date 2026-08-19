@@ -1,9 +1,9 @@
 import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
+import { LlmTextResponseContent, formatOptionalLatency } from "./LlmTextResponseContent";
 import {
   HighlightedCode,
   HighlightedDiff,
-  HighlightedMarkdown,
 } from "./SyntaxHighlightedContent";
 import { isEnterKey } from "../lib/keymap";
 import type { PatchProgressFile, PatchProgressState } from "../lib/patch/types";
@@ -85,36 +85,13 @@ function PatchProgress({ progress }: { progress: PatchProgressState }) {
 
 function TextResponse({ request }: { request: LlmRequestState }) {
   return (
-    <box
-      style={{
-        flexDirection: "column",
-        flexGrow: 1,
-        gap: 1,
-        minHeight: 1,
-        width: "100%",
-      }}
-    >
-      <text style={{ fg: "gray" }}>Response</text>
-      <scrollbox style={{ flexGrow: 1, height: "100%", width: "100%" }}>
-        {request.responseText.length > 0 ? (
-          <HighlightedMarkdown
-            content={request.responseText}
-            streaming={request.status === "loading"}
-          />
-        ) : (
-          <text>
-            {request.status === "loading" ? "Waiting for model..." : ""}
-          </text>
-        )}
-      </scrollbox>
-      {request.status === "error" ? (
-        <text style={{ fg: "red" }}>{request.errorMessage}</text>
-      ) : null}
-      {request.savedContextItemId === undefined ? null : (
-        <text style={{ fg: "green" }}>Saved to context.</text>
-      )}
-      <ResponseHotkeys hotkeys={getTextResponseHotkeys(request)} />
-    </box>
+    <LlmTextResponseContent
+      errorMessage={request.status === "error" ? request.errorMessage : undefined}
+      hotkeys={getTextResponseHotkeys(request)}
+      responseText={request.responseText}
+      status={request.status}
+      streaming={request.status === "loading" || request.status === "streaming"}
+    />
   );
 }
 
@@ -222,6 +199,7 @@ function handleTextResponseKey({
   request: LlmRequestState;
 }) {
   if (
+    request.autoSaveTextToContext !== true &&
     (request.status === "loading" || request.status === "streaming") &&
     event.name === "s"
   ) {
@@ -235,7 +213,11 @@ function handleTextResponseKey({
     return;
   }
 
-  if (request.status === "done" && event.name === "s") {
+  if (
+    request.autoSaveTextToContext !== true &&
+    request.status === "done" &&
+    event.name === "s"
+  ) {
     event.preventDefault();
     event.stopPropagation();
     actions.response.saveTextToContext({ requestId: request.id });
@@ -331,18 +313,20 @@ function handlePatchReviewKey({
 
 function getTextResponseHotkeys(request: LlmRequestState): string | undefined {
   if (request.status === "loading" || request.status === "streaming") {
-    return request.savedContextItemId === undefined
-      ? "s save to context"
-      : undefined;
+    return request.autoSaveTextToContext === true ||
+      request.savedContextItemId !== undefined
+      ? undefined
+      : "s save to context";
   }
 
   if (request.status === "error") {
     return "Enter clear · Esc edit prompt";
   }
 
-  return request.savedContextItemId === undefined
-    ? "s save to context · Enter clear · Esc edit prompt"
-    : "Enter clear · Esc edit prompt";
+  return request.autoSaveTextToContext === true ||
+    request.savedContextItemId !== undefined
+    ? "Enter clear · Esc edit prompt"
+    : "s save to context · Enter clear · Esc edit prompt";
 }
 
 export function getPatchReviewHotkeys(
@@ -443,21 +427,7 @@ function formatStatus(status: string): string {
   return status;
 }
 
-export function formatOptionalLatency(
-  milliseconds: number | undefined,
-  fallback: string,
-): string {
-  if (milliseconds === undefined) {
-    return fallback;
-  }
-
-  if (milliseconds < 1000) {
-    return `${milliseconds}ms`;
-  }
-
-  const seconds = milliseconds / 1000;
-  return `${seconds.toFixed(seconds < 10 ? 2 : 1)}s`;
-}
+export { formatOptionalLatency } from "./LlmTextResponseContent";
 
 function formatPatchStatus(status: string): string {
   if (status === "apply-error") {

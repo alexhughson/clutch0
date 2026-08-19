@@ -1,4 +1,5 @@
 import {
+  estimateContextItemListRowCount,
   getContextItemDisplayEntries,
   type ContextItemDisplayEntry,
 } from "../lib/context/contextItemDisplay";
@@ -25,7 +26,6 @@ const MEDIUM_MIN_HEIGHT = 24;
 const WORKSPACE_VERTICAL_CHROME_HEIGHT = 8;
 const CONTEXT_LIST_MIN_HEIGHT = 4;
 const CONTEXT_LIST_HEADER_HEIGHT = 1;
-const CONTEXT_ITEM_SUMMARY_ROWS = 2;
 const MIN_SUMMARY_HEIGHT = 1;
 const PANE_TAKEOVER_CONTEXT_RATIO = 0.5;
 export const WIDE_SUMMARY_HEIGHT = 9;
@@ -160,31 +160,9 @@ function sumEntryHeights(entries: readonly ContextItemDisplayEntry[]): number {
       continue;
     }
 
-    height += 1;
-    const regenStatus = entry.item.getRegenStatus?.();
-    if (
-      regenStatus?.status === "running" ||
-      regenStatus?.status === "error"
-    ) {
-      height += 1;
-    }
-    const summary = entry.item.getSummaryView();
-    if (hasShortSummary(summary.status, summary.title, summary.label)) {
-      height += CONTEXT_ITEM_SUMMARY_ROWS;
-    }
+    height += estimateContextItemListRowCount(entry.item);
   }
   return height;
-}
-
-function hasShortSummary(
-  status: string,
-  title: string,
-  label: string,
-): boolean {
-  if (status === "ready" && title !== label) {
-    return true;
-  }
-  return status === "pending";
 }
 
 function fitSuggestionHeight({

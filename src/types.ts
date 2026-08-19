@@ -138,6 +138,15 @@ export type ContextItemDetailView =
       title: string;
     }
   | {
+      errorMessage?: string;
+      kind: "llm-text-response";
+      question: string;
+      responseText: string;
+      savedContextItemId?: string;
+      status: "done" | "error" | "loading" | "streaming";
+      title: string;
+    }
+  | {
       content: string;
       kind: "text";
       title: string;

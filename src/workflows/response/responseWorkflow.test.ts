@@ -127,6 +127,80 @@ test("saving a running response creates live context and finish updates it", () 
   expect(item?.id).toBe("saved:1");
 });
 
+test("finishing an ask-only text response auto-saves to context", () => {
+  const harness = createHarness({
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      request: {
+        autoSaveTextToContext: true,
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        question: "Explain the app",
+        responseText: "",
+        status: "loading",
+      },
+    },
+    nextContextItemId: 1,
+    nextLlmRequestId: 2,
+    workspace: createInitialComposeScreen(),
+  });
+
+  harness.response.finish({
+    requestId: 1,
+    responseKind: "text",
+    responseText: "final output",
+  });
+
+  expect(harness.state.activeTask?.kind).toBe("response");
+  if (harness.state.activeTask?.kind !== "response") {
+    return;
+  }
+
+  expect(harness.state.activeTask.request.savedContextItemId).toBe("saved:1");
+  expect(harness.state.workspace.contextItems).toHaveLength(1);
+  expect(harness.state.workspace.contextItems[0]).toBeInstanceOf(
+    SavedLlmResponseContextItem,
+  );
+  expect(
+    (harness.state.workspace.contextItems[0] as SavedLlmResponseContextItem)
+      .output,
+  ).toBe("final output");
+});
+
+test("finishing a compose text response does not auto-save", () => {
+  const harness = createHarness({
+    actions: {} as AppActions,
+    activeTask: {
+      kind: "response",
+      request: {
+        contextItems: [],
+        focusedContextItemId: null,
+        id: 1,
+        question: "Explain the app",
+        responseText: "",
+        status: "loading",
+      },
+    },
+    nextContextItemId: 1,
+    nextLlmRequestId: 2,
+    workspace: createInitialComposeScreen(),
+  });
+
+  harness.response.finish({
+    requestId: 1,
+    responseKind: "text",
+    responseText: "final output",
+  });
+
+  expect(harness.state.workspace.contextItems).toHaveLength(0);
+  if (harness.state.activeTask?.kind !== "response") {
+    return;
+  }
+  expect(harness.state.activeTask.request.savedContextItemId).toBeUndefined();
+});
+
 test("records latency stats on the active response request", () => {
   const harness = createHarness({
     actions: {} as AppActions,
