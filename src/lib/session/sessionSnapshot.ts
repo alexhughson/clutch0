@@ -14,6 +14,7 @@ import { createAutomaticContextItems } from "../context/automaticContextItems";
 import {
   LiveLlmResponseContextItem,
   PiAgentContextItem,
+  ShellCommandOutputContextItem,
   type PersistentContextItemState,
   parseAgentOutputBlock,
   restoreContextItem,
@@ -22,7 +23,10 @@ import {
 import type { CreateFileValidationResult } from "../createFile/createFile";
 import { patchProposalFromLegacyEdits } from "../patch/patchEngine";
 import type { PatchProgressState, PatchReviewState } from "../patch/types";
-import type { ShellCommandResult } from "../shell/shellCommand";
+import {
+  isShellCommandResultRunning,
+  type ShellCommandResult,
+} from "../shell/shellCommand";
 import type { ContextItem } from "../../types";
 import { existsSync } from "node:fs";
 
@@ -313,6 +317,14 @@ function parseShellCommandTask(
     id: assertPositiveSafeInteger(record.id, "activeTask.id"),
     kind: "shell-command",
     prompt: assertString(record.prompt, "activeTask.prompt"),
+    ...(record.proposedCommand === undefined
+      ? {}
+      : {
+          proposedCommand: assertString(
+            record.proposedCommand,
+            "activeTask.proposedCommand",
+          ),
+        }),
     ...(record.rejectComposer === undefined
       ? {}
       : { rejectComposer: parseComposer(record.rejectComposer) }),
@@ -332,7 +344,7 @@ function parseShellCommandTask(
         }),
     status: assertOneOf(
       record.status,
-      ["done", "error", "running"],
+      ["awaiting-approval", "done", "error", "running", "selecting"],
       "activeTask.status",
     ),
   };
@@ -786,14 +798,34 @@ function parseShellCommandResult(value: unknown): ShellCommandResult {
 export function normalizeRestoredState(
   state: Omit<AppState, "actions">,
 ): Omit<AppState, "actions"> {
+  const interruptedStreamingItemId =
+    getInterruptedShellCommandStreamingItemId(state.activeTask);
+  const contextItems = state.workspace.contextItems
+    .map(normalizeRestoredItem)
+    .filter((item) => item.id !== interruptedStreamingItemId);
+
   return {
     ...state,
     activeTask: normalizeRestoredTask(state.activeTask),
     workspace: {
       ...state.workspace,
-      contextItems: state.workspace.contextItems.map(normalizeRestoredItem),
+      contextItems,
     },
   };
+}
+
+function getInterruptedShellCommandStreamingItemId(
+  task: AppTask | null,
+): string | null {
+  if (
+    task?.kind !== "shell-command" ||
+    task.status !== "running" ||
+    task.savedContextItemId === undefined
+  ) {
+    return null;
+  }
+
+  return task.savedContextItemId;
 }
 
 function serializeAppTask(task: AppTask | null): SerializedAppTask | null {
@@ -876,10 +908,13 @@ function normalizeRestoredTask(task: AppTask | null): AppTask | null {
     case "response":
       return normalizeRestoredResponseTask(task);
     case "shell-command":
-      return task.status === "running"
+      return task.status === "running" || task.status === "selecting"
         ? {
             ...task,
-            errorMessage: "Interrupted while running shell command.",
+            errorMessage:
+              task.status === "running"
+                ? "Interrupted while running shell command."
+                : "Interrupted while selecting shell command.",
             status: "error",
           }
         : task;
@@ -933,6 +968,20 @@ function normalizePatchReviewState(patch: PatchReviewState): PatchReviewState {
 function normalizeRestoredItem(item: ContextItem): ContextItem {
   if (item instanceof LiveLlmResponseContextItem && item.status === "running") {
     return item.withError("Interrupted while waiting for model response.");
+  }
+
+  if (
+    item instanceof ShellCommandOutputContextItem &&
+    isShellCommandResultRunning(item.result)
+  ) {
+    return item.withResult({
+      ...item.result,
+      signal: "SIGTERM",
+      stderr:
+        item.result.stderr.length === 0
+          ? "Interrupted while running shell command."
+          : `${item.result.stderr}\nInterrupted while running shell command.`,
+    });
   }
 
   if (item instanceof PiAgentContextItem) {

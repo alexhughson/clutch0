@@ -153,11 +153,9 @@ function runtimeDetailsForWorkflowResult(
   switch (result.kind) {
     case "add-files":
       return { pathCount: result.paths.length };
-    case "command-output":
+    case "command-proposal":
       return {
-        command: result.result.command,
-        exitCode: result.result.exitCode,
-        signal: result.result.signal,
+        command: result.command,
       };
     case "create-file":
       return {

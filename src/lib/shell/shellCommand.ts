@@ -11,19 +11,35 @@ export type ShellCommandResult = {
   truncated: boolean;
 };
 
+export type ShellCommandStreamUpdate = {
+  chunk: string;
+  stream: "stderr" | "stdout";
+};
+
+export type ShellCommandInputHandle = {
+  endInput: () => void;
+  writeInput: (input: string) => void;
+};
+
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_STREAM_CHARACTERS = 60_000;
 const ABORT_KILL_GRACE_MS = 2_000;
 
 export async function runShellCommand({
   command,
+  onSpawn,
+  onOutput,
   root = process.cwd(),
   signal,
+  stdinMode = "ignore",
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   command: string;
+  onSpawn?: (inputHandle: ShellCommandInputHandle) => void;
+  onOutput?: (update: ShellCommandStreamUpdate) => void;
   root?: string;
   signal?: AbortSignal;
+  stdinMode?: "ignore" | "pipe";
   timeoutMs?: number;
 }): Promise<ShellCommandResult> {
   const startedAt = Date.now();
@@ -51,8 +67,28 @@ export async function runShellCommand({
       cwd: root,
       detached: true,
       shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [stdinMode, "pipe", "pipe"],
     });
+    const inputHandle: ShellCommandInputHandle = {
+      endInput: () => {
+        if (child.stdin === null || settled) {
+          return;
+        }
+
+        child.stdin.end();
+      },
+      writeInput: (input) => {
+        if (child.stdin === null) {
+          throw new Error("Shell command stdin is not available.");
+        }
+        if (settled) {
+          throw new Error("Cannot write input after command completion.");
+        }
+
+        child.stdin.write(input);
+      },
+    };
+    onSpawn?.(inputHandle);
     const timeout = setTimeout(() => {
       terminate("timeout");
     }, timeoutMs);
@@ -60,13 +96,35 @@ export async function runShellCommand({
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
-      stdout = appendStream(stdout, chunk);
+      const update = appendStream(stdout, chunk);
+      stdout = update.value;
+      if (update.appendedChunk.length > 0) {
+        onOutput?.({
+          chunk: update.appendedChunk,
+          stream: "stdout",
+        });
+      }
     });
     child.stderr?.on("data", (chunk: string) => {
-      stderr = appendStream(stderr, chunk);
+      const update = appendStream(stderr, chunk);
+      stderr = update.value;
+      if (update.appendedChunk.length > 0) {
+        onOutput?.({
+          chunk: update.appendedChunk,
+          stream: "stderr",
+        });
+      }
     });
     child.on("error", (error) => {
-      stderr = appendStream(stderr, error.message);
+      const update = appendStream(stderr, error.message);
+      stderr = update.value;
+      if (update.appendedChunk.length > 0) {
+        onOutput?.({
+          chunk: update.appendedChunk,
+          stream: "stderr",
+        });
+      }
+      finish(null);
     });
     child.on("close", (exitCode, exitSignal) => {
       finish(exitCode, exitSignal ?? undefined);
@@ -130,12 +188,27 @@ export async function runShellCommand({
   });
 }
 
-function appendStream(current: string, chunk: string): string {
+function appendStream(
+  current: string,
+  chunk: string,
+): { appendedChunk: string; value: string } {
   if (current.length >= MAX_STREAM_CHARACTERS) {
-    return current;
+    return {
+      appendedChunk: "",
+      value: current,
+    };
   }
 
-  return `${current}${chunk}`;
+  const remainingCharacterCount = MAX_STREAM_CHARACTERS - current.length;
+  const appendedChunk =
+    chunk.length <= remainingCharacterCount
+      ? chunk
+      : chunk.slice(0, remainingCharacterCount);
+
+  return {
+    appendedChunk,
+    value: `${current}${appendedChunk}`,
+  };
 }
 
 function killProcessTree(pid: number | undefined, signal: NodeJS.Signals) {
@@ -174,4 +247,13 @@ function truncateStream(value: string): { truncated: boolean; value: string } {
     truncated: true,
     value: `${value.slice(0, MAX_STREAM_CHARACTERS)}\n[Output truncated.]`,
   };
+}
+
+export function isShellCommandResultRunning(result: ShellCommandResult): boolean {
+  return (
+    result.exitCode === null &&
+    result.signal === undefined &&
+    result.durationMs === 0 &&
+    result.timedOut === false
+  );
 }

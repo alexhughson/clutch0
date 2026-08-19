@@ -40,3 +40,45 @@ test("shell commands respect already-aborted signals", async () => {
     await rm(root, { force: true, recursive: true });
   }
 });
+
+test("shell commands stream stdout and stderr chunks", async () => {
+  const updates: { chunk: string; stream: "stderr" | "stdout" }[] = [];
+  const result = await runShellCommand({
+    command: "printf out && printf err 1>&2",
+    onOutput: (update) => {
+      updates.push(update);
+    },
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toBe("out");
+  expect(result.stderr).toBe("err");
+  expect(updates).toEqual([
+    { chunk: "out", stream: "stdout" },
+    { chunk: "err", stream: "stderr" },
+  ]);
+});
+
+test("shell commands accept stdin input when piped", async () => {
+  let endInput: () => void = () => {
+    throw new Error("Expected shell command input handle.");
+  };
+  let writeInput: (input: string) => void = () => {
+    throw new Error("Expected shell command input handle.");
+  };
+  const resultPromise = runShellCommand({
+    command: "bash -lc 'read value; printf \"stdin:%s\" \"$value\"'",
+    onSpawn: (inputHandle) => {
+      endInput = inputHandle.endInput;
+      writeInput = inputHandle.writeInput;
+    },
+    stdinMode: "pipe",
+  });
+
+  writeInput("hello\n");
+  endInput();
+
+  const result = await resultPromise;
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toBe("stdin:hello");
+});

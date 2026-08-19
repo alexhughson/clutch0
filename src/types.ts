@@ -160,6 +160,21 @@ export type ContextItemDetailView =
       title: string;
     }
   | {
+      command: string;
+      durationMs: number;
+      exitCode: number | null;
+      itemId: string;
+      kind: "shell-output";
+      requestId: number;
+      signal?: string;
+      status: "finished" | "running";
+      stderr: string;
+      stdout: string;
+      timedOut: boolean;
+      title: string;
+      truncated: boolean;
+    }
+  | {
       diffText: string;
       kind: "diff";
       summary: string;

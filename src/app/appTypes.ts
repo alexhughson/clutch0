@@ -142,11 +142,12 @@ export type ShellCommandTaskState = {
   id: number;
   kind: "shell-command";
   prompt: string;
+  proposedCommand?: string;
   rejectComposer?: ComposerState;
   replacement?: ShellCommandReplacementTarget;
   result?: ShellCommandResult;
   savedContextItemId?: string;
-  status: "done" | "error" | "running";
+  status: "awaiting-approval" | "done" | "error" | "running" | "selecting";
 };
 
 export type FindFilesTaskState = {
@@ -263,11 +264,25 @@ export type AppActions = {
     }) => number | null;
   };
   shellCommand: {
+    appendOutput: (options: {
+      chunk: string;
+      outputContextItemId: string;
+      requestId: number;
+      stream: "stderr" | "stdout";
+    }) => void;
+    confirmRun: (options: { requestId: number }) => void;
     fail: (options: { errorMessage: string; requestId: number }) => void;
     finish: (options: {
+      outputContextItemId: string;
+      replacementContextItemId?: string;
       requestId: number;
       result: ShellCommandResult;
     }) => void;
+    propose: (options: { command: string; requestId: number }) => void;
+    rerun: (options: {
+      command: string;
+      replaceContextItemId: string;
+    }) => number | null;
     saveOutputToContext: (options: { requestId: number }) => void;
     start: (options: {
       prompt: string;

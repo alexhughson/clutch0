@@ -37,8 +37,20 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
       <text style={{ fg: "gray" }}>Request</text>
       <text>{task.prompt}</text>
       <box style={{ flexDirection: "column", flexGrow: 1, gap: 1 }}>
+        {task.status === "selecting" ? (
+          <text>Asking the model to choose a shell command...</text>
+        ) : null}
+        {task.status === "awaiting-approval" ? (
+          <box style={{ flexDirection: "column", gap: 1 }}>
+            <text style={{ fg: "gray" }}>Proposed command</text>
+            <text>{`$ ${task.proposedCommand ?? ""}`}</text>
+            <text>
+              Press Enter to approve. Output streams into the context item.
+            </text>
+          </box>
+        ) : null}
         {task.status === "running" ? (
-          <text>Asking the model to choose and run a shell command...</text>
+          <text>Running approved command and streaming output to context...</text>
         ) : null}
         {task.status === "error" ? (
           <text style={{ fg: "red" }}>{task.errorMessage}</text>
@@ -80,7 +92,14 @@ function handleShellCommandKey({
   event: KeyEvent;
   task: ShellCommandTaskState;
 }) {
-  if (task.status === "running") {
+  if (task.status === "selecting" || task.status === "running") {
+    return;
+  }
+
+  if (task.status === "awaiting-approval" && isEnterKey(event.name)) {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.shellCommand.confirmRun({ requestId: task.id });
     return;
   }
 
@@ -112,8 +131,12 @@ function handleShellCommandKey({
 function getShellCommandHotkeys(
   task: ShellCommandTaskState,
 ): string | undefined {
-  if (task.status === "running") {
+  if (task.status === "selecting" || task.status === "running") {
     return undefined;
+  }
+
+  if (task.status === "awaiting-approval") {
+    return "Enter approve command · Esc edit prompt";
   }
 
   if (task.status === "error") {
@@ -126,6 +149,10 @@ function getShellCommandHotkeys(
 }
 
 function formatStatus(status: ShellCommandTaskState["status"]): string {
+  if (status === "awaiting-approval") {
+    return "awaiting approval";
+  }
+
   if (status === "done") {
     return "complete";
   }
