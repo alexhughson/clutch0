@@ -29,6 +29,7 @@ export function startLlmRequest(
   question: string,
   options: {
     allowedToolNames?: readonly string[];
+    autoSaveTextToContext?: boolean;
     commandDirective?: string;
     patchToolMode?: PatchToolMode;
     rejectComposer?: ComposerState;
@@ -43,6 +44,7 @@ export function startLlmRequest(
     focusedContextItemId: currentState.workspace.focusedContextItemId,
   });
   const requestId = currentState.actions.compose.startLlmRequest({
+    autoSaveTextToContext: options.autoSaveTextToContext,
     question,
     rejectComposer: options.rejectComposer,
     replacement: options.replacement,

@@ -52,6 +52,7 @@ type LlmRequestBase = {
   question: string;
   replacement?: ContextItemReplacementTarget;
   responseText: string;
+  autoSaveTextToContext?: boolean;
   savedContextItemId?: string;
 };
 
@@ -190,6 +191,7 @@ export type AppActions = {
     removeFocusedContextItem: () => void;
     setComposerState: (composerState: ComposerState) => void;
     startLlmRequest: (options: {
+      autoSaveTextToContext?: boolean;
       question: string;
       rejectComposer?: ComposerState;
       replacement?: ContextItemReplacementTarget;

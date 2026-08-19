@@ -30,6 +30,7 @@ export function runLlmSlashCommand({
       command.allowedToolNames.length > 0
         ? command.allowedToolNames
         : undefined,
+    autoSaveTextToContext: command.allowedToolNames.length === 0,
     commandDirective: command.promptDirective,
     patchToolMode: command.patchToolMode,
     rejectComposer: submittedComposer,

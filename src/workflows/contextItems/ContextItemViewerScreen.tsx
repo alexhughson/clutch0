@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextItemViewerTaskState } from "../../app/appTypes";
 import { isEnterKey, isOpenFocusedContextItemKey } from "../../lib/keymap";
 import { AgentOutputLog } from "../../components/AgentOutputLog";
+import { LlmTextResponseContent } from "../../components/LlmTextResponseContent";
 import {
   HighlightedCode,
   HighlightedDiff,
@@ -45,6 +46,8 @@ export function ContextItemViewerScreen({
   const liveDetail = item?.getLiveDetailView?.() ?? null;
   const detail = liveDetail ?? staticDetail;
   const isAgentDetail = detail?.kind === "agent-output";
+  const isChromelessDetail =
+    detail?.kind === "llm-text-response" || detail?.kind === "editable-text";
   const canAct = screen.applyStatus !== "applying";
   const itemActions = useMemo(
     () => item?.getActions().filter((action) => action.id !== "open") ?? [],
@@ -54,10 +57,12 @@ export function ContextItemViewerScreen({
     canAct && detail !== null && detail.kind !== "editable-text";
   const canRunPaneActions =
     canRunShortcutActions && detail.kind !== "agent-output";
-  const title = isAgentDetail
+  const title = isAgentDetail || isChromelessDetail
     ? undefined
     : (detail?.title ?? item?.getListLabel() ?? "Context item");
-  const bottomTitle = isAgentDetail
+  const bottomTitle = isChromelessDetail
+    ? undefined
+    : isAgentDetail
     ? [
         formatAgentShortcutHints(itemActions),
         screen.rejectComposer === undefined ? "Esc back" : "Esc edit prompt",
@@ -76,6 +81,18 @@ export function ContextItemViewerScreen({
           ? "Esc back"
           : "Esc edit prompt"
         : undefined;
+
+  const chromelessFooterHints = isChromelessDetail
+    ? [
+        detail?.kind === "llm-text-response" && canRunPaneActions
+          ? formatPaneActionHints(itemActions)
+          : null,
+        detail?.kind === "llm-text-response" ? "Enter clear" : null,
+        screen.rejectComposer === undefined ? "Esc back" : "Esc edit prompt",
+      ]
+        .filter((part): part is string => part !== null && part.length > 0)
+        .join(" · ")
+    : undefined;
 
   useEffect(() => {
     if (item === null || item.getLiveDetailView !== undefined) {
@@ -126,6 +143,15 @@ export function ContextItemViewerScreen({
       return;
     }
 
+    if (isEnterKey(event.name)) {
+      if (detail?.kind === "llm-text-response") {
+        event.preventDefault();
+        event.stopPropagation();
+        actions.navigation.dismissPane();
+        return;
+      }
+    }
+
     if (canRunShortcutActions) {
       const shortcutAction = getContextItemActionForKeyEvent({
         actions: itemActions,
@@ -164,15 +190,15 @@ export function ContextItemViewerScreen({
       title={title}
       bottomTitle={bottomTitle}
       bottomTitleAlignment="right"
-      borderStyle="rounded"
+      borderStyle={isChromelessDetail ? undefined : "rounded"}
       style={{
-        border: true,
+        border: !isChromelessDetail,
         borderColor: isAgentDetail ? "#374151" : undefined,
         flexDirection: "column",
         flexGrow: 1,
         gap: 1,
         height: "100%",
-        padding: 1,
+        padding: isChromelessDetail ? 0 : 1,
         width: "100%",
       }}
     >
@@ -187,15 +213,20 @@ export function ContextItemViewerScreen({
       ) : detail === null ? (
         <text>Loading...</text>
       ) : (
-        <ContextItemDetailViewRenderer detail={detail} />
+        <ContextItemDetailViewRenderer
+          chromelessFooterHints={chromelessFooterHints}
+          detail={detail}
+        />
       )}
     </box>
   );
 }
 
 function ContextItemDetailViewRenderer({
+  chromelessFooterHints,
   detail,
 }: {
+  chromelessFooterHints?: string;
   detail: ContextItemDetailView;
 }) {
   if (detail.kind === "agent-output") {
@@ -218,8 +249,22 @@ function ContextItemDetailViewRenderer({
     );
   }
 
+  if (detail.kind === "llm-text-response") {
+    return (
+      <LlmTextResponseDetailView
+        detail={detail}
+        hotkeys={chromelessFooterHints ?? "Esc back"}
+      />
+    );
+  }
+
   if (detail.kind === "editable-text") {
-    return <EditableTextDetailView detail={detail} />;
+    return (
+      <EditableTextDetailView
+        detail={detail}
+        footerHints={chromelessFooterHints}
+      />
+    );
   }
 
   if (detail.kind === "shell-output") {
@@ -413,10 +458,30 @@ function formatShellOutputStatus(
   return parts.join(" · ");
 }
 
+function LlmTextResponseDetailView({
+  detail,
+  hotkeys,
+}: {
+  detail: Extract<ContextItemDetailView, { kind: "llm-text-response" }>;
+  hotkeys: string;
+}) {
+  return (
+    <LlmTextResponseContent
+      errorMessage={detail.errorMessage}
+      hotkeys={hotkeys}
+      question={detail.question}
+      responseText={detail.responseText}
+      status={detail.status}
+    />
+  );
+}
+
 function EditableTextDetailView({
   detail,
+  footerHints,
 }: {
   detail: Extract<ContextItemDetailView, { kind: "editable-text" }>;
+  footerHints?: string;
 }) {
   const actions = useAppStore((state) => state.actions);
   const textareaRef = useRef<TextareaRenderable | null>(null);
@@ -441,14 +506,25 @@ function EditableTextDetailView({
   return (
     <box
       style={{
-        backgroundColor: "#1f2937",
+        flexDirection: "column",
         flexGrow: 1,
+        gap: 1,
         height: "100%",
-        paddingX: 1,
+        minHeight: 0,
         width: "100%",
       }}
     >
-      <textarea
+      <box
+        style={{
+          backgroundColor: "#1f2937",
+          flexGrow: 1,
+          height: "100%",
+          minHeight: 0,
+          paddingX: 1,
+          width: "100%",
+        }}
+      >
+        <textarea
         ref={textareaRef}
         focused
         initialValue={detail.content}
@@ -472,6 +548,10 @@ function EditableTextDetailView({
         placeholder="Add context text"
         style={{ height: "100%", width: "100%", wrapMode: "word" }}
       />
+      </box>
+      {footerHints === undefined ? null : (
+        <text style={{ fg: "gray", flexShrink: 0 }}>{footerHints}</text>
+      )}
     </box>
   );
 }

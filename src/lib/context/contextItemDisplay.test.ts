@@ -105,7 +105,7 @@ test("focus order walks pinned items first", () => {
   ).toEqual([pinnedAsk.id, file.id]);
 });
 
-test("focus order walks pinned items, then files, then grouped items", () => {
+test("focus order walks pinned items, then grouped items, then files", () => {
   const pinnedAsk = createSavedLlmResponseContextItem({
     createdAt: 1,
     id: "saved:ask",
@@ -122,7 +122,7 @@ test("focus order walks pinned items, then files, then grouped items", () => {
 
   expect(
     getContextItemDisplayOrder([say, file, pinnedAsk]).map((item) => item.id),
-  ).toEqual([pinnedAsk.id, file.id, say.id]);
+  ).toEqual([pinnedAsk.id, say.id, file.id]);
 });
 
 test("groups non-file items by slash command and drops type prefixes", () => {
@@ -202,15 +202,14 @@ test("groups non-file items by slash command and drops type prefixes", () => {
   ]);
 
   expect(summarizeEntries(entries)).toEqual([
-    { id: file.id, kind: "item", label: "@package.json" },
-    { kind: "folder", label: "workspace" },
-    { id: workspaceItems[0]?.id, kind: "item", label: "Current changes" },
-    { id: workspaceItems[1]?.id, kind: "item", label: "File list" },
     { kind: "folder", label: "/say" },
     { id: say.id, kind: "item", label: "remember the layout" },
     { kind: "folder", label: "/ask" },
     { id: liveAsk.id, kind: "item", label: "still running" },
     { id: ask.id, kind: "item", label: "what next" },
+    { kind: "folder", label: "workspace" },
+    { id: workspaceItems[0]?.id, kind: "item", label: "Current changes" },
+    { id: workspaceItems[1]?.id, kind: "item", label: "File list" },
     { kind: "folder", label: "/agent" },
     { id: agentDiff.id, kind: "item", label: "touch a" },
     { id: agent.id, kind: "item", label: "fix the bug" },
@@ -218,6 +217,7 @@ test("groups non-file items by slash command and drops type prefixes", () => {
     { id: edit.id, kind: "item", label: "rename helper" },
     { kind: "folder", label: "commands" },
     { id: command.id, kind: "item", label: "git status" },
+    { id: file.id, kind: "item", label: "@package.json" },
   ]);
 });
 
@@ -225,10 +225,10 @@ test("visible automatic deck keeps the file tree and groups ambient items", () =
   const entries = getContextItemDisplayEntries(getVisibleContextItems([]));
 
   expect(summarizeEntries(entries)).toEqual([
-    { id: "file:AGENTS.md", kind: "item", label: "@AGENTS.md" },
     { kind: "folder", label: "workspace" },
     { id: "builtin:unstaged-changes", kind: "item", label: "Current changes" },
     { id: "builtin:file-list", kind: "item", label: "File list" },
+    { id: "file:AGENTS.md", kind: "item", label: "@AGENTS.md" },
   ]);
 });
 
@@ -244,10 +244,10 @@ test("omits empty type groups and leaves the file tree unchanged", () => {
 
   expect(summarizeEntries(getContextItemDisplayEntries([ask, nestedFile]))).toEqual(
     [
-      { kind: "folder", label: "src/lib" },
-      { id: nestedFile.id, kind: "item", label: "@file1.js" },
       { kind: "folder", label: "/ask" },
       { id: ask.id, kind: "item", label: "what next" },
+      { kind: "folder", label: "src/lib" },
+      { id: nestedFile.id, kind: "item", label: "@file1.js" },
     ],
   );
 });

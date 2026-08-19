@@ -206,6 +206,33 @@ function finishResponse(
       request.replacement.contextItemId,
     )
   ) {
+    if (
+      responseKind === "text" &&
+      responseText.trim().length > 0 &&
+      request.autoSaveTextToContext === true
+    ) {
+      const itemId = `saved:${state.nextContextItemId}`;
+      const item = createSavedTextResponseItem({
+        createdAt: Date.now(),
+        id: itemId,
+        output: responseText,
+        prompt: request.question,
+        sourceRequestId: request.id,
+      });
+
+      return {
+        activeTask: {
+          ...state.activeTask,
+          request: {
+            ...request,
+            savedContextItemId: item.id,
+          },
+        },
+        nextContextItemId: state.nextContextItemId + 1,
+        workspace: replacePreservingPlacement(state, item),
+      };
+    }
+
     return setActiveLlmRequest(state, request);
   }
 
@@ -561,11 +588,13 @@ function replacePreservingPlacement(
   item: ContextItem,
 ) {
   const previous = getContextItemById(state.workspace.contextItems, item.id);
-  const next =
-    previous === null ? item : preserveContextItemPlacement(previous, item);
-  return ContextDeck.fromComposeScreen(state.workspace)
-    .replace(next)
-    .applyTo(state.workspace);
+  const deck = ContextDeck.fromComposeScreen(state.workspace);
+  if (previous === null) {
+    return deck.add(item).applyTo(state.workspace);
+  }
+
+  const next = preserveContextItemPlacement(previous, item);
+  return deck.replace(next).applyTo(state.workspace);
 }
 
 function getLiveLlmResponseItemByRequestId(
