@@ -304,6 +304,47 @@ test("restore removes interrupted shell-command stream context item", () => {
   ]);
 });
 
+test("restore marks detached shell-command stream item as interrupted", () => {
+  const initial = createInitialAppState();
+  const streaming = createShellCommandOutputContextItem({
+    createdAt: 1,
+    id: "saved:22",
+    result: {
+      command: "npm run long-task",
+      durationMs: 0,
+      exitCode: null,
+      stderr: "",
+      stdout: "partial output",
+      timedOut: false,
+      truncated: false,
+    },
+    sourceRequestId: 22,
+  });
+  const state: AppState = {
+    ...initial,
+    actions: {} as AppState["actions"],
+    workspace: {
+      ...initial.workspace,
+      contextItems: [streaming],
+      focusedContextItemId: streaming.id,
+    },
+  };
+
+  const restored = restoreAppStateFromSnapshot(
+    serializeAppSnapshot({ state, workspaceRoot: "/repo" }),
+  );
+  expect(restored.workspace.contextItems).toHaveLength(1);
+  expect(restored.workspace.contextItems[0]).toMatchObject({
+    id: "saved:22",
+    result: {
+      signal: "SIGTERM",
+      stderr: "Interrupted while running shell command.",
+      stdout: "partial output",
+    },
+    type: "shell-command-output",
+  });
+});
+
 test("restore keeps harness-backed agent sessions live when sandbox exists", () => {
   const initial = createInitialAppState();
   const agent = createPiAgentContextItem({

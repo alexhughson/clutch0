@@ -266,16 +266,23 @@ export type AppActions = {
   shellCommand: {
     appendOutput: (options: {
       chunk: string;
+      outputContextItemId: string;
       requestId: number;
       stream: "stderr" | "stdout";
     }) => void;
     confirmRun: (options: { requestId: number }) => void;
     fail: (options: { errorMessage: string; requestId: number }) => void;
     finish: (options: {
+      outputContextItemId: string;
+      replacementContextItemId?: string;
       requestId: number;
       result: ShellCommandResult;
     }) => void;
     propose: (options: { command: string; requestId: number }) => void;
+    rerun: (options: {
+      command: string;
+      replaceContextItemId: string;
+    }) => number | null;
     saveOutputToContext: (options: { requestId: number }) => void;
     start: (options: {
       prompt: string;

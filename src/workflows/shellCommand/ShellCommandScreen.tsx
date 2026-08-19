@@ -44,7 +44,9 @@ export function ShellCommandScreen({ task }: ShellCommandScreenProps) {
           <box style={{ flexDirection: "column", gap: 1 }}>
             <text style={{ fg: "gray" }}>Proposed command</text>
             <text>{`$ ${task.proposedCommand ?? ""}`}</text>
-            <text>Press Enter to approve and run the command.</text>
+            <text>
+              Press Enter to approve. Output streams into the context item.
+            </text>
           </box>
         ) : null}
         {task.status === "running" ? (

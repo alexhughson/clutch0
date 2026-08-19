@@ -9,7 +9,11 @@ import {
 } from "../lib/config/clutchConfig";
 import { CURSOR_AUTH_PROVIDER_ID } from "../lib/config/clutchConfig";
 import type { SessionRecorder } from "../lib/session/sessionRecorder";
-import { createUserTextContextItem } from "../lib/context/contextItems";
+import {
+  createShellCommandOutputContextItem,
+  createUserTextContextItem,
+} from "../lib/context/contextItems";
+import type { ContextItem } from "../types";
 import {
   hydrateAppStore,
   setSessionRecorder,
@@ -138,19 +142,27 @@ test("LLM requests forward patch apply mode and request id to the streamer", asy
 
 test("shell reruns record selection and execution runtime events", async () => {
   const events = captureRuntimeEvents();
+  const item = createShellCommandOutputContextItem({
+    createdAt: 1,
+    id: "saved:1",
+    result: {
+      command: "printf old",
+      durationMs: 1,
+      exitCode: 0,
+      stderr: "",
+      stdout: "old",
+      timedOut: false,
+      truncated: false,
+    },
+    sourceRequestId: 1,
+  });
+  hydrateStoreWithContextItem(item);
 
   startShellCommandRerun({
     command: "printf runtime-shell",
-    replaceContextItemId: "shell:missing",
+    replaceContextItemId: "saved:1",
   });
   await waitForRuntimeEvent(events, "shell-command.selection-finished");
-  const activeTask = useAppStore.getState().activeTask;
-  if (activeTask?.kind !== "shell-command") {
-    throw new Error("Expected active shell command task.");
-  }
-  useAppStore.getState().actions.shellCommand.confirmRun({
-    requestId: activeTask.id,
-  });
   await waitForRuntimeEvent(events, "shell-command.finished");
 
   expect(eventKinds(events)).toContain("shell-command.selection-finished");
@@ -307,7 +319,7 @@ function eventKinds(events: readonly Record<string, unknown>[]): unknown[] {
 }
 
 function hydrateStoreWithContextItem(
-  item: ReturnType<typeof createUserTextContextItem>,
+  item: ContextItem,
 ) {
   const state = createInitialAppState();
   hydrateAppStore({

@@ -12,7 +12,10 @@ import {
   patchProposalFromLegacyEdits,
 } from "../patch/patchEngine";
 import type { PatchProposal } from "../patch/types";
-import type { ShellCommandResult } from "../shell/shellCommand";
+import {
+  isShellCommandResultRunning,
+  type ShellCommandResult,
+} from "../shell/shellCommand";
 import type {
   AgentSandboxContext,
   ContextItem,
@@ -594,9 +597,14 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
   }
 
   getSummaryView() {
+    const running = isShellCommandResultRunning(this.result);
     return getGeneratedSummaryView(this.state.summaryState, {
-      detail: summarize(formatShellCommandOutput(this.result)),
-      title: `Command: ${summarize(this.result.command)}`,
+      detail: running
+        ? summarize(getRunningShellOutputPreview(this.result))
+        : summarize(formatShellCommandOutput(this.result)),
+      title: running
+        ? `Command running: ${summarize(this.result.command)}`
+        : `Command: ${summarize(this.result.command)}`,
     });
   }
 
@@ -623,6 +631,13 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
   withCreatedAt(createdAt: number): ShellCommandOutputContextItem {
     return new ShellCommandOutputContextItem(
       { ...this.state, createdAt },
+      this.regenStatus,
+    );
+  }
+
+  withResult(result: ShellCommandResult): ShellCommandOutputContextItem {
+    return new ShellCommandOutputContextItem(
+      { ...this.state, result, summaryState: MISSING_SUMMARY_STATE },
       this.regenStatus,
     );
   }
@@ -694,6 +709,10 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
   }
 
   async getSummarizationInput() {
+    if (isShellCommandResultRunning(this.result)) {
+      return null;
+    }
+
     const sourceText = `Command:\n${truncateContent(this.result.command, MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}\n\nOutput:\n${truncateContent(formatShellCommandOutput(this.result), MAX_CONTEXT_ITEM_SUMMARY_CHARACTERS)}`;
 
     return {
@@ -705,20 +724,52 @@ export class ShellCommandOutputContextItem implements ContextItem<ShellCommandOu
     };
   }
 
-  async getDetailView() {
-    return {
-      content: formatShellCommandOutput(this.result),
-      kind: "text" as const,
+  getLiveDetailView(): Extract<
+    ContextItemDetailView,
+    { kind: "shell-output" }
+  > {
+    const detail: Extract<ContextItemDetailView, { kind: "shell-output" }> = {
+      command: this.result.command,
+      durationMs: this.result.durationMs,
+      exitCode: this.result.exitCode,
+      itemId: this.id,
+      kind: "shell-output" as const,
+      requestId: this.sourceRequestId,
+      status: isShellCommandResultRunning(this.result) ? "running" : "finished",
+      stderr: this.result.stderr,
+      stdout: this.result.stdout,
+      timedOut: this.result.timedOut,
       title: `Command: ${summarize(this.result.command)}`,
+      truncated: this.result.truncated,
     };
+    if (this.result.signal !== undefined) {
+      detail.signal = this.result.signal;
+    }
+
+    return detail;
+  }
+
+  async getDetailView() {
+    return this.getLiveDetailView();
   }
 
   async formatForLlm({
     focused,
   }: FormatContextItemForLlmOptions): Promise<FormattedContextItem> {
+    const running = isShellCommandResultRunning(this.result);
+    const attributes: Record<string, boolean | number | string | undefined> = {
+      created_at: new Date(this.createdAt).toISOString(),
+      focused,
+      source_request_id: this.sourceRequestId,
+      status: running ? "running" : "finished",
+    };
+    if (!running) {
+      attributes.exit_code = this.result.exitCode ?? "signal";
+      attributes.signal = this.result.signal;
+    }
     return {
       consumedFileCharacters: 0,
-      text: `<shell_command${formatAttributes({ focused, source_request_id: this.sourceRequestId, created_at: new Date(this.createdAt).toISOString(), exit_code: this.result.exitCode ?? "signal", signal: this.result.signal })}>\n<command>\n${truncateContent(this.result.command, MAX_SAVED_CONTEXT_CHARACTERS)}\n</command>\n<output>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n</shell_command>`,
+      text: `<shell_command${formatAttributes(attributes)}>\n<command>\n${truncateContent(this.result.command, MAX_SAVED_CONTEXT_CHARACTERS)}\n</command>\n<output>\n${truncateContent(formatShellCommandOutput(this.result), MAX_SAVED_CONTEXT_CHARACTERS)}\n</output>\n</shell_command>`,
     };
   }
 
@@ -2534,6 +2585,17 @@ function rerunShellCommandAction({
     run: (context) =>
       context.rerunShellCommand({ command, replaceContextItemId }),
   };
+}
+
+function getRunningShellOutputPreview(result: ShellCommandResult): string {
+  const combinedOutput = `${result.stdout}\n${result.stderr}`.trim();
+  if (combinedOutput.length === 0) {
+    return "Running. Waiting for output.";
+  }
+
+  const lines = combinedOutput.split(/\r?\n/).filter((line) => line.length > 0);
+  const tail = lines.slice(-3).join(" ");
+  return `Running. Latest output: ${tail}`;
 }
 
 async function readFileContext({

@@ -2,7 +2,7 @@ import type { KeyEvent, TextareaRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ContextItemViewerTaskState } from "../../app/appTypes";
-import { isOpenFocusedContextItemKey } from "../../lib/keymap";
+import { isEnterKey, isOpenFocusedContextItemKey } from "../../lib/keymap";
 import { AgentOutputLog } from "../../components/AgentOutputLog";
 import {
   HighlightedCode,
@@ -20,6 +20,11 @@ import { useAppStore } from "../../store/appStore";
 import type { ContextItemAction, ContextItemDetailView } from "../../types";
 import { AgentSessionFollowUp } from "../agentAsk/AgentSessionFollowUp";
 import { runContextItemAction } from "./contextItemActionRunner";
+import {
+  endShellCommandInput,
+  sendShellCommandInput,
+} from "../shellCommand/shellCommandSessionRegistry";
+import { startShellCommandRerun } from "../shellCommand/startShellCommandRequest";
 
 export function ContextItemViewerScreen({
   screen,
@@ -217,6 +222,10 @@ function ContextItemDetailViewRenderer({
     return <EditableTextDetailView detail={detail} />;
   }
 
+  if (detail.kind === "shell-output") {
+    return <ShellOutputDetailView detail={detail} />;
+  }
+
   if (detail.kind === "diff") {
     return (
       <>
@@ -233,6 +242,175 @@ function ContextItemDetailViewRenderer({
       <text>{detail.content}</text>
     </scrollbox>
   );
+}
+
+function ShellOutputDetailView({
+  detail,
+}: {
+  detail: Extract<ContextItemDetailView, { kind: "shell-output" }>;
+}) {
+  const outputText = formatShellOutputText(detail);
+
+  return (
+    <box
+      style={{
+        flexDirection: "column",
+        flexGrow: 1,
+        gap: 1,
+        height: "100%",
+        minHeight: 0,
+      }}
+    >
+      <box
+        style={{
+          backgroundColor: "#111827",
+          flexDirection: "column",
+          flexShrink: 0,
+          gap: 0,
+          paddingX: 1,
+          paddingY: 1,
+        }}
+      >
+        <text truncate wrapMode="none">
+          {detail.command}
+        </text>
+        <text
+          truncate
+          wrapMode="none"
+          style={{ fg: detail.status === "running" ? "#fbbf24" : "#94a3b8" }}
+        >
+          {formatShellOutputStatus(detail)}
+        </text>
+      </box>
+      <scrollbox
+        stickyScroll
+        stickyStart="bottom"
+        style={{ flexGrow: 1, minHeight: 0, width: "100%" }}
+      >
+        <text>{outputText}</text>
+      </scrollbox>
+      {detail.status === "running" ? (
+        <box style={{ flexShrink: 0 }}>
+          <ShellCommandInput
+            command={detail.command}
+            contextItemId={detail.itemId}
+            requestId={detail.requestId}
+          />
+        </box>
+      ) : null}
+    </box>
+  );
+}
+
+function ShellCommandInput({
+  command,
+  contextItemId,
+  requestId,
+}: {
+  command: string;
+  contextItemId: string;
+  requestId: number;
+}) {
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  return (
+    <box style={{ flexDirection: "column", gap: 1, width: "100%" }}>
+      <text style={{ fg: "gray" }}>
+        Enter send line · Ctrl+d send EOF · Ctrl+r rerun
+      </text>
+      {errorMessage === null ? null : (
+        <text style={{ fg: "red" }}>{errorMessage}</text>
+      )}
+      <input
+        focused
+        value={message}
+        placeholder="Send input to running command"
+        onInput={(nextMessage) => {
+          if (errorMessage !== null) {
+            setErrorMessage(null);
+          }
+          setMessage(nextMessage);
+        }}
+        onKeyDown={(event: KeyEvent) => {
+          if (event.ctrl && event.name === "r") {
+            event.preventDefault();
+            event.stopPropagation();
+            startShellCommandRerun({
+              command,
+              replaceContextItemId: contextItemId,
+            });
+            setErrorMessage(null);
+            return;
+          }
+
+          if (event.ctrl && event.name === "d") {
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+              endShellCommandInput(requestId);
+              setErrorMessage(null);
+            } catch (error) {
+              setErrorMessage(
+                error instanceof Error ? error.message : "Failed to close stdin.",
+              );
+            }
+            return;
+          }
+
+          if (!isEnterKey(event.name)) {
+            return;
+          }
+
+          if (message.length === 0) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            sendShellCommandInput({
+              input: `${message}\n`,
+              requestId,
+            });
+            setMessage("");
+            setErrorMessage(null);
+          } catch (error) {
+            setErrorMessage(
+              error instanceof Error ? error.message : "Failed to send input.",
+            );
+          }
+        }}
+        style={{ width: "100%" }}
+      />
+    </box>
+  );
+}
+
+function formatShellOutputText(
+  detail: Extract<ContextItemDetailView, { kind: "shell-output" }>,
+): string {
+  const stdout = detail.stdout.length > 0 ? detail.stdout : "<empty>";
+  const stderr = detail.stderr.length > 0 ? detail.stderr : "<empty>";
+  return `stdout:\n${stdout}\n\nstderr:\n${stderr}`;
+}
+
+function formatShellOutputStatus(
+  detail: Extract<ContextItemDetailView, { kind: "shell-output" }>,
+): string {
+  if (detail.status === "running") {
+    return "running";
+  }
+
+  const parts = [
+    `exit code: ${detail.exitCode ?? "signal"}`,
+    detail.signal === undefined ? null : `signal: ${detail.signal}`,
+    `duration: ${detail.durationMs}ms`,
+    detail.timedOut ? "timed out" : null,
+    detail.truncated ? "output truncated" : null,
+  ].filter((part): part is string => part !== null);
+
+  return parts.join(" · ");
 }
 
 function EditableTextDetailView({

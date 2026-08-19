@@ -58,3 +58,27 @@ test("shell commands stream stdout and stderr chunks", async () => {
     { chunk: "err", stream: "stderr" },
   ]);
 });
+
+test("shell commands accept stdin input when piped", async () => {
+  let endInput: () => void = () => {
+    throw new Error("Expected shell command input handle.");
+  };
+  let writeInput: (input: string) => void = () => {
+    throw new Error("Expected shell command input handle.");
+  };
+  const resultPromise = runShellCommand({
+    command: "bash -lc 'read value; printf \"stdin:%s\" \"$value\"'",
+    onSpawn: (inputHandle) => {
+      endInput = inputHandle.endInput;
+      writeInput = inputHandle.writeInput;
+    },
+    stdinMode: "pipe",
+  });
+
+  writeInput("hello\n");
+  endInput();
+
+  const result = await resultPromise;
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toBe("stdin:hello");
+});

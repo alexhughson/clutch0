@@ -7,7 +7,13 @@ import { createShellCommandActions } from "./shellCommandWorkflow";
 function createHarness(
   initialState: Omit<AppState, "actions"> = createInitialAppState(),
 ) {
-  const runCalls: { command: string; requestId: number; root?: string }[] = [];
+  const runCalls: {
+    command: string;
+    outputContextItemId: string;
+    replacementContextItemId?: string;
+    requestId: number;
+    root?: string;
+  }[] = [];
   let state: AppState = {
     ...initialState,
     actions: {} as AppActions,
@@ -83,26 +89,8 @@ test("running shell command output replaces the saved context item", () => {
     .withPinned(true)
     .withAutoRegenerate(true);
 
-  const runningResult = {
-    command: "printf new",
-    durationMs: 0,
-    exitCode: null,
-    stderr: "",
-    stdout: "partial",
-    timedOut: false,
-    truncated: false,
-  } as const;
   const harness = createHarness({
     ...createInitialAppState(),
-    activeTask: {
-      id: 1,
-      kind: "shell-command",
-      prompt: saved.result.command,
-      replacement: { contextItemId: saved.id },
-      result: runningResult,
-      savedContextItemId: saved.id,
-      status: "running",
-    },
     workspace: {
       ...createInitialAppState().workspace,
       contextItems: [saved],
@@ -111,6 +99,7 @@ test("running shell command output replaces the saved context item", () => {
   });
 
   harness.shellCommand.finish({
+    outputContextItemId: saved.id,
     requestId: 1,
     result: {
       command: "printf new",
@@ -129,11 +118,7 @@ test("running shell command output replaces the saved context item", () => {
     result: { command: "printf new", stdout: "new" },
     type: "shell-command-output",
   });
-  expect(harness.state.activeTask).toMatchObject({
-    kind: "shell-command",
-    savedContextItemId: saved.id,
-    status: "done",
-  });
+  expect(harness.state.activeTask).toBeNull();
   expect(harness.state.workspace.contextItems[0]?.isPinned()).toBe(true);
   expect(
     harness.state.workspace.contextItems[0]?.getAutoRegenerate?.(),
@@ -171,15 +156,6 @@ test("replacement finish keeps prior item until completion and removes stream it
   });
   const harness = createHarness({
     ...createInitialAppState(),
-    activeTask: {
-      id: 2,
-      kind: "shell-command",
-      prompt: "rerun command",
-      replacement: { contextItemId: previous.id },
-      result: streaming.result,
-      savedContextItemId: streaming.id,
-      status: "running",
-    },
     workspace: {
       ...createInitialAppState().workspace,
       contextItems: [previous, streaming],
@@ -188,6 +164,8 @@ test("replacement finish keeps prior item until completion and removes stream it
   });
 
   harness.shellCommand.finish({
+    outputContextItemId: streaming.id,
+    replacementContextItemId: previous.id,
     requestId: 2,
     result: {
       command: "printf new",
@@ -206,14 +184,10 @@ test("replacement finish keeps prior item until completion and removes stream it
     result: { stdout: "new" },
     type: "shell-command-output",
   });
-  expect(harness.state.activeTask).toMatchObject({
-    replacement: { contextItemId: "saved:1" },
-    savedContextItemId: "saved:1",
-    status: "done",
-  });
+  expect(harness.state.activeTask).toBeNull();
 });
 
-test("shell command stream chunks update active task and context", () => {
+test("shell command stream chunks update context output item", () => {
   const runningItem = createShellCommandOutputContextItem({
     createdAt: 1,
     id: "saved:1",
@@ -230,22 +204,6 @@ test("shell command stream chunks update active task and context", () => {
   });
   const harness = createHarness({
     ...createInitialAppState(),
-    activeTask: {
-      id: 1,
-      kind: "shell-command",
-      prompt: "list files",
-      result: {
-        command: "ls",
-        durationMs: 0,
-        exitCode: null,
-        stderr: "",
-        stdout: "",
-        timedOut: false,
-        truncated: false,
-      },
-      savedContextItemId: "saved:1",
-      status: "running",
-    },
     workspace: {
       ...createInitialAppState().workspace,
       contextItems: [runningItem],
@@ -254,22 +212,18 @@ test("shell command stream chunks update active task and context", () => {
 
   harness.shellCommand.appendOutput({
     chunk: "package.json\n",
+    outputContextItemId: "saved:1",
     requestId: 1,
     stream: "stdout",
   });
   harness.shellCommand.appendOutput({
     chunk: "warning\n",
+    outputContextItemId: "saved:1",
     requestId: 1,
     stream: "stderr",
   });
 
-  expect(harness.state.activeTask).toMatchObject({
-    kind: "shell-command",
-    result: {
-      stderr: "warning\n",
-      stdout: "package.json\n",
-    },
-  });
+  expect(harness.state.activeTask).toBeNull();
   expect(harness.state.workspace.contextItems[0]).toMatchObject({
     id: "saved:1",
     result: {
@@ -291,20 +245,67 @@ test("confirm run moves from approval to running and creates context item", () =
 
   harness.shellCommand.confirmRun({ requestId: 1 });
 
-  if (harness.state.activeTask?.kind !== "shell-command") {
-    throw new Error("Expected shell-command task.");
-  }
-  expect(harness.state.activeTask.status).toBe("running");
-  expect(harness.state.activeTask.result).toMatchObject({
-    command: "ls",
-    stderr: "",
-    stdout: "",
-  });
-  expect(harness.state.activeTask.savedContextItemId).toBeDefined();
+  expect(harness.state.activeTask).toBeNull();
   expect(harness.state.workspace.contextItems).toHaveLength(1);
   expect(harness.state.workspace.contextItems[0]).toMatchObject({
+    id: "saved:1",
     result: { command: "ls", stderr: "", stdout: "" },
     type: "shell-command-output",
   });
-  expect(harness.runCalls).toEqual([{ command: "ls", requestId: 1 }]);
+  expect(harness.runCalls).toEqual([
+    {
+      command: "ls",
+      outputContextItemId: "saved:1",
+      requestId: 1,
+    },
+  ]);
+});
+
+test("rerun starts immediately and reuses existing context item", () => {
+  const previous = createShellCommandOutputContextItem({
+    createdAt: 1,
+    id: "saved:44",
+    result: {
+      command: "npm test",
+      durationMs: 12,
+      exitCode: 0,
+      stderr: "",
+      stdout: "old output",
+      timedOut: false,
+      truncated: false,
+    },
+    sourceRequestId: 9,
+  });
+  const harness = createHarness({
+    ...createInitialAppState(),
+    workspace: {
+      ...createInitialAppState().workspace,
+      contextItems: [previous],
+      focusedContextItemId: previous.id,
+    },
+  });
+
+  const requestId = harness.shellCommand.rerun({
+    command: "npm test",
+    replaceContextItemId: previous.id,
+  });
+  expect(requestId).toBe(1);
+  expect(harness.state.activeTask).toBeNull();
+  expect(harness.state.workspace.contextItems).toHaveLength(1);
+  expect(harness.state.workspace.contextItems[0]).toMatchObject({
+    id: previous.id,
+    result: {
+      command: "npm test",
+      stderr: "",
+      stdout: "",
+    },
+    type: "shell-command-output",
+  });
+  expect(harness.runCalls).toEqual([
+    {
+      command: "npm test",
+      outputContextItemId: "saved:44",
+      requestId: 1,
+    },
+  ]);
 });

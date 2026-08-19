@@ -106,9 +106,9 @@ export function startShellCommandRerun({
   command: string;
   replaceContextItemId: string;
 }) {
-  const requestId = useAppStore.getState().actions.shellCommand.start({
-    prompt: command,
-    replacement: { contextItemId: replaceContextItemId },
+  const requestId = useAppStore.getState().actions.shellCommand.rerun({
+    command,
+    replaceContextItemId,
   });
   if (requestId === null) {
     return;

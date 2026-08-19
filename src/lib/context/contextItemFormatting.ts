@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import type { AgentOutputBlock } from "../agentOutput/agentOutputTypes";
-import type { ShellCommandResult } from "../shell/shellCommand";
+import {
+  isShellCommandResultRunning,
+  type ShellCommandResult,
+} from "../shell/shellCommand";
 import type { ContextItemSummaryState, LlmFileContext } from "../../types";
 
 export const MAX_FILE_CONTEXT_CHARACTERS = 60_000;
@@ -50,11 +53,12 @@ export function safeJsonStringify(value: unknown): string {
 }
 
 export function formatShellCommandOutput(result: ShellCommandResult): string {
+  const running = isShellCommandResultRunning(result);
   const metadata = [
     `$ ${result.command}`,
-    `exit code: ${result.exitCode ?? "signal"}`,
+    running ? "status: running" : `exit code: ${result.exitCode ?? "signal"}`,
     result.signal === undefined ? null : `signal: ${result.signal}`,
-    `duration: ${result.durationMs}ms`,
+    running ? "duration: running" : `duration: ${result.durationMs}ms`,
     result.timedOut ? "timed out" : null,
     result.truncated ? "output truncated" : null,
   ].filter((line): line is string => line !== null);

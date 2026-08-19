@@ -14,6 +14,7 @@ import { createAutomaticContextItems } from "../context/automaticContextItems";
 import {
   LiveLlmResponseContextItem,
   PiAgentContextItem,
+  ShellCommandOutputContextItem,
   type PersistentContextItemState,
   parseAgentOutputBlock,
   restoreContextItem,
@@ -22,7 +23,10 @@ import {
 import type { CreateFileValidationResult } from "../createFile/createFile";
 import { patchProposalFromLegacyEdits } from "../patch/patchEngine";
 import type { PatchProgressState, PatchReviewState } from "../patch/types";
-import type { ShellCommandResult } from "../shell/shellCommand";
+import {
+  isShellCommandResultRunning,
+  type ShellCommandResult,
+} from "../shell/shellCommand";
 import type { ContextItem } from "../../types";
 import { existsSync } from "node:fs";
 
@@ -964,6 +968,20 @@ function normalizePatchReviewState(patch: PatchReviewState): PatchReviewState {
 function normalizeRestoredItem(item: ContextItem): ContextItem {
   if (item instanceof LiveLlmResponseContextItem && item.status === "running") {
     return item.withError("Interrupted while waiting for model response.");
+  }
+
+  if (
+    item instanceof ShellCommandOutputContextItem &&
+    isShellCommandResultRunning(item.result)
+  ) {
+    return item.withResult({
+      ...item.result,
+      signal: "SIGTERM",
+      stderr:
+        item.result.stderr.length === 0
+          ? "Interrupted while running shell command."
+          : `${item.result.stderr}\nInterrupted while running shell command.`,
+    });
   }
 
   if (item instanceof PiAgentContextItem) {

@@ -1,13 +1,21 @@
 import { runShellCommand } from "../../lib/shell/shellCommand";
 import { createRuntimeAbortHandle } from "../../lib/session/runtimeInterrupts";
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
+import {
+  registerShellCommandSessionInput,
+  unregisterShellCommandSessionInput,
+} from "./shellCommandSessionRegistry";
 
 export function runApprovedShellCommand({
   command,
+  outputContextItemId,
+  replacementContextItemId,
   requestId,
   root,
 }: {
   command: string;
+  outputContextItemId: string;
+  replacementContextItemId?: string;
   requestId: number;
   root?: string;
 }) {
@@ -20,11 +28,19 @@ export function runApprovedShellCommand({
 
   void runShellCommand({
     command,
+    onSpawn: (inputHandle) => {
+      registerShellCommandSessionInput({
+        inputHandle,
+        requestId,
+      });
+    },
     root,
     signal: abortHandle.signal,
+    stdinMode: "pipe",
     onOutput: ({ chunk, stream }) => {
       useAppStore.getState().actions.shellCommand.appendOutput({
         chunk,
+        outputContextItemId,
         requestId,
         stream,
       });
@@ -32,6 +48,7 @@ export function runApprovedShellCommand({
   }).then(
     (result) => {
       abortHandle.dispose();
+      unregisterShellCommandSessionInput(requestId);
       recordSessionRuntimeEvent({
         command: result.command,
         exitCode: result.exitCode,
@@ -41,12 +58,15 @@ export function runApprovedShellCommand({
         timedOut: result.timedOut,
       });
       useAppStore.getState().actions.shellCommand.finish({
+        outputContextItemId,
         requestId,
+        replacementContextItemId,
         result,
       });
     },
     (error: unknown) => {
       abortHandle.dispose();
+      unregisterShellCommandSessionInput(requestId);
       recordSessionRuntimeEvent({
         errorMessage: error instanceof Error ? error.message : String(error),
         kind: "shell-command.failed",

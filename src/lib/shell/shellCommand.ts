@@ -16,21 +16,30 @@ export type ShellCommandStreamUpdate = {
   stream: "stderr" | "stdout";
 };
 
+export type ShellCommandInputHandle = {
+  endInput: () => void;
+  writeInput: (input: string) => void;
+};
+
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_STREAM_CHARACTERS = 60_000;
 const ABORT_KILL_GRACE_MS = 2_000;
 
 export async function runShellCommand({
   command,
+  onSpawn,
   onOutput,
   root = process.cwd(),
   signal,
+  stdinMode = "ignore",
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   command: string;
+  onSpawn?: (inputHandle: ShellCommandInputHandle) => void;
   onOutput?: (update: ShellCommandStreamUpdate) => void;
   root?: string;
   signal?: AbortSignal;
+  stdinMode?: "ignore" | "pipe";
   timeoutMs?: number;
 }): Promise<ShellCommandResult> {
   const startedAt = Date.now();
@@ -58,8 +67,28 @@ export async function runShellCommand({
       cwd: root,
       detached: true,
       shell: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: [stdinMode, "pipe", "pipe"],
     });
+    const inputHandle: ShellCommandInputHandle = {
+      endInput: () => {
+        if (child.stdin === null || settled) {
+          return;
+        }
+
+        child.stdin.end();
+      },
+      writeInput: (input) => {
+        if (child.stdin === null) {
+          throw new Error("Shell command stdin is not available.");
+        }
+        if (settled) {
+          throw new Error("Cannot write input after command completion.");
+        }
+
+        child.stdin.write(input);
+      },
+    };
+    onSpawn?.(inputHandle);
     const timeout = setTimeout(() => {
       terminate("timeout");
     }, timeoutMs);
@@ -95,6 +124,7 @@ export async function runShellCommand({
           stream: "stderr",
         });
       }
+      finish(null);
     });
     child.on("close", (exitCode, exitSignal) => {
       finish(exitCode, exitSignal ?? undefined);
@@ -217,4 +247,13 @@ function truncateStream(value: string): { truncated: boolean; value: string } {
     truncated: true,
     value: `${value.slice(0, MAX_STREAM_CHARACTERS)}\n[Output truncated.]`,
   };
+}
+
+export function isShellCommandResultRunning(result: ShellCommandResult): boolean {
+  return (
+    result.exitCode === null &&
+    result.signal === undefined &&
+    result.durationMs === 0 &&
+    result.timedOut === false
+  );
 }
