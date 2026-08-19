@@ -3,12 +3,10 @@ import {
   streamLlmInteraction,
 } from "../../lib/llm/streamResponse";
 import type { ComposerState } from "../../app/appTypes";
-import { runShellCommand } from "../../lib/shell/shellCommand";
 import { createRuntimeAbortHandle } from "../../lib/session/runtimeInterrupts";
 import { recordSessionRuntimeEvent, useAppStore } from "../../store/appStore";
 import { RUN_SHELL_COMMAND_TOOL_NAME } from "../llmTools/shellCommandWorkflowTool";
 import { handleLlmWorkflowResult } from "../llmTools/toolRegistry";
-import { markContextItemRerunStarted } from "../contextItems/regenerateContextItem";
 
 export function startShellCommandRequest(
   prompt: string,
@@ -47,6 +45,19 @@ export function startShellCommandRequest(
         useAppStore.getState().actions.shellCommand.fail({
           errorMessage:
             "The model did not run a shell command. Try a more specific /cmd request.",
+          requestId,
+        });
+        return;
+      }
+      if (result.kind !== "command-proposal") {
+        recordSessionRuntimeEvent({
+          kind: "shell-command.selection-failed",
+          reason: `unexpected-result-kind:${result.kind}`,
+          requestId,
+        });
+        useAppStore.getState().actions.shellCommand.fail({
+          errorMessage:
+            "The model proposed a non-command workflow. Try a direct shell command request.",
           requestId,
         });
         return;
@@ -103,41 +114,14 @@ export function startShellCommandRerun({
     return;
   }
 
-  markContextItemRerunStarted(replaceContextItemId);
-
-  const abortHandle = createRuntimeAbortHandle();
   recordSessionRuntimeEvent({
     command,
-    kind: "shell-command.started",
+    kind: "shell-command.selection-finished",
+    requestId,
+    resultKind: "command-proposal",
+  });
+  useAppStore.getState().actions.shellCommand.propose({
+    command,
     requestId,
   });
-  void runShellCommand({ command, signal: abortHandle.signal }).then(
-    (result) => {
-      abortHandle.dispose();
-      recordSessionRuntimeEvent({
-        command: result.command,
-        exitCode: result.exitCode,
-        kind: "shell-command.finished",
-        requestId,
-        signal: result.signal,
-        timedOut: result.timedOut,
-      });
-      useAppStore.getState().actions.shellCommand.finish({
-        requestId,
-        result,
-      });
-    },
-    (error: unknown) => {
-      abortHandle.dispose();
-      recordSessionRuntimeEvent({
-        errorMessage: error instanceof Error ? error.message : String(error),
-        kind: "shell-command.failed",
-        requestId,
-      });
-      useAppStore.getState().actions.shellCommand.fail({
-        errorMessage: error instanceof Error ? error.message : String(error),
-        requestId,
-      });
-    },
-  );
 }

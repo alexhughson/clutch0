@@ -40,3 +40,21 @@ test("shell commands respect already-aborted signals", async () => {
     await rm(root, { force: true, recursive: true });
   }
 });
+
+test("shell commands stream stdout and stderr chunks", async () => {
+  const updates: { chunk: string; stream: "stderr" | "stdout" }[] = [];
+  const result = await runShellCommand({
+    command: "printf out && printf err 1>&2",
+    onOutput: (update) => {
+      updates.push(update);
+    },
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).toBe("out");
+  expect(result.stderr).toBe("err");
+  expect(updates).toEqual([
+    { chunk: "out", stream: "stdout" },
+    { chunk: "err", stream: "stderr" },
+  ]);
+});

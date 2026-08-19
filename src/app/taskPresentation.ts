@@ -22,7 +22,7 @@ export function canCloseTaskWithCtrlC(task: AppTask): boolean {
     case "response":
       return canCloseResponseTaskWithCtrlC(task);
     case "shell-command":
-      return task.status !== "running";
+      return task.status !== "running" && task.status !== "selecting";
     case "show-context":
       return task.status !== "loading";
     default:

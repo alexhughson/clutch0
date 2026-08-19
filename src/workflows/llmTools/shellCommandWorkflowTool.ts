@@ -6,8 +6,6 @@ import {
   parseApplyPatchShellCommand,
 } from "../../lib/patch/applyPatchShellCommand";
 import { validatePatchProposal } from "../../lib/patch/patchEngine";
-import { runShellCommand } from "../../lib/shell/shellCommand";
-import { recordSessionRuntimeEvent } from "../../store/appStore";
 import type { LlmWorkflowToolController } from "./types";
 
 export const RUN_SHELL_COMMAND_TOOL_NAME = "run_shell_command";
@@ -15,7 +13,7 @@ export const RUN_SHELL_COMMAND_TOOL_NAME = "run_shell_command";
 export const runShellCommandTool: LlmTool = {
   name: RUN_SHELL_COMMAND_TOOL_NAME,
   description:
-    "Run one project-root shell command and save stdout/stderr as context.",
+    "Propose one project-root shell command for user approval before running.",
   parameters: {
     type: "object",
     properties: {
@@ -29,10 +27,10 @@ export const runShellCommandTool: LlmTool = {
 };
 
 export const shellCommandWorkflowTool: LlmWorkflowToolController = {
-  resultKind: "command-output",
+  resultKind: "command-proposal",
   slashCommand: {
     description:
-      "Ask the LLM to choose and run a shell command, then save the output as context.",
+      "Ask the LLM to choose a shell command, then approve and run it.",
     name: "cmd",
     promptDirective: shellCommandPromptDirective,
     title: "Run shell command",
@@ -41,12 +39,12 @@ export const shellCommandWorkflowTool: LlmWorkflowToolController = {
   tool: runShellCommandTool,
   handleResult({ actions, requestId, result }) {
     invariant(
-      result.kind === "command-output",
+      result.kind === "command-proposal",
       `run_shell_command cannot handle ${result.kind} results`,
     );
-    actions.shellCommand.finish({
+    actions.shellCommand.propose({
+      command: result.command,
       requestId,
-      result: result.result,
     });
   },
   async routeToolCall({ root, signal, toolCall }) {
@@ -97,27 +95,9 @@ export const shellCommandWorkflowTool: LlmWorkflowToolController = {
       };
     }
 
-    recordSessionRuntimeEvent({ command, kind: "shell-command.started" });
-    try {
-      const result = await runShellCommand({ command, root, signal });
-      recordSessionRuntimeEvent({
-        command,
-        exitCode: result.exitCode,
-        kind: "shell-command.finished",
-        signal: result.signal,
-        timedOut: result.timedOut,
-      });
-      return {
-        kind: "command-output" as const,
-        result,
-      };
-    } catch (error) {
-      recordSessionRuntimeEvent({
-        command,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        kind: "shell-command.failed",
-      });
-      throw error;
-    }
+    return {
+      command,
+      kind: "command-proposal" as const,
+    };
   },
 };

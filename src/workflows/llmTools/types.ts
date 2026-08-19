@@ -6,7 +6,6 @@ import type {
   PatchReviewState,
   PatchValidationResult,
 } from "../../lib/patch/types";
-import type { ShellCommandResult } from "../../lib/shell/shellCommand";
 
 export type PatchToolMode = "apply" | "review";
 
@@ -26,8 +25,8 @@ export type LlmWorkflowToolResult =
       kind: "find-files";
     }
   | {
-      kind: "command-output";
-      result: ShellCommandResult;
+      command: string;
+      kind: "command-proposal";
     }
   | {
       kind: "create-file";

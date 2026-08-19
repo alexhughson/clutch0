@@ -8,6 +8,7 @@ import {
   createLiveLlmResponseContextItem,
   createPiAgentContextItem,
   createSavedLlmResponseContextItem,
+  createShellCommandOutputContextItem,
 } from "../context/contextItems";
 import {
   parseAppSnapshot,
@@ -152,6 +153,19 @@ test("restore normalizes interrupted active task variants before render", () => 
     },
     {
       activeTask: {
+        id: 30,
+        kind: "shell-command",
+        prompt: "run tests",
+        status: "selecting",
+      },
+      expected: {
+        errorMessage: "Interrupted while selecting shell command.",
+        status: "error",
+      },
+      name: "shell-command selecting",
+    },
+    {
+      activeTask: {
         id: 4,
         kind: "show-context",
         question: "show context",
@@ -239,6 +253,55 @@ test("restore detaches legacy agent sessions and marks running agents interrupte
   expect((restoredAgent as PiAgentContextItem).errorMessage).toContain(
     "Interrupted",
   );
+});
+
+test("restore removes interrupted shell-command stream context item", () => {
+  const initial = createInitialAppState();
+  const preserved = createFileContextItem("src/index.tsx");
+  const streaming = createShellCommandOutputContextItem({
+    createdAt: 1,
+    id: "saved:1",
+    result: {
+      command: "npm test",
+      durationMs: 0,
+      exitCode: null,
+      stderr: "",
+      stdout: "partial output",
+      timedOut: false,
+      truncated: false,
+    },
+    sourceRequestId: 5,
+  });
+  const state: AppState = {
+    ...initial,
+    actions: {} as AppState["actions"],
+    activeTask: {
+      id: 5,
+      kind: "shell-command",
+      prompt: "run tests",
+      result: streaming.result,
+      savedContextItemId: streaming.id,
+      status: "running",
+    },
+    workspace: {
+      ...initial.workspace,
+      contextItems: [preserved, streaming],
+      focusedContextItemId: streaming.id,
+    },
+  };
+
+  const restored = restoreAppStateFromSnapshot(
+    serializeAppSnapshot({ state, workspaceRoot: "/repo" }),
+  );
+
+  expect(restored.activeTask).toMatchObject({
+    errorMessage: "Interrupted while running shell command.",
+    kind: "shell-command",
+    status: "error",
+  });
+  expect(restored.workspace.contextItems.map((item) => item.id)).toEqual([
+    preserved.id,
+  ]);
 });
 
 test("restore keeps harness-backed agent sessions live when sandbox exists", () => {

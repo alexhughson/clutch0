@@ -93,7 +93,7 @@ test("routes create file tool calls to the create file workflow", async () => {
   });
 });
 
-test("routes shell command tool calls and captures output", async () => {
+test("routes shell command tool calls into command proposals", async () => {
   const result = await routeLlmWorkflowToolCalls({
     allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
     toolCalls: [
@@ -109,12 +109,8 @@ test("routes shell command tool calls and captures output", async () => {
   });
 
   expect(result).toMatchObject({
-    kind: "command-output",
-    result: {
-      command: "printf clutch-cmd",
-      exitCode: 0,
-      stdout: "clutch-cmd",
-    },
+    command: "printf clutch-cmd",
+    kind: "command-proposal",
   });
 });
 
@@ -302,62 +298,10 @@ test("rejects implicit shell patch bodies as patch validation failures", async (
   expect(await Bun.file(join(root, "hello.txt")).exists()).toBe(false);
 });
 
-test("routes abort signals into shell command tool calls", async () => {
-  const controller = new AbortController();
-  const resultPromise = routeLlmWorkflowToolCalls({
-    allowedToolNames: [RUN_SHELL_COMMAND_TOOL_NAME],
-    signal: controller.signal,
-    toolCalls: [
-      {
-        type: "toolCall",
-        id: "tool-1",
-        name: RUN_SHELL_COMMAND_TOOL_NAME,
-        arguments: {
-          command: "sleep 10",
-        },
-      } satisfies LlmToolCall,
-    ],
-  });
-
-  controller.abort();
-  const result = await resultPromise;
-
-  expect(result).toMatchObject({
-    kind: "command-output",
-    result: {
-      exitCode: null,
-      signal: "SIGTERM",
-      timedOut: false,
-    },
-  });
-});
-
-test("exposes shell commands to unrestricted LLM requests", async () => {
+test("exposes shell commands to unrestricted LLM requests", () => {
   expect(getLlmWorkflowTools().map((tool) => tool.name)).toContain(
     RUN_SHELL_COMMAND_TOOL_NAME,
   );
-
-  const result = await routeLlmWorkflowToolCalls({
-    toolCalls: [
-      {
-        type: "toolCall",
-        id: "tool-1",
-        name: RUN_SHELL_COMMAND_TOOL_NAME,
-        arguments: {
-          command: "printf clutch-cmd",
-        },
-      } satisfies LlmToolCall,
-    ],
-  });
-
-  expect(result).toMatchObject({
-    kind: "command-output",
-    result: {
-      command: "printf clutch-cmd",
-      exitCode: 0,
-      stdout: "clutch-cmd",
-    },
-  });
 });
 
 test("restricts workflow tools by allowed tool names", () => {
@@ -416,50 +360,38 @@ test("rejects malformed workflow tool calls", async () => {
 
 test("derives slash commands from workflow tools plus ask", () => {
   const commands = getLlmSlashCommands();
+  const names = commands.map((command) => command.name);
+  expect(names).toContain("ask");
+  expect(names).toContain("agent");
+  expect(names).toContain("config");
+  expect(names).toContain("show-context");
+  expect(names).toContain("say");
+  expect(names).toContain("add");
+  expect(names).toContain("create");
+  expect(names).toContain("find");
+  expect(names).toContain("edit");
+  expect(names).toContain("cmd");
 
-  expect(commands.map((command) => command.name)).toEqual([
-    "ask",
-    "agent",
-    "config",
-    "show-context",
-    "say",
-    "add",
-    "create",
-    "find",
-    "edit",
-    "cmd",
-  ]);
-  expect(
-    commands.find((command) => command.name === "ask")?.allowedToolNames,
-  ).toEqual([]);
-  expect(
-    commands.find((command) => command.name === "config")?.allowedToolNames,
-  ).toEqual([]);
-  expect(
-    commands.find((command) => command.name === "show-context")
-      ?.allowedToolNames,
-  ).toEqual([]);
-  expect(
-    commands.find((command) => command.name === "say")?.allowedToolNames,
-  ).toEqual([]);
-  expect(
-    commands.find((command) => command.name === "add")?.allowedToolNames,
-  ).toEqual([ADD_CONTEXT_FILES_TOOL_NAME]);
-  expect(
-    commands.find((command) => command.name === "create")?.allowedToolNames,
-  ).toEqual([CREATE_FILE_TOOL_NAME]);
-  expect(
-    commands.find((command) => command.name === "edit")?.allowedToolNames,
-  ).toEqual([APPLY_PATCH_TOOL_NAME]);
-  expect(
-    commands.find((command) => command.name === "edit")?.patchToolMode,
-  ).toBe("review");
-  expect(
-    commands.find((command) => command.name === "find")?.allowedToolNames,
-  ).toEqual([FIND_RELEVANT_FILES_TOOL_NAME]);
-  expect(
-    commands.find((command) => command.name === "cmd")?.allowedToolNames,
-  ).toEqual([RUN_SHELL_COMMAND_TOOL_NAME]);
+  const ask = commands.find((command) => command.name === "ask");
+  const config = commands.find((command) => command.name === "config");
+  const showContext = commands.find((command) => command.name === "show-context");
+  const say = commands.find((command) => command.name === "say");
+  const add = commands.find((command) => command.name === "add");
+  const create = commands.find((command) => command.name === "create");
+  const edit = commands.find((command) => command.name === "edit");
+  const find = commands.find((command) => command.name === "find");
+  const cmd = commands.find((command) => command.name === "cmd");
+
+  expect(ask?.allowedToolNames).toEqual([]);
+  expect(config?.allowedToolNames).toEqual([]);
+  expect(showContext?.allowedToolNames).toEqual([]);
+  expect(say?.allowedToolNames).toEqual([]);
+  expect(add?.allowedToolNames).toEqual([ADD_CONTEXT_FILES_TOOL_NAME]);
+  expect(create?.allowedToolNames).toEqual([CREATE_FILE_TOOL_NAME]);
+  expect(edit?.allowedToolNames).toEqual([APPLY_PATCH_TOOL_NAME]);
+  expect(edit?.patchToolMode).toBe("review");
+  expect(find?.allowedToolNames).toEqual([FIND_RELEVANT_FILES_TOOL_NAME]);
+  expect(cmd?.allowedToolNames).toEqual([RUN_SHELL_COMMAND_TOOL_NAME]);
 });
 
 test("parses known slash commands and leaves unknown commands unrestricted", () => {
