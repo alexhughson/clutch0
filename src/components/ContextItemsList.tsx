@@ -5,9 +5,11 @@ import {
   peekClutchConfigRecoveryNotice,
 } from "../lib/config/clutchConfig";
 import {
+  getInlineListDisplayContent,
   getContextItemDisplayEntries,
-  getContextItemInlineListContent,
   getContextItemShortSummary,
+  getListShortSummary,
+  getWrapWidthForDepth,
 } from "../lib/context/contextItemDisplay";
 import { getContextItemById } from "../lib/context/contextItems";
 import type { ContextItem, ContextItemSummaryView } from "../types";
@@ -16,12 +18,14 @@ type ContextItemsListProps = {
   columns?: 1 | 2;
   contextItems: readonly ContextItem[];
   focusedContextItemId: string | null;
+  wrapWidth: number;
 };
 
 export function ContextItemsList({
   columns = 1,
   contextItems,
   focusedContextItemId,
+  wrapWidth,
 }: ContextItemsListProps) {
   const configNotice = getConfigSetupNotice();
 
@@ -59,6 +63,7 @@ export function ContextItemsList({
           entries={entryColumns[0] ?? []}
           focusedContextItemId={focusedContextItemId}
           width="100%"
+          wrapWidth={wrapWidth}
         />
       ) : (
         <box
@@ -70,6 +75,7 @@ export function ContextItemsList({
               entries={entries}
               focusedContextItemId={focusedContextItemId}
               width="50%"
+              wrapWidth={wrapWidth}
             />
           ))}
         </box>
@@ -103,16 +109,19 @@ function ContextEntryScroll({
   entries,
   focusedContextItemId,
   width,
+  wrapWidth,
 }: {
   entries: ReturnType<typeof getContextItemDisplayEntries>;
   focusedContextItemId: string | null;
   width: `${number}%` | "100%";
+  wrapWidth: number;
 }) {
   const scrollBoxRef = useRef<ScrollBoxRenderable | null>(null);
   const focusedInColumn =
     focusedContextItemId !== null &&
     entries.some(
-      (entry) => entry.kind === "item" && entry.item.id === focusedContextItemId,
+      (entry) =>
+        entry.kind === "item" && entry.item.id === focusedContextItemId,
     );
 
   useEffect(() => {
@@ -132,6 +141,7 @@ function ContextEntryScroll({
       <ContextEntryColumn
         entries={entries}
         focusedContextItemId={focusedContextItemId}
+        wrapWidth={wrapWidth}
       />
     </scrollbox>
   );
@@ -140,9 +150,11 @@ function ContextEntryScroll({
 function ContextEntryColumn({
   entries,
   focusedContextItemId,
+  wrapWidth,
 }: {
   entries: ReturnType<typeof getContextItemDisplayEntries>;
   focusedContextItemId: string | null;
+  wrapWidth: number;
 }) {
   return (
     <box style={{ flexDirection: "column", width: "100%" }}>
@@ -160,7 +172,10 @@ function ContextEntryColumn({
         const isFocused = entry.item.id === focusedContextItemId;
         const summary = entry.item.getSummaryView();
         const regenStatus = entry.item.getRegenStatus?.();
-        const inlineContent = getContextItemInlineListContent(entry.item);
+        const rowWrapWidth = getWrapWidthForDepth(wrapWidth, entry.depth);
+        const inlineContent =
+          getInlineListDisplayContent(entry.item, rowWrapWidth)?.content ??
+          null;
 
         return (
           <ContextItemRow
@@ -170,7 +185,9 @@ function ContextEntryColumn({
             id={getContextItemRowId(entry.item.id)}
             inlineContent={inlineContent}
             label={
-              inlineContent === null ? (entry.label ?? summary.label) : undefined
+              inlineContent === null
+                ? (entry.label ?? summary.label)
+                : undefined
             }
             pinned={entry.item.isPinned()}
             regenerating={regenStatus?.status === "running"}
@@ -180,6 +197,7 @@ function ContextEntryColumn({
                 : undefined
             }
             summary={summary}
+            wrapWidth={rowWrapWidth}
           />
         );
       })}
@@ -211,6 +229,7 @@ export function ContextItemRow({
   regenError,
   regenerating = false,
   summary,
+  wrapWidth,
 }: {
   depth: number;
   focused: boolean;
@@ -221,10 +240,11 @@ export function ContextItemRow({
   regenError?: string;
   regenerating?: boolean;
   summary: ContextItemSummaryView;
+  wrapWidth: number;
 }) {
   const shortSummary =
     inlineContent === null || inlineContent === undefined
-      ? getContextItemShortSummary(summary)
+      ? (getListShortSummary(summary, wrapWidth)?.content ?? null)
       : null;
   const indent = getIndent(depth);
   const marker = focused ? "> " : pinned ? "* " : "  ";
@@ -299,4 +319,3 @@ function getConfigSetupNotice() {
     </text>
   );
 }
-

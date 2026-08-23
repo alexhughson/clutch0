@@ -94,13 +94,13 @@ test("only passive panes share context-list keyboard navigation", () => {
 });
 
 test("workspace stack heights fit supported small layouts", () => {
-  expect(stackTotal("medium", 24, false, [])).toBeLessThanOrEqual(24);
-  expect(stackTotal("medium", 25, true, [])).toBeLessThanOrEqual(25);
-  expect(stackTotal("compact", 20, false, [])).toBeLessThanOrEqual(20);
-  expect(stackTotal("compact", 20, true, [])).toBeLessThanOrEqual(20);
-  expect(stackTotal("compact", 19, true, [])).toBeLessThanOrEqual(19);
-  expect(stackTotal("compact", 14, true, [])).toBeLessThanOrEqual(14);
-  expect(stackTotal("compact", 14, false, [])).toBeLessThanOrEqual(14);
+  expect(stackTotal("medium", 24, 90, false, [])).toBeLessThanOrEqual(24);
+  expect(stackTotal("medium", 25, 90, true, [])).toBeLessThanOrEqual(25);
+  expect(stackTotal("compact", 20, 80, false, [])).toBeLessThanOrEqual(20);
+  expect(stackTotal("compact", 20, 80, true, [])).toBeLessThanOrEqual(20);
+  expect(stackTotal("compact", 19, 80, true, [])).toBeLessThanOrEqual(19);
+  expect(stackTotal("compact", 14, 80, true, [])).toBeLessThanOrEqual(14);
+  expect(stackTotal("compact", 14, 80, false, [])).toBeLessThanOrEqual(14);
 });
 
 test("workspace stack sizes context to content until the composer is pinned", () => {
@@ -108,11 +108,15 @@ test("workspace stack sizes context to content until the composer is pinned", ()
   const twoSummarized = [item("one", true), item("two", true)];
 
   // Small lists keep a minimum chrome height; larger lists grow with content.
-  expect(stack("medium", 40, false, oneItem).contextHeight).toBe(4);
-  expect(stack("compact", 40, false, twoSummarized).contextHeight).toBe(
-    estimateContextListHeight({ columns: 1, contextItems: twoSummarized }),
+  expect(stack("medium", 40, 100, false, oneItem).contextHeight).toBe(4);
+  expect(stack("compact", 40, 100, false, twoSummarized).contextHeight).toBe(
+    estimateContextListHeight({
+      columns: 1,
+      contextItems: twoSummarized,
+      wrapWidth: 94,
+    }),
   );
-  expect(stack("compact", 20, false, []).contextHeight).toBe(4);
+  expect(stack("compact", 20, 100, false, []).contextHeight).toBe(4);
 
   const growing = [
     item("one", true),
@@ -120,28 +124,67 @@ test("workspace stack sizes context to content until the composer is pinned", ()
     item("three", true),
     item("four", true),
   ];
-  expect(stack("compact", 40, false, growing).contextHeight).toBe(
-    estimateContextListHeight({ columns: 1, contextItems: growing }),
+  expect(stack("compact", 40, 100, false, growing).contextHeight).toBe(
+    estimateContextListHeight({
+      columns: 1,
+      contextItems: growing,
+      wrapWidth: 94,
+    }),
   );
 
   const manyItems = Array.from({ length: 30 }, (_, index) =>
     item(`item-${index}`, true),
   );
-  const constrained = stack("compact", 20, false, manyItems);
+  const constrained = stack("compact", 20, 100, false, manyItems);
   expect(constrained.contextHeight).toBeLessThan(
-    estimateContextListHeight({ columns: 1, contextItems: manyItems }),
+    estimateContextListHeight({
+      columns: 1,
+      contextItems: manyItems,
+      wrapWidth: 94,
+    }),
   );
-  expect(stackTotal("compact", 20, false, manyItems)).toBeLessThanOrEqual(20);
+  expect(stackTotal("compact", 20, 100, false, manyItems)).toBeLessThanOrEqual(
+    20,
+  );
 });
 
 test("estimateContextListHeight accounts for summary rows and columns", () => {
   const items = [item("a", true), item("b", true), item("c", false)];
-  expect(estimateContextListHeight({ columns: 1, contextItems: items })).toBe(
-    1 + 2 + 2 + 1,
-  );
-  expect(estimateContextListHeight({ columns: 2, contextItems: items })).toBe(
-    1 + Math.max(2 + 2, 1),
-  );
+  expect(
+    estimateContextListHeight({
+      columns: 1,
+      contextItems: items,
+      wrapWidth: 80,
+    }),
+  ).toBe(1 + 2 + 2 + 1);
+  expect(
+    estimateContextListHeight({
+      columns: 2,
+      contextItems: items,
+      wrapWidth: 39,
+    }),
+  ).toBe(1 + Math.max(2 + 2, 1));
+});
+
+test("estimateContextListHeight wraps and caps long summaries", () => {
+  const longTitle = "x".repeat(500);
+  const items = [itemWithSummary(longTitle)];
+
+  expect(
+    estimateContextListHeight({
+      columns: 1,
+      contextItems: items,
+      wrapWidth: 80,
+    }),
+  ).toBe(1 + 1 + 2);
+
+  expect(
+    estimateContextListHeight({
+      columns: 1,
+      contextItems: items,
+      wrapWidth: 40,
+    }),
+  ).toBe(1 + 1 + 2);
 });
 
 function configTask(mode: "first-run" | "settings"): AppTask {
@@ -159,6 +202,7 @@ function configTask(mode: "first-run" | "settings"): AppTask {
 function stack(
   mode: "compact" | "medium",
   terminalHeight: number,
+  terminalWidth: number,
   composerHasSuggestions: boolean,
   contextItems: readonly ContextItem[],
 ) {
@@ -167,18 +211,21 @@ function stack(
     contextItems,
     mode,
     terminalHeight,
+    terminalWidth,
   });
 }
 
 function stackTotal(
   mode: "compact" | "medium",
   terminalHeight: number,
+  terminalWidth: number,
   composerHasSuggestions: boolean,
   contextItems: readonly ContextItem[],
 ): number {
   const layout = stack(
     mode,
     terminalHeight,
+    terminalWidth,
     composerHasSuggestions,
     contextItems,
   );
@@ -207,6 +254,20 @@ function item(id: string, withSummary: boolean): ContextItem {
         title: id,
       };
 
+  return makeItem(id, summary);
+}
+
+function itemWithSummary(title: string): ContextItem {
+  const summary: ContextItemSummaryView = {
+    label: `${title} label`,
+    status: "ready",
+    title,
+  };
+
+  return makeItem(title, summary);
+}
+
+function makeItem(id: string, summary: ContextItemSummaryView): ContextItem {
   return {
     id,
     getListGroup: () => null,

@@ -12,6 +12,7 @@ test("context item summaries wrap across two rows when needed", () => {
       title:
         "A longer generated summary that definitely needs a second terminal row when wrapped at eighty columns",
     },
+    wrapWidth: 80,
   });
 
   const summaryText = collectElementsByType(element, "text").find((text) =>
@@ -32,6 +33,7 @@ test("single-line context item summaries do not reserve extra height", () => {
       status: "ready",
       title: "Short summary",
     },
+    wrapWidth: 80,
   });
 
   const summaryText = collectElementsByType(element, "text").find((text) =>
@@ -51,6 +53,7 @@ test("say items render their full text inline in the context list", () => {
       status: "missing",
       title: "User text: remember the full…",
     },
+    wrapWidth: 80,
   });
 
   const contentText = collectElementsByType(element, "text").find((text) =>
@@ -78,7 +81,11 @@ function collectElementsByType(element: unknown, type: string): UiElement[] {
   return [...matches, ...collectElementsByType(children, type)];
 }
 
-function getTextContent(element: UiElement): string {
+function getTextContent(element: UiElement | undefined): string {
+  if (element === undefined) {
+    return "";
+  }
+
   const children = element.props.children;
   if (typeof children === "string") {
     return children;

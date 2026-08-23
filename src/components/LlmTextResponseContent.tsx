@@ -1,8 +1,5 @@
 import type { LlmRequestLatencyStats } from "../app/appTypes";
-import {
-  HighlightedMarkdown,
-  type HighlightedMarkdownProps,
-} from "./SyntaxHighlightedContent";
+import { HighlightedMarkdown } from "./SyntaxHighlightedContent";
 
 type LlmTextResponseContentProps = {
   errorMessage?: string;
@@ -10,8 +7,9 @@ type LlmTextResponseContentProps = {
   latencyStats?: LlmRequestLatencyStats;
   question?: string;
   responseText: string;
+  savedToContext?: boolean;
   status?: "done" | "error" | "loading" | "streaming";
-  streaming?: HighlightedMarkdownProps["streaming"];
+  streaming?: boolean;
 };
 
 export function LlmTextResponseContent({
@@ -20,6 +18,7 @@ export function LlmTextResponseContent({
   latencyStats,
   question,
   responseText,
+  savedToContext,
   status = "done",
   streaming,
 }: LlmTextResponseContentProps) {
@@ -37,7 +36,9 @@ export function LlmTextResponseContent({
     >
       {question === undefined ? null : (
         <>
-          <text style={{ fg: "gray" }}>{`Question · ${formatStatus(status)}`}</text>
+          <text
+            style={{ fg: "gray" }}
+          >{`Question · ${formatStatus(status)}`}</text>
           <text>{question}</text>
           <LatencyStats stats={latencyStats} />
         </>
@@ -52,7 +53,9 @@ export function LlmTextResponseContent({
         }}
       >
         <text style={{ fg: "gray" }}>Response</text>
-        <scrollbox style={{ flexGrow: 1, minHeight: 0, height: "100%", width: "100%" }}>
+        <scrollbox
+          style={{ flexGrow: 1, minHeight: 0, height: "100%", width: "100%" }}
+        >
           {responseText.length > 0 ? (
             <HighlightedMarkdown content={responseText} streaming={streaming} />
           ) : (
@@ -61,6 +64,9 @@ export function LlmTextResponseContent({
         </scrollbox>
         {status === "error" ? (
           <text style={{ fg: "red" }}>{errorMessage}</text>
+        ) : null}
+        {savedToContext === true ? (
+          <text style={{ fg: "green" }}>Saved to context.</text>
         ) : null}
         {hotkeys === undefined ? null : (
           <text style={{ fg: "gray" }}>{hotkeys}</text>
@@ -83,7 +89,9 @@ function LatencyStats({ stats }: { stats?: LlmRequestLatencyStats }) {
   );
 }
 
-function formatStatus(status: NonNullable<LlmTextResponseContentProps["status"]>): string {
+function formatStatus(
+  status: NonNullable<LlmTextResponseContentProps["status"]>,
+): string {
   if (status === "done") {
     return "complete";
   }
