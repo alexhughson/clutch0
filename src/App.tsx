@@ -17,6 +17,10 @@ import {
   ContextItemsList,
   FocusedContextItemSummary,
 } from "./components/ContextItemsList";
+import {
+  getContextListWrapWidth,
+  getWrapWidthForColumn,
+} from "./lib/context/contextItemDisplay";
 import { MessageComposer } from "./components/MessageComposer/MessageComposer";
 import {
   formatContextItemAction,
@@ -160,6 +164,7 @@ export function App({ filePaths, onExit }: AppProps) {
         filePaths={filePaths}
         mode={layout.mode}
         terminalHeight={height}
+        terminalWidth={width}
         workspace={workspace}
       />
     </AppRoot>
@@ -193,12 +198,14 @@ function WorkspaceLayout({
   filePaths,
   mode,
   terminalHeight,
+  terminalWidth,
   workspace,
 }: {
   paneTask: AppTask | null;
   filePaths: readonly FilePath[];
   mode: WorkspaceLayoutMode;
   terminalHeight: number;
+  terminalWidth: number;
   workspace: WorkspaceState;
 }) {
   const contextItems = getVisibleContextItems(
@@ -240,6 +247,9 @@ function WorkspaceLayout({
             <ContextItemsList
               contextItems={contextItems}
               focusedContextItemId={workspace.focusedContextItemId}
+              wrapWidth={getWrapWidthForColumn(
+                Math.floor((terminalWidth - 2) * 0.36),
+              )}
             />
           </box>
           <box
@@ -279,12 +289,17 @@ function WorkspaceLayout({
   }
 
   const columns = mode === "medium" ? 2 : 1;
+  const contextWrapWidth = getContextListWrapWidth({
+    columns,
+    terminalWidth,
+  });
   const { contextHeight, inputHeight, suggestionHeight, summaryHeight } =
     getWorkspaceStackLayout({
       composerHasSuggestions,
       contextItems,
       mode,
       terminalHeight,
+      terminalWidth,
     });
 
   return (
@@ -305,11 +320,18 @@ function WorkspaceLayout({
         focusedContextItemId={workspace.focusedContextItemId}
         showItemActions={paneTask === null}
       />
-      <box style={{ flexDirection: "column", flexShrink: 0, height: contextHeight }}>
+      <box
+        style={{
+          flexDirection: "column",
+          flexShrink: 0,
+          height: contextHeight,
+        }}
+      >
         <ContextItemsList
           columns={columns}
           contextItems={contextItems}
           focusedContextItemId={workspace.focusedContextItemId}
+          wrapWidth={contextWrapWidth}
         />
       </box>
       <box

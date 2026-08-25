@@ -5,7 +5,19 @@ import type {
 } from "../../types";
 import { FileContextItem, UserTextContextItem } from "./contextItems";
 
-const CONTEXT_LIST_SUMMARY_WRAP_WIDTH = 80;
+// These must track the workspace stack styles in App.tsx: outer padding,
+// the gap between context columns, and the row indent plus marker width.
+const WORKSPACE_STACK_HORIZONTAL_CHROME = 2;
+const CONTEXT_COLUMN_GAP = 2;
+const CONTEXT_ROW_WRAP_CHROME = 4;
+// Extra wrap chrome per tree depth: two indent columns per level.
+const CONTEXT_ROW_WRAP_CHROME_PER_DEPTH = 2;
+
+// Inline notes and generated summaries are capped so one item cannot push
+// the composer out of the workspace stack. Rendering truncates with the
+// same helpers, so estimates and rendered rows stay in agreement.
+const INLINE_LIST_MAX_ROWS = 3;
+const SUMMARY_LIST_MAX_ROWS = 2;
 
 export type ContextItemDisplayEntry =
   | {
@@ -85,35 +97,143 @@ export function getContextItemShortSummary(
   return null;
 }
 
-export function getContextItemSummaryRowCount(summary: string): number {
-  const normalized = summary.replace(/\s+/g, " ").trim();
-  if (normalized.length === 0) {
+export function getContextListWrapWidth({
+  columns,
+  terminalWidth,
+}: {
+  columns: 1 | 2;
+  terminalWidth: number;
+}): number {
+  const paddedWidth = Math.max(
+    0,
+    terminalWidth - WORKSPACE_STACK_HORIZONTAL_CHROME,
+  );
+  const columnWidth =
+    columns === 1
+      ? paddedWidth
+      : Math.floor((paddedWidth - CONTEXT_COLUMN_GAP) / 2);
+  return getWrapWidthForColumn(columnWidth);
+}
+
+export function getWrapWidthForColumn(columnWidth: number): number {
+  return Math.max(1, columnWidth - CONTEXT_ROW_WRAP_CHROME);
+}
+
+export function getWrapWidthForDepth(wrapWidth: number, depth: number): number {
+  return Math.max(1, wrapWidth - depth * CONTEXT_ROW_WRAP_CHROME_PER_DEPTH);
+}
+
+export function getContextItemSummaryRowCount(
+  summary: string,
+  wrapWidth: number,
+): number {
+  if (summary.replace(/\s+/g, "").length === 0) {
     return 0;
   }
 
-  const explicitLines = summary.split("\n").length;
-  const wrappedLines = Math.ceil(normalized.length / CONTEXT_LIST_SUMMARY_WRAP_WIDTH);
-  return Math.max(explicitLines, wrappedLines, 1);
+  let rows = 0;
+  for (const line of summary.split("\n")) {
+    rows += Math.max(1, Math.ceil(line.length / wrapWidth));
+  }
+  return rows;
 }
 
-export function estimateContextItemListRowCount(item: ContextItem): number {
+export function truncateTextToRows(
+  text: string,
+  wrapWidth: number,
+  maxRows: number,
+): string {
+  let rowsUsed = 0;
+  const keptLines: string[] = [];
+  for (const line of text.split("\n")) {
+    const remainingRows = maxRows - rowsUsed;
+    if (remainingRows <= 0) {
+      trimLastLineForEllipsis(keptLines, wrapWidth);
+      return `${keptLines.join("\n")}…`;
+    }
+
+    const lineRows = Math.max(1, Math.ceil(line.length / wrapWidth));
+    if (lineRows <= remainingRows) {
+      keptLines.push(line);
+      rowsUsed += lineRows;
+      continue;
+    }
+
+    keptLines.push(line.slice(0, Math.max(1, remainingRows * wrapWidth - 1)));
+    return `${keptLines.join("\n")}…`;
+  }
+  return keptLines.join("\n");
+}
+
+// Appending the ellipsis must not push the last kept line onto a new row.
+function trimLastLineForEllipsis(lines: string[], wrapWidth: number): void {
+  if (lines.length === 0) {
+    return;
+  }
+
+  const lastLine = lines[lines.length - 1];
+  if (lastLine.length % wrapWidth === 0) {
+    lines[lines.length - 1] = lastLine.slice(
+      0,
+      Math.max(0, lastLine.length - 1),
+    );
+  }
+}
+
+// Single truncation path: rendering and row estimates both go through these
+// helpers, so the estimated height always matches the rendered rows.
+export function getInlineListDisplayContent(
+  item: ContextItem,
+  wrapWidth: number,
+): { content: string; rowCount: number } | null {
   const inlineContent = getContextItemInlineListContent(item);
-  if (inlineContent !== null) {
-    return getContextItemSummaryRowCount(inlineContent);
+  if (inlineContent === null) {
+    return null;
+  }
+  return fitToRowBudget(inlineContent, wrapWidth, INLINE_LIST_MAX_ROWS);
+}
+
+export function getListShortSummary(
+  summary: ContextItemSummaryView,
+  wrapWidth: number,
+): { content: string; rowCount: number } | null {
+  const shortSummary = getContextItemShortSummary(summary);
+  if (shortSummary === null) {
+    return null;
+  }
+  return fitToRowBudget(shortSummary, wrapWidth, SUMMARY_LIST_MAX_ROWS);
+}
+
+function fitToRowBudget(
+  text: string,
+  wrapWidth: number,
+  maxRows: number,
+): { content: string; rowCount: number } {
+  const content = truncateTextToRows(text, wrapWidth, maxRows);
+  return {
+    content,
+    rowCount: getContextItemSummaryRowCount(content, wrapWidth),
+  };
+}
+
+export function estimateContextItemListRowCount(
+  item: ContextItem,
+  wrapWidth: number,
+): number {
+  const inlineDisplay = getInlineListDisplayContent(item, wrapWidth);
+  if (inlineDisplay !== null) {
+    return inlineDisplay.rowCount;
   }
 
   let rows = 1;
   const regenStatus = item.getRegenStatus?.();
-  if (
-    regenStatus?.status === "running" ||
-    regenStatus?.status === "error"
-  ) {
+  if (regenStatus?.status === "running" || regenStatus?.status === "error") {
     rows += 1;
   }
 
-  const shortSummary = getContextItemShortSummary(item.getSummaryView());
-  if (shortSummary !== null) {
-    rows += getContextItemSummaryRowCount(shortSummary);
+  const summaryDisplay = getListShortSummary(item.getSummaryView(), wrapWidth);
+  if (summaryDisplay !== null) {
+    rows += summaryDisplay.rowCount;
   }
 
   return rows;

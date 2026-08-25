@@ -40,9 +40,8 @@ export function ContextItemViewerScreen({
       state.workspace.automaticContextItems,
     ),
   );
-  const [staticDetail, setStaticDetail] = useState<ContextItemDetailView | null>(
-    null,
-  );
+  const [staticDetail, setStaticDetail] =
+    useState<ContextItemDetailView | null>(null);
   const liveDetail = item?.getLiveDetailView?.() ?? null;
   const detail = liveDetail ?? staticDetail;
   const isAgentDetail = detail?.kind === "agent-output";
@@ -57,30 +56,35 @@ export function ContextItemViewerScreen({
     canAct && detail !== null && detail.kind !== "editable-text";
   const canRunPaneActions =
     canRunShortcutActions && detail.kind !== "agent-output";
-  const title = isAgentDetail || isChromelessDetail
-    ? undefined
-    : (detail?.title ?? item?.getListLabel() ?? "Context item");
+  const title =
+    isAgentDetail || isChromelessDetail
+      ? undefined
+      : (detail?.title ?? item?.getListLabel() ?? "Context item");
   const bottomTitle = isChromelessDetail
     ? undefined
     : isAgentDetail
-    ? [
-        formatAgentShortcutHints(itemActions),
-        screen.rejectComposer === undefined ? "Esc back" : "Esc edit prompt",
-      ]
-        .filter((part): part is string => part !== undefined && part.length > 0)
-        .join(" · ")
-    : canRunPaneActions
       ? [
-          formatPaneActionHints(itemActions),
+          formatAgentShortcutHints(itemActions),
           screen.rejectComposer === undefined ? "Esc back" : "Esc edit prompt",
         ]
-          .filter((part) => part.length > 0)
+          .filter(
+            (part): part is string => part !== undefined && part.length > 0,
+          )
           .join(" · ")
-      : canAct
-        ? screen.rejectComposer === undefined
-          ? "Esc back"
-          : "Esc edit prompt"
-        : undefined;
+      : canRunPaneActions
+        ? [
+            formatPaneActionHints(itemActions),
+            screen.rejectComposer === undefined
+              ? "Esc back"
+              : "Esc edit prompt",
+          ]
+            .filter((part) => part.length > 0)
+            .join(" · ")
+        : canAct
+          ? screen.rejectComposer === undefined
+            ? "Esc back"
+            : "Esc edit prompt"
+          : undefined;
 
   const chromelessFooterHints = isChromelessDetail
     ? [
@@ -397,7 +401,9 @@ function ShellCommandInput({
               setErrorMessage(null);
             } catch (error) {
               setErrorMessage(
-                error instanceof Error ? error.message : "Failed to close stdin.",
+                error instanceof Error
+                  ? error.message
+                  : "Failed to close stdin.",
               );
             }
             return;
@@ -471,6 +477,7 @@ function LlmTextResponseDetailView({
       hotkeys={hotkeys}
       question={detail.question}
       responseText={detail.responseText}
+      savedToContext={detail.savedContextItemId !== undefined}
       status={detail.status}
     />
   );
@@ -525,29 +532,29 @@ function EditableTextDetailView({
         }}
       >
         <textarea
-        ref={textareaRef}
-        focused
-        initialValue={detail.content}
-        onContentChange={() => {
-          const text = textareaRef.current?.plainText;
-          if (text === undefined) {
-            return;
-          }
+          ref={textareaRef}
+          focused
+          initialValue={detail.content}
+          onContentChange={() => {
+            const text = textareaRef.current?.plainText;
+            if (text === undefined) {
+              return;
+            }
 
-          actions.say.updateText({ itemId: detail.itemId, text });
-        }}
-        onKeyDown={(event: KeyEvent) => {
-          if (event.name !== "escape") {
-            return;
-          }
+            actions.say.updateText({ itemId: detail.itemId, text });
+          }}
+          onKeyDown={(event: KeyEvent) => {
+            if (event.name !== "escape") {
+              return;
+            }
 
-          event.preventDefault();
-          event.stopPropagation();
-          actions.navigation.dismissPane();
-        }}
-        placeholder="Add context text"
-        style={{ height: "100%", width: "100%", wrapMode: "word" }}
-      />
+            event.preventDefault();
+            event.stopPropagation();
+            actions.navigation.dismissPane();
+          }}
+          placeholder="Add context text"
+          style={{ height: "100%", width: "100%", wrapMode: "word" }}
+        />
       </box>
       {footerHints === undefined ? null : (
         <text style={{ fg: "gray", flexShrink: 0 }}>{footerHints}</text>

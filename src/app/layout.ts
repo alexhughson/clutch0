@@ -1,6 +1,8 @@
 import {
   estimateContextItemListRowCount,
   getContextItemDisplayEntries,
+  getContextListWrapWidth,
+  getWrapWidthForDepth,
   type ContextItemDisplayEntry,
 } from "../lib/context/contextItemDisplay";
 import type { ContextItem } from "../types";
@@ -46,9 +48,11 @@ export function getWorkspaceLayout({
   width: number;
 }): WorkspaceLayout {
   const mode = getWorkspaceLayoutMode({ height, width });
+  const columns = mode === "medium" ? 2 : 1;
   const preferredContextHeight = estimateContextListHeight({
-    columns: mode === "medium" ? 2 : 1,
+    columns,
     contextItems,
+    wrapWidth: getContextListWrapWidth({ columns, terminalWidth: width }),
   });
 
   return {
@@ -83,15 +87,21 @@ export function getWorkspaceStackLayout({
   contextItems,
   mode,
   terminalHeight,
+  terminalWidth,
 }: {
   composerHasSuggestions: boolean;
   contextItems: readonly ContextItem[];
   mode: Exclude<WorkspaceLayoutMode, "wide">;
   terminalHeight: number;
+  terminalWidth: number;
 }): WorkspaceStackLayout {
   const preferredContextHeight = estimateContextListHeight({
     columns: mode === "medium" ? 2 : 1,
     contextItems,
+    wrapWidth: getContextListWrapWidth({
+      columns: mode === "medium" ? 2 : 1,
+      terminalWidth,
+    }),
   });
 
   if (mode === "medium") {
@@ -133,9 +143,11 @@ export function getWorkspaceStackLayout({
 export function estimateContextListHeight({
   columns,
   contextItems,
+  wrapWidth,
 }: {
   columns: 1 | 2;
   contextItems: readonly ContextItem[];
+  wrapWidth: number;
 }): number {
   if (contextItems.length === 0) {
     return CONTEXT_LIST_MIN_HEIGHT;
@@ -143,16 +155,19 @@ export function estimateContextListHeight({
 
   const entries = getContextItemDisplayEntries(contextItems);
   if (columns === 1) {
-    return CONTEXT_LIST_HEADER_HEIGHT + sumEntryHeights(entries);
+    return CONTEXT_LIST_HEADER_HEIGHT + sumEntryHeights(entries, wrapWidth);
   }
 
   const splitIndex = Math.ceil(entries.length / 2);
-  const leftHeight = sumEntryHeights(entries.slice(0, splitIndex));
-  const rightHeight = sumEntryHeights(entries.slice(splitIndex));
+  const leftHeight = sumEntryHeights(entries.slice(0, splitIndex), wrapWidth);
+  const rightHeight = sumEntryHeights(entries.slice(splitIndex), wrapWidth);
   return CONTEXT_LIST_HEADER_HEIGHT + Math.max(leftHeight, rightHeight);
 }
 
-function sumEntryHeights(entries: readonly ContextItemDisplayEntry[]): number {
+function sumEntryHeights(
+  entries: readonly ContextItemDisplayEntry[],
+  wrapWidth: number,
+): number {
   let height = 0;
   for (const entry of entries) {
     if (entry.kind === "folder") {
@@ -160,7 +175,10 @@ function sumEntryHeights(entries: readonly ContextItemDisplayEntry[]): number {
       continue;
     }
 
-    height += estimateContextItemListRowCount(entry.item);
+    height += estimateContextItemListRowCount(
+      entry.item,
+      getWrapWidthForDepth(wrapWidth, entry.depth),
+    );
   }
   return height;
 }

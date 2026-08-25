@@ -1,10 +1,10 @@
 import type { KeyEvent } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
-import { LlmTextResponseContent, formatOptionalLatency } from "./LlmTextResponseContent";
 import {
-  HighlightedCode,
-  HighlightedDiff,
-} from "./SyntaxHighlightedContent";
+  LlmTextResponseContent,
+  formatOptionalLatency,
+} from "./LlmTextResponseContent";
+import { HighlightedCode, HighlightedDiff } from "./SyntaxHighlightedContent";
 import { isEnterKey } from "../lib/keymap";
 import type { PatchProgressFile, PatchProgressState } from "../lib/patch/types";
 import { useAppStore, type LlmRequestState } from "../store/appStore";
@@ -86,9 +86,12 @@ function PatchProgress({ progress }: { progress: PatchProgressState }) {
 function TextResponse({ request }: { request: LlmRequestState }) {
   return (
     <LlmTextResponseContent
-      errorMessage={request.status === "error" ? request.errorMessage : undefined}
+      errorMessage={
+        request.status === "error" ? request.errorMessage : undefined
+      }
       hotkeys={getTextResponseHotkeys(request)}
       responseText={request.responseText}
+      savedToContext={request.savedContextItemId !== undefined}
       status={request.status}
       streaming={request.status === "loading" || request.status === "streaming"}
     />

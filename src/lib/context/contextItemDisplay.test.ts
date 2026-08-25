@@ -13,10 +13,82 @@ import {
   createShellCommandOutputContextItem,
   createUserTextContextItem,
 } from "./contextItems";
+import type { ContextItem } from "../../types";
 import {
   getContextItemDisplayEntries,
   getContextItemDisplayOrder,
+  getContextItemSummaryRowCount,
+  getContextListWrapWidth,
+  getInlineListDisplayContent,
+  getListShortSummary,
+  estimateContextItemListRowCount,
+  truncateTextToRows,
 } from "./contextItemDisplay";
+
+test("counts wrapped rows per explicit line", () => {
+  expect(getContextItemSummaryRowCount("short", 80)).toBe(1);
+  expect(getContextItemSummaryRowCount("x".repeat(81), 80)).toBe(2);
+  expect(
+    getContextItemSummaryRowCount(`${"x".repeat(90)}\n${"y".repeat(90)}`, 80),
+  ).toBe(4);
+  expect(getContextItemSummaryRowCount("   \n  ", 80)).toBe(0);
+});
+
+test("truncates text to the row budget and marks the cut", () => {
+  expect(truncateTextToRows("short", 80, 3)).toBe("short");
+  expect(truncateTextToRows("x".repeat(200), 80, 2)).toBe(
+    `${"x".repeat(159)}…`,
+  );
+  expect(truncateTextToRows("a\nb\nc\nd", 80, 3)).toBe("a\nb\nc…");
+});
+
+test("computes list wrap width from terminal width and column count", () => {
+  expect(getContextListWrapWidth({ columns: 1, terminalWidth: 100 })).toBe(94);
+  expect(getContextListWrapWidth({ columns: 2, terminalWidth: 100 })).toBe(44);
+  expect(getContextListWrapWidth({ columns: 2, terminalWidth: 24 })).toBe(6);
+});
+
+test("inline note estimates match the truncated render output", () => {
+  const say = createUserTextContextItem({
+    createdAt: 1,
+    id: "say:long",
+    text: `${"x".repeat(300)} tail`,
+  });
+
+  const display = getInlineListDisplayContent(say, 80);
+  if (display === null) {
+    throw new Error("expected inline list content for a user text item");
+  }
+
+  expect(display.content).toBe(`${"x".repeat(239)}…`);
+  expect(display.rowCount).toBe(
+    getContextItemSummaryRowCount(display.content, 80),
+  );
+  expect(display.rowCount).toBeLessThanOrEqual(3);
+  expect(estimateContextItemListRowCount(say, 80)).toBe(display.rowCount);
+});
+
+test("summary estimates match the truncated render output", () => {
+  const longTitle = `${"y".repeat(300)} tail`;
+  const item = {
+    id: "ask:long",
+    getListGroup: () => null,
+    getSummaryView: () => ({ label: "ask", status: "ready", title: longTitle }),
+    isPinned: () => false,
+  } as ContextItem;
+
+  const display = getListShortSummary(
+    { label: "ask", status: "ready", title: longTitle },
+    80,
+  );
+  if (display === null) {
+    throw new Error("expected short summary for a ready title");
+  }
+
+  expect(display.content.endsWith("…")).toBe(true);
+  expect(display.rowCount).toBeLessThanOrEqual(2);
+  expect(estimateContextItemListRowCount(item, 80)).toBe(1 + display.rowCount);
+});
 
 test("groups file context items under compact alphabetical folder headers", () => {
   const entries = getContextItemDisplayEntries([
@@ -242,14 +314,14 @@ test("omits empty type groups and leaves the file tree unchanged", () => {
   });
   const nestedFile = createFileContextItem("src/lib/file1.js");
 
-  expect(summarizeEntries(getContextItemDisplayEntries([ask, nestedFile]))).toEqual(
-    [
-      { kind: "folder", label: "/ask" },
-      { id: ask.id, kind: "item", label: "what next" },
-      { kind: "folder", label: "src/lib" },
-      { id: nestedFile.id, kind: "item", label: "@file1.js" },
-    ],
-  );
+  expect(
+    summarizeEntries(getContextItemDisplayEntries([ask, nestedFile])),
+  ).toEqual([
+    { kind: "folder", label: "/ask" },
+    { id: ask.id, kind: "item", label: "what next" },
+    { kind: "folder", label: "src/lib" },
+    { id: nestedFile.id, kind: "item", label: "@file1.js" },
+  ]);
 });
 
 function summarizeEntries(
